@@ -7,15 +7,23 @@ services:
     envVars:
       - key: REDIS_URL
         fromService:
-          name: vlad-redis
           type: redis
+          name: vlad-redis
+          property: connectionString
+      - key: DATABASE_URL
+        fromDatabase:
+          name: vlad_db
+          property: connectionString
+
   - type: worker
     name: vlad-bingo-bot
     env: python
     startCommand: "python backend/bingo/bot/main.py"
+
+  - type: redis
+    name: vlad-redis
+    plan: free
+
 databases:
   - name: vlad_db
-    plan: free
-redis:
-  - name: vlad-redis
     plan: free
