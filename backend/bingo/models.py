@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
+import random
 
 class User(AbstractUser):
     is_agent = models.BooleanField(default=False)
@@ -12,6 +13,10 @@ class Transaction(models.Model):
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     running_balance = models.DecimalField(max_digits=12, decimal_places=2)
     note = models.TextField(blank=True)
+
+class PermanentCard(models.Model):
+    card_number = models.PositiveSmallIntegerField(unique=True)
+    board = models.JSONField() # Stores the 5x5 grid
 
 class GameRound(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
