@@ -1,3 +1,7 @@
+#!/bin/bash
+# VladBingo - Professional Compressed UI
+
+cat <<EOF > backend/bingo/templates/live_view.html
 <!DOCTYPE html>
 <html>
 <head>
@@ -79,3 +83,6 @@
     </script>
 </body>
 </html>
+EOF
+
+echo "✅ UI Updated to Professional Compressed Layout!"
