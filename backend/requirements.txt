@@ -1,0 +1,11 @@
+Django>=4.2
+djangorestframework
+python-telegram-bot
+requests
+python-dotenv
+daphne
+channels
+channels-redis
+dj-database-url
+whitenoise
+psycopg2-binary

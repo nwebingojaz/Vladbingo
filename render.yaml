@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: vlad-bingo-web
+    env: python
+    buildCommand: "./backend/build.sh"
+    startCommand: "python -m daphne vlad_bingo.asgi:application"
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          name: vlad-redis
+          type: redis
+  - type: worker
+    name: vlad-bingo-bot
+    env: python
+    startCommand: "python backend/bingo/bot/main.py"
+databases:
+  - name: vlad_db
+    plan: free
+redis:
+  - name: vlad-redis
+    plan: free
