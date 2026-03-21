@@ -3,8 +3,8 @@ services:
     name: vlad-bingo-web
     env: python
     buildCommand: "./backend/build.sh"
-    # Added 'backend.' prefix here
-    startCommand: "cd backend && python -m daphne vlad_bingo.asgi:application"
+    # We added -b 0.0.0.0 and -p $PORT here
+    startCommand: "cd backend && python -m daphne -b 0.0.0.0 -p $PORT vlad_bingo.asgi:application"
     envVars:
       - key: REDIS_URL
         fromService:
@@ -19,7 +19,6 @@ services:
   - type: worker
     name: vlad-bingo-bot
     env: python
-    # Added 'cd backend' to ensure imports work
     startCommand: "cd backend && python bingo/bot/main.py"
 
   - type: redis
