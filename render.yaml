@@ -3,7 +3,8 @@ services:
     name: vlad-bingo-web
     env: python
     buildCommand: "./backend/build.sh"
-    startCommand: "python backend/manage.py runserver 0.0.0.0:10000"
+    # THE KEY FIX: cd backend before starting
+    startCommand: "cd backend && python -m daphne -b 0.0.0.0 -p 10000 vlad_bingo.asgi:application"
     envVars:
       - key: REDIS_URL
         fromService:
@@ -19,7 +20,8 @@ services:
     name: vlad-bingo-bot
     env: python
     buildCommand: "./backend/build.sh"
-    startCommand: "python backend/bingo/bot/main.py"
+    # THE KEY FIX: cd backend before starting
+    startCommand: "cd backend && python bingo/bot/main.py"
 
   - type: redis
     name: vlad-redis
