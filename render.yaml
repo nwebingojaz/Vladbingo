@@ -23,7 +23,9 @@ services:
   - type: redis
     name: vlad-redis
     plan: free
+    ipAllowList: [] # This fixes the 'IP allow list' error
 
 databases:
   - name: vlad_db
     plan: free
+    ipAllowList: [] # This keeps your database secure and internal
