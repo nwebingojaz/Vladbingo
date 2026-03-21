@@ -3,7 +3,8 @@ services:
     name: vlad-bingo-web
     env: python
     buildCommand: "./backend/build.sh"
-    startCommand: "python -m daphne vlad_bingo.asgi:application"
+    # Added 'backend.' prefix here
+    startCommand: "cd backend && python -m daphne vlad_bingo.asgi:application"
     envVars:
       - key: REDIS_URL
         fromService:
@@ -18,14 +19,15 @@ services:
   - type: worker
     name: vlad-bingo-bot
     env: python
-    startCommand: "python backend/bingo/bot/main.py"
+    # Added 'cd backend' to ensure imports work
+    startCommand: "cd backend && python bingo/bot/main.py"
 
   - type: redis
     name: vlad-redis
     plan: free
-    ipAllowList: [] # This fixes the 'IP allow list' error
+    ipAllowList: []
 
 databases:
   - name: vlad_db
     plan: free
-    ipAllowList: [] # This keeps your database secure and internal
+    ipAllowList: []

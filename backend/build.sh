@@ -3,16 +3,13 @@
 set -o errexit
 
 # Install dependencies
-pip install -r backend/requirements.txt
-
-# Create static directory
-mkdir -p backend/staticfiles
+pip install -r requirements.txt
 
 # Collect static files
-python backend/manage.py collectstatic --no-input
+python manage.py collectstatic --no-input
 
-# EMERGENCY: Generate the migrations on the server since Termux is broken
-python backend/manage.py makemigrations bingo --no-input
+# Generate migrations
+python manage.py makemigrations bingo --no-input
 
 # Run migrations
-python backend/manage.py migrate --no-input
+python manage.py migrate --no-input
