@@ -3,8 +3,7 @@ services:
     name: vlad-bingo-web
     env: python
     buildCommand: "./backend/build.sh"
-    # We added -b 0.0.0.0 and -p $PORT here
-    startCommand: "cd backend && python -m daphne -b 0.0.0.0 -p $PORT vlad_bingo.asgi:application"
+    startCommand: "python backend/manage.py runserver 0.0.0.0:10000"
     envVars:
       - key: REDIS_URL
         fromService:
@@ -19,7 +18,8 @@ services:
   - type: worker
     name: vlad-bingo-bot
     env: python
-    startCommand: "cd backend && python bingo/bot/main.py"
+    buildCommand: "./backend/build.sh"
+    startCommand: "python backend/bingo/bot/main.py"
 
   - type: redis
     name: vlad-redis
