@@ -1,3 +1,35 @@
+#!/bin/bash
+# VladBingo - Interactive Markable Customer Card
+
+# 1. Update Views to include Card Data API
+cat <<EOF > backend/bingo/views.py
+from django.shortcuts import render
+from django.http import JsonResponse
+from .models import PermanentCard, User
+
+def live_view(request):
+    return render(request, 'live_view.html')
+
+def get_card_data(request, card_num):
+    try:
+        card = PermanentCard.objects.get(card_number=card_num)
+        return JsonResponse({'card_number': card.card_number, 'board': card.board})
+    except:
+        return JsonResponse({'error': 'Not found'}, status=404)
+EOF
+
+# 2. Update URLs
+cat <<EOF > backend/bingo/urls.py
+from django.urls import path
+from .views import live_view, get_card_data
+urlpatterns = [
+    path('live/', live_view, name='live_view'),
+    path('card-data/<int:card_num>/', get_card_data),
+]
+EOF
+
+# 3. Update the Live View (The Masterpiece UI)
+cat <<EOF > backend/bingo/templates/live_view.html
 <!DOCTYPE html>
 <html>
 <head>
@@ -89,3 +121,6 @@
     </script>
 </body>
 </html>
+EOF
+
+echo "✅ Interactive UI with Green Marking Added!"
