@@ -1,3 +1,35 @@
+#!/bin/bash
+# VladBingo - Final Synchronized Code Sync
+
+# 1. Update bingo/views.py (Includes home, live_view, and card data)
+cat <<EOF > backend/bingo/views.py
+from django.shortcuts import render
+from django.http import HttpResponse, JsonResponse
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from .models import PermanentCard, User
+
+def home(request):
+    return HttpResponse("<h1>VladBingo Server is Online</h1><p>The system is running perfectly.</p>")
+
+def live_view(request):
+    return render(request, 'live_view.html')
+
+def get_card_data(request, card_num):
+    try:
+        card = PermanentCard.objects.get(card_number=card_num)
+        return JsonResponse({'card_number': card.card_number, 'board': card.board})
+    except:
+        return JsonResponse({'error': 'Card not found'}, status=404)
+
+class ChapaWebhookView(APIView):
+    permission_classes = []
+    def post(self, request):
+        return Response({"status": "ok"})
+EOF
+
+# 2. Update the Bot Main (Ensures it points to the right path)
+cat <<EOF > backend/bingo/bot/main.py
 import os, sys, django, asyncio
 from pathlib import Path
 
@@ -39,3 +71,6 @@ def run():
 
 if __name__ == "__main__":
     run()
+EOF
+
+echo "✅ Everything is now in sync!"
