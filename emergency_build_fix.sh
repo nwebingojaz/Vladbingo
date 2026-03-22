@@ -1,3 +1,7 @@
+#!/bin/bash
+# VladBingo - Emergency Build Script to bypass DuplicateTable error
+
+cat <<EOF > backend/build.sh
 #!/usr/bin/env bash
 set -o errexit
 cd backend
@@ -18,3 +22,6 @@ python manage.py migrate --no-input
 
 # 5. Generate Bingo Cards
 python manage.py init_bingo || true
+EOF
+
+echo "✅ Emergency Build Script created!"
