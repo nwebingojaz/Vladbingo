@@ -1,3 +1,7 @@
+#!/bin/bash
+# VladBingo - Professional Bot Selector Fix
+
+cat <<EOF > backend/bingo/bot/main.py
 import os, sys, django, asyncio
 from pathlib import Path
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
@@ -69,3 +73,6 @@ def run():
 
 if __name__ == "__main__":
     run()
+EOF
+
+echo "✅ Selector logic updated!"
