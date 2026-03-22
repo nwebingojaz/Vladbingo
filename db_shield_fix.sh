@@ -1,3 +1,8 @@
+#!/bin/bash
+# VladBingo - Database Shield and Migration Force
+
+# 1. Update init_bingo.py to be more robust
+cat <<EOF > backend/bingo/management/commands/init_bingo.py
 from django.core.management.base import BaseCommand
 from django.db import connection
 from bingo.models import PermanentCard
@@ -26,3 +31,25 @@ class Command(BaseCommand):
             rows[2][2] = "FREE"
             PermanentCard.objects.create(card_number=i, board=rows)
         self.stdout.write("Success!")
+EOF
+
+# 2. Update build.sh to ensure migrations are CRITICAL
+cat <<EOF > backend/build.sh
+#!/usr/bin/env bash
+set -o errexit
+cd backend
+pip install -r requirements.txt
+python manage.py collectstatic --no-input
+
+# FORCE migration creation on the server
+python manage.py makemigrations --no-input
+python manage.py makemigrations bingo --no-input
+
+# APPLY migrations
+python manage.py migrate --no-input
+
+# Now run the generator
+python manage.py init_bingo
+EOF
+
+echo "✅ Database shield applied!"
