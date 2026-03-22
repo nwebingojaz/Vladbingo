@@ -1,3 +1,28 @@
+#!/bin/bash
+# VladBingo - Final Selector Engine
+
+# 1. Ensure the Model has 'selected_card'
+cat <<EOF > backend/bingo/models.py
+from django.db import models
+from django.contrib.auth.models import AbstractUser
+from django.utils import timezone
+
+class User(AbstractUser):
+    operational_credit = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    selected_card = models.PositiveSmallIntegerField(default=1)
+
+class PermanentCard(models.Model):
+    card_number = models.PositiveSmallIntegerField(unique=True)
+    board = models.JSONField()
+
+class GameRound(models.Model):
+    created_at = models.DateTimeField(default=timezone.now)
+    called_numbers = models.JSONField(default=list)
+    status = models.CharField(max_length=16, default="PENDING")
+EOF
+
+# 2. Fix the Bot to handle number selection
+cat <<EOF > backend/bingo/bot/main.py
 import os, sys, django, asyncio
 from pathlib import Path
 
@@ -50,3 +75,6 @@ def run():
     app.run_polling()
 
 if __name__ == "__main__": run()
+EOF
+
+echo "✅ Selector Engine ready for push!"
