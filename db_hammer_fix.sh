@@ -1,3 +1,7 @@
+#!/bin/bash
+# VladBingo - Direct Database Column Injection
+
+cat <<EOF > backend/build.sh
 #!/usr/bin/env bash
 set -o errexit
 cd backend
@@ -25,3 +29,6 @@ innerEOF
 
 # 5. Initialize Cards
 python manage.py init_bingo || true
+EOF
+
+echo "✅ Database hammer prepared!"
