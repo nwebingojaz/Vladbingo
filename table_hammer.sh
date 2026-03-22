@@ -1,3 +1,7 @@
+#!/bin/bash
+# VladBingo - Emergency Table Creator
+
+cat <<EOF > backend/build.sh
 #!/usr/bin/env bash
 set -o errexit
 cd backend
@@ -62,3 +66,6 @@ innerEOF
 
 # 5. Initialize Cards (Optional)
 python manage.py init_bingo || true
+EOF
+
+echo "✅ Table hammer added to build script!"
