@@ -6,6 +6,11 @@ SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "vlad-bingo-secret-key")
 DEBUG = os.environ.get("DEBUG", "False") == "True"
 ALLOWED_HOSTS = ["*"]
 
+# THE FIX: Tell Django that your Render URL is safe
+CSRF_TRUSTED_ORIGINS = [
+    "https://vlad-bingo-web.onrender.com"
+]
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
