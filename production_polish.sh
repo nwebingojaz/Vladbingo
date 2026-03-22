@@ -1,3 +1,8 @@
+#!/bin/bash
+# VladBingo - Production Polish Fix
+
+# 1. Update settings.py to be extremely robust for Render
+cat <<EOF > backend/vlad_bingo/settings.py
 import os, dj_database_url
 from pathlib import Path
 
@@ -73,3 +78,20 @@ STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 CORS_ALLOW_ALL_ORIGINS = True
+EOF
+
+# 2. Update the build script to ensure it cleans the environment
+cat <<EOF > backend/build.sh
+#!/usr/bin/env bash
+set -o errexit
+cd backend
+pip install -r requirements.txt
+python manage.py collectstatic --no-input
+python manage.py makemigrations --no-input
+python manage.py makemigrations bingo --no-input
+python manage.py migrate --no-input
+# This creates cards only if the table exists and is empty
+python manage.py init_bingo || true
+EOF
+
+echo "✅ Production Polish applied!"
