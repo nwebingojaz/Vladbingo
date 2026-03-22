@@ -1,3 +1,7 @@
+#!/bin/bash
+# VladBingo - Unique Card Selector Logic
+
+cat <<EOF > backend/bingo/bot/main.py
 import os, sys, django, asyncio
 from pathlib import Path
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
@@ -23,7 +27,7 @@ async def start(update: Update, context):
            f"💰 **Balance:** {user.operational_credit} ETB\n\n"
            f"🛠 **Commands:**\n"
            f"Type **/select <number>** to pick a new lucky card.\n"
-           f"Example: `/select 7`")
+           f"Example: \`/select 7\`")
     
     kbd = [
         [InlineKeyboardButton("🏆 ENTER LIVE HALL", web_app=WebAppInfo(url=live_url))],
@@ -37,7 +41,7 @@ async def select_card(update: Update, context):
     user = User.objects.get(username=f"tg_{uid}")
 
     if not context.args:
-        await update.message.reply_text("❌ Please provide a number. Example: `/select 25`", parse_mode='Markdown')
+        await update.message.reply_text("❌ Please provide a number. Example: \`/select 25\`", parse_mode='Markdown')
         return
 
     try:
@@ -81,3 +85,6 @@ def run():
 
 if __name__ == "__main__":
     run()
+EOF
+
+echo "✅ Unique Selector Logic Applied!"
