@@ -1,3 +1,16 @@
+#!/bin/bash
+# VladBingo - Final Admin and App Sync
+
+# 1. Fix bingo/apps.py (Ensure the name matches exactly)
+cat <<EOF > backend/bingo/apps.py
+from django.apps import AppConfig
+class BingoConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'bingo'
+EOF
+
+# 2. Fix bingo/admin.py (The registration logic)
+cat <<EOF > backend/bingo/admin.py
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import User, PermanentCard, GameRound, Transaction
@@ -26,3 +39,10 @@ class GameRoundAdmin(admin.ModelAdmin):
 @admin.register(Transaction)
 class TransactionAdmin(admin.ModelAdmin):
     list_display = ('agent', 'amount', 'timestamp')
+EOF
+
+# 3. Ensure bingo is in settings.py INSTALLED_APPS
+# (Just in case it was missing)
+sed -i "s/'bingo'/'bingo.apps.BingoConfig'/g" backend/vlad_bingo/settings.py
+
+echo "✅ Admin Logic Rebuilt!"
