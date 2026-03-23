@@ -1,3 +1,38 @@
+#!/bin/bash
+# VladBingo - Total System Integrity Fix
+
+# 1. WRITE THE FULL MODELS (No models left behind!)
+cat <<EOF > backend/bingo/models.py
+from django.db import models
+from django.contrib.auth.models import AbstractUser
+from django.utils import timezone
+
+class User(AbstractUser):
+    operational_credit = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    selected_card = models.PositiveSmallIntegerField(default=1)
+    is_agent = models.BooleanField(default=False)
+
+class PermanentCard(models.Model):
+    card_number = models.PositiveSmallIntegerField(unique=True)
+    board = models.JSONField()
+
+class GameRound(models.Model):
+    created_at = models.DateTimeField(default=timezone.now)
+    called_numbers = models.JSONField(default=list)
+    status = models.CharField(max_length=16, default="PENDING")
+    amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+class Transaction(models.Model):
+    agent = models.ForeignKey("User", on_delete=models.CASCADE)
+    timestamp = models.DateTimeField(default=timezone.now)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    type = models.CharField(max_length=20, default="DEPOSIT")
+    status = models.CharField(max_length=20, default="SUCCESS")
+    note = models.TextField(blank=True)
+EOF
+
+# 2. WRITE THE BOT (Selector + 20 ETB Deposit + Withdraw)
+cat <<EOF > backend/bingo/bot/main.py
 import os, sys, django, asyncio
 from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -65,3 +100,25 @@ def run():
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__": run()
+EOF
+
+# 3. FIX ADMIN (Registering all models)
+cat <<EOF > backend/bingo/admin.py
+from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from .models import User, PermanentCard, GameRound, Transaction
+
+try: admin.site.unregister(User)
+except: pass
+
+@admin.register(User)
+class CustomUserAdmin(BaseUserAdmin):
+    fieldsets = BaseUserAdmin.fieldsets + (('Bingo', {'fields': ('operational_credit', 'selected_card')}),)
+    list_display = ('username', 'operational_credit', 'selected_card')
+
+admin.site.register(PermanentCard)
+admin.site.register(GameRound)
+admin.site.register(Transaction)
+EOF
+
+echo "✅ Integrity System Rebuilt!"
