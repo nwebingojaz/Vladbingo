@@ -1,3 +1,7 @@
+#!/bin/bash
+# VladBingo - Connection Reset & Force Reply
+
+cat <<EOF > backend/bingo/bot/main.py
 import os, sys, django, asyncio
 from pathlib import Path
 
@@ -65,3 +69,6 @@ def run():
 
 if __name__ == "__main__":
     run()
+EOF
+
+echo "✅ Connection Reset code applied!"
