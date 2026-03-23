@@ -1,83 +1,75 @@
 import os, sys, django, asyncio
 from pathlib import Path
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
-# Setup Paths
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(BASE_DIR))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "vlad_bingo.settings")
 django.setup()
 
-from bingo.models import User
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
+from bingo.models import User, Transaction
+from bingo.services.chapa import get_deposit_link
 
 async def start(update: Update, context):
     uid = update.effective_user.id
     user, _ = User.objects.get_or_create(username=f"tg_{uid}")
-    
     live_url = f"https://vlad-bingo-web.onrender.com/api/live/?card={user.selected_card}"
     
-    msg = (f"🎮 **VLAD BINGO SESSION** 🎮\n\n"
-           f"👤 **Player:** {update.effective_user.first_name}\n"
-           f"🎫 **Your Active Card:** #{user.selected_card}\n"
-           f"💰 **Balance:** {user.operational_credit} ETB\n\n"
-           f"🛠 **Commands:**\n"
-           f"Type **/select <number>** to pick a new lucky card.\n"
-           f"Example: `/select 7`")
+    msg = (f"🎰 **VLAD BINGO LIVE** 🎰\n\n"
+           f"👤 Player: {update.effective_user.first_name}\n"
+           f"🎫 Active Card: #**{user.selected_card}**\n"
+           f"💰 Balance: {user.operational_credit} ETB\n\n"
+           f"Commands:\n/select <1-100> - Pick a card\n/deposit <amount> - Add ETB\n/withdraw <amount> - Cash out")
     
-    kbd = [
-        [InlineKeyboardButton("🏆 ENTER LIVE HALL", web_app=WebAppInfo(url=live_url))],
-        [InlineKeyboardButton("🎲 Change My Card", callback_data="hint")]
-    ]
-    
+    kbd = [[InlineKeyboardButton("🎮 OPEN LIVE HALL", web_app=WebAppInfo(url=live_url))]]
     await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(kbd), parse_mode='Markdown')
 
-async def select_card(update: Update, context):
-    uid = update.effective_user.id
-    user = User.objects.get(username=f"tg_{uid}")
-
-    if not context.args:
-        await update.message.reply_text("❌ Please provide a number. Example: `/select 25`", parse_mode='Markdown')
-        return
-
+async def select(update, context):
     try:
-        requested_num = int(context.args[0])
-        
-        if not (1 <= requested_num <= 100):
-            await update.message.reply_text("❌ Pick a number between 1 and 100.")
+        num = int(context.args[0])
+        if not (1 <= num <= 100): raise ValueError
+        uid = update.effective_user.id
+        # Unique check
+        if User.objects.filter(selected_card=num).exclude(username=f"tg_{uid}").exists():
+            await update.message.reply_text(f"🚫 Card #{num} is already taken!")
             return
+        user = User.objects.get(username=f"tg_{uid}")
+        user.selected_card = num
+        user.save()
+        await update.message.reply_text(f"✅ You now own Card #{num}!")
+    except:
+        await update.message.reply_text("Usage: /select 45")
 
-        # THE UNIQUE CHECK: Is anyone else using this card?
-        # We exclude the current user from the check
-        is_taken = User.objects.filter(selected_card=requested_num).exclude(id=user.id).exists()
+async def deposit(update, context):
+    try:
+        amount = int(context.args[0])
+        user = User.objects.get(username=f"tg_{update.effective_user.id}")
+        res = get_deposit_link(user, amount)
+        link = res['data']['checkout_url']
+        await update.message.reply_text(f"💳 [Click here to pay {amount} ETB]({link})", parse_mode='Markdown')
+    except:
+        await update.message.reply_text("Usage: /deposit 100")
 
-        if is_taken:
-            await update.message.reply_text(f"🚫 **Card #{requested_num} is ALREADY TAKEN!**\nPlease pick another lucky number.", parse_mode='Markdown')
+async def withdraw(update, context):
+    try:
+        amt = int(context.args[0])
+        user = User.objects.get(username=f"tg_{update.effective_user.id}")
+        if user.operational_credit >= amt:
+            Transaction.objects.create(agent=user, amount=-amt, type="WITHDRAWAL")
+            await update.message.reply_text(f"✅ Withdrawal request for {amt} ETB sent to admin!")
         else:
-            user.selected_card = requested_num
-            user.save()
-            
-            live_url = f"https://vlad-bingo-web.onrender.com/api/live/?card={requested_num}"
-            kbd = [[InlineKeyboardButton("🎮 JOIN WITH CARD #"+str(requested_num), web_app=WebAppInfo(url=live_url))]]
-            
-            await update.message.reply_text(
-                f"✅ **Success!** You now own **Card #{requested_num}** for the next round.",
-                reply_markup=InlineKeyboardMarkup(kbd),
-                parse_mode='Markdown'
-            )
-
-    except ValueError:
-        await update.message.reply_text("❌ Invalid input. Please use a number.")
+            await update.message.reply_text("❌ Insufficient balance.")
+    except:
+        await update.message.reply_text("Usage: /withdraw 500")
 
 def run():
-    token = os.environ.get("TELEGRAM_BOT_TOKEN")
-    app = Application.builder().token(token).build()
-    
+    app = Application.builder().token(os.environ.get("TELEGRAM_BOT_TOKEN")).build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("select", select_card))
-    
-    print("🤖 Bot is Online with Unique Selector...")
+    app.add_handler(CommandHandler("select", select))
+    app.add_handler(CommandHandler("deposit", deposit))
+    app.add_handler(CommandHandler("withdraw", withdraw))
+    print("🤖 Bot Fully Armed and Online...")
     app.run_polling()
 
-if __name__ == "__main__":
-    run()
+if __name__ == "__main__": run()
