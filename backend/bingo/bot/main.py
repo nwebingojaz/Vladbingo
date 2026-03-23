@@ -1,67 +1,34 @@
 import os, sys, django, asyncio
 from pathlib import Path
+
+# Fix paths
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(BASE_DIR))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "vlad_bingo.settings")
 django.setup()
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from telegram.ext import Application, CommandHandler, MessageHandler, filters
-from bingo.models import User, Transaction
-from bingo.services.chapa import get_deposit_link
+from telegram import Update
+from telegram.ext import Application, CommandHandler
+from bingo.models import User
 
 async def start(update: Update, context):
     uid = update.effective_user.id
     user, _ = User.objects.get_or_create(username=f"tg_{uid}")
-    live_url = f"https://vlad-bingo-web.onrender.com/api/live/?card={user.selected_card}"
-    msg = (f"🎰 **VLAD BINGO LIVE** 🎰\n\n"
-           f"🎫 Your Card: #**{user.selected_card}**\n"
-           f"💰 Balance: {user.operational_credit} ETB\n\n"
-           f"🕹 **COMMANDS:**\n"
-           f"1️⃣ Type **/select <number>** to pick card\n"
-           f"2️⃣ Type **/deposit <amount>** (Min 20 ETB)\n"
-           f"3️⃣ Type **/withdraw <amount>** to cash out")
-    kbd = [[InlineKeyboardButton("🎮 OPEN LIVE HALL", web_app=WebAppInfo(url=live_url))]]
-    await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(kbd), parse_mode='Markdown')
-
-async def select(update, context):
-    try:
-        num = int(context.args[0])
-        if not (1 <= num <= 100): raise ValueError
-        uid = update.effective_user.id
-        if User.objects.filter(selected_card=num).exclude(username=f"tg_{uid}").exists():
-            await update.message.reply_text(f"🚫 Card #{num} is ALREADY TAKEN!")
-            return
-        user = User.objects.get(username=f"tg_{uid}")
-        user.selected_card = num
-        user.save()
-        await update.message.reply_text(f"✅ Card updated to #**{num}**!", parse_mode='Markdown')
-    except:
-        await update.message.reply_text("Usage: /select 45")
-
-async def deposit(update, context):
-    try:
-        amount = int(context.args[0])
-        if amount < 20:
-            await update.message.reply_text("⚠️ Minimum deposit is 20 Birr.")
-            return
-        user = User.objects.get(username=f"tg_{update.effective_user.id}")
-        res = get_deposit_link(user, amount)
-        link = res['data']['checkout_url']
-        await update.message.reply_text(f"💳 [Click here to pay {amount} ETB]({link})", parse_mode='Markdown')
-    except:
-        await update.message.reply_text("Usage: /deposit 100")
+    await update.message.reply_text(f"✅ VladBingo is LIVE!\nBalance: {user.operational_credit} ETB")
 
 async def post_init(app):
-    await app.bot.delete_webhook()
+    # This clears any old connections immediately
+    await app.bot.delete_webhook(drop_pending_updates=True)
+    print("🚀 Fresh bot session started.")
 
 def run():
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    if not token:
+        print("Error: No Token")
+        return
     app = Application.builder().token(token).post_init(post_init).build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("select", select))
-    app.add_handler(CommandHandler("deposit", deposit))
-    print("🤖 Bot Fully Integrity Verified...")
     app.run_polling(drop_pending_updates=True)
 
-if __name__ == "__main__": run()
+if __name__ == "__main__":
+    run()
