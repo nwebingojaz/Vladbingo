@@ -1,3 +1,8 @@
+#!/bin/bash
+# VladBingo - Automated Dealer & Multi-Card Warning
+
+# 1. Update the Bot Main with the Automated Caller
+cat <<'EOF' > backend/bingo/bot/main.py
 import os, sys, django, asyncio, random
 from pathlib import Path
 from asgiref.sync import sync_to_async
@@ -76,3 +81,6 @@ def run():
     app.run_polling()
 
 if __name__ == "__main__": run()
+EOF
+
+echo "✅ Game Engine & Dealer Loop Applied!"
