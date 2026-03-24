@@ -7,8 +7,9 @@ except: pass
 
 @admin.register(User)
 class CustomUserAdmin(BaseUserAdmin):
-    fieldsets = BaseUserAdmin.fieldsets + (('Bingo', {'fields': ('operational_credit', 'selected_card')}),)
-    list_display = ('username', 'operational_credit', 'selected_card')
+    # Fixed: Changed selected_card to selected_cards
+    fieldsets = BaseUserAdmin.fieldsets + (('Bingo', {'fields': ('operational_credit', 'selected_cards')}),)
+    list_display = ('username', 'operational_credit', 'selected_cards')
 
 admin.site.register(PermanentCard)
 admin.site.register(GameRound)
