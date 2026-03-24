@@ -1,3 +1,7 @@
+#!/bin/bash
+# VladBingo - Async Database Shield Fix
+
+cat <<'EOF' > backend/bingo/bot/main.py
 import os, sys, django, asyncio
 from pathlib import Path
 from asgiref.sync import sync_to_async
@@ -47,3 +51,6 @@ def run():
 
 if __name__ == "__main__":
     run()
+EOF
+
+echo "✅ Async Shield applied to Bot logic!"
