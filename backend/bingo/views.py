@@ -1,13 +1,18 @@
 from django.shortcuts import render
-from django.http import HttpResponse, JsonResponse
+from django.http import JsonResponse
 from .models import User, PermanentCard
-def home(request): return HttpResponse("<h1>VladBingo Online</h1>")
-def live_view(request): return render(request, 'live_view.html')
+
+def live_view(request):
+    return render(request, 'live_view.html')
+
 def get_user_card(request, tg_id):
     try:
         user = User.objects.get(username=f"tg_{tg_id}")
-        card = PermanentCard.objects.get(card_number=user.selected_cards[0])
-        return JsonResponse({'card_number': card.card_number, 'board': card.board})
+        # Always show the last card they added
+        if user.selected_cards:
+            card_to_show = user.selected_cards[-1]
+            card = PermanentCard.objects.get(card_number=card_to_show)
+            return JsonResponse({'card_number': card.card_number, 'board': card.board})
+        return JsonResponse({'error': 'No cards selected'}, status=404)
     except:
-        card = PermanentCard.objects.first()
-        return JsonResponse({'card_number': 1, 'board': card.board if card else []})
+        return JsonResponse({'error': 'Not found'}, status=404)
