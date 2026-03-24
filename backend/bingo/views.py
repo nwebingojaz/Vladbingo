@@ -1,17 +1,26 @@
 from django.shortcuts import render
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
+from rest_framework.views import APIView
+from rest_framework.response import Response
 from .models import User, PermanentCard
+
+def home(request):
+    return HttpResponse("<h1>VladBingo Server is Online</h1>")
 
 def live_view(request):
     return render(request, 'live_view.html')
 
 def get_user_card(request, tg_id):
-    """The Mini App calls this to find out which card the user owns right now"""
     try:
         user = User.objects.get(username=f"tg_{tg_id}")
         card = PermanentCard.objects.get(card_number=user.selected_card)
         return JsonResponse({'card_number': card.card_number, 'board': card.board})
-    except:
-        # If user hasn't picked a card, default to 1 (or show error)
+    except Exception as e:
+        # Fallback to Card #1 if user/card not found
         card = PermanentCard.objects.first()
-        return JsonResponse({'card_number': card.card_number, 'board': card.board})
+        return JsonResponse({'card_number': 1, 'board': card.board if card else []})
+
+class ChapaWebhookView(APIView):
+    permission_classes = []
+    def post(self, request):
+        return Response({"status": "ok"})

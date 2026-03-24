@@ -1,3 +1,49 @@
+#!/bin/bash
+# VladBingo - Final Synchronized Logic (Home + Live + Dynamic Sync)
+
+# 1. Update bingo/views.py (Includes EVERYTHING)
+cat <<EOF > backend/bingo/views.py
+from django.shortcuts import render
+from django.http import HttpResponse, JsonResponse
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from .models import User, PermanentCard
+
+def home(request):
+    return HttpResponse("<h1>VladBingo Server is Online</h1>")
+
+def live_view(request):
+    return render(request, 'live_view.html')
+
+def get_user_card(request, tg_id):
+    try:
+        user = User.objects.get(username=f"tg_{tg_id}")
+        card = PermanentCard.objects.get(card_number=user.selected_card)
+        return JsonResponse({'card_number': card.card_number, 'board': card.board})
+    except Exception as e:
+        # Fallback to Card #1 if user/card not found
+        card = PermanentCard.objects.first()
+        return JsonResponse({'card_number': 1, 'board': card.board if card else []})
+
+class ChapaWebhookView(APIView):
+    permission_classes = []
+    def post(self, request):
+        return Response({"status": "ok"})
+EOF
+
+# 2. Update bingo/urls.py
+cat <<EOF > backend/bingo/urls.py
+from django.urls import path
+from .views import live_view, get_user_card, ChapaWebhookView
+urlpatterns = [
+    path('live/', live_view, name='live_view'),
+    path('chapa-webhook/', ChapaWebhookView.as_view()),
+    path('user-card-data/<int:tg_id>/', get_user_card),
+]
+EOF
+
+# 3. Update Mini App Template (Self-Updating based on User ID)
+cat <<EOF > backend/bingo/templates/live_view.html
 <!DOCTYPE html>
 <html>
 <head>
@@ -51,3 +97,6 @@
     </script>
 </body>
 </html>
+EOF
+
+echo "✅ All files synchronized and ready!"
