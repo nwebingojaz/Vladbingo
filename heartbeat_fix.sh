@@ -1,3 +1,7 @@
+#!/bin/bash
+# VladBingo - Full Feature Heartbeat (The Final Sync)
+
+cat <<'EOF' > backend/bingo/bot/main.py
 import os, sys, django, asyncio, random
 from pathlib import Path
 from asgiref.sync import sync_to_async
@@ -108,3 +112,6 @@ def run():
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__": run()
+EOF
+
+echo "✅ Heartbeat Fix Applied!"
