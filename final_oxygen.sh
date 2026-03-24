@@ -1,3 +1,25 @@
+#!/bin/bash
+# VladBingo - Final Sync & Features (Select, Deposit, Withdraw)
+
+# 1. Fix Chapa Service (Ensure function name is init_deposit)
+cat <<EOF > backend/bingo/services/chapa.py
+import os, requests, uuid
+CHAPA_KEY = os.environ.get("CHAPA_SECRET_KEY")
+WEBHOOK = os.environ.get("WEBHOOK_URL")
+
+def init_deposit(user, amount):
+    ref = f"dep-{uuid.uuid4().hex[:6]}"
+    payload = {
+        "amount": str(amount), "currency": "ETB", "tx_ref": ref,
+        "email": f"user_{user.id}@vladbingo.com", "callback_url": WEBHOOK
+    }
+    headers = {"Authorization": f"Bearer {CHAPA_KEY}"}
+    res = requests.post("https://api.chapa.co/v1/transaction/initialize", json=payload, headers=headers)
+    return res.json(), ref
+EOF
+
+# 2. Fix Bot Main (Matching the function names + Adding Withdraw)
+cat <<'EOF' > backend/bingo/bot/main.py
 import os, sys, django, asyncio
 from pathlib import Path
 from asgiref.sync import sync_to_async
@@ -94,3 +116,6 @@ def run():
     app.run_polling()
 
 if __name__ == "__main__": run()
+EOF
+
+echo "✅ Oxygen Fix applied! All names synced."
