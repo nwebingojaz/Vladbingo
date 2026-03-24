@@ -1,3 +1,39 @@
+#!/bin/bash
+# VladBingo - Dynamic Card Sync (Final Polish)
+
+# 1. Update Views.py (Add endpoint to find card by Telegram ID)
+cat <<EOF > backend/bingo/views.py
+from django.shortcuts import render
+from django.http import JsonResponse
+from .models import User, PermanentCard
+
+def live_view(request):
+    return render(request, 'live_view.html')
+
+def get_user_card(request, tg_id):
+    """The Mini App calls this to find out which card the user owns right now"""
+    try:
+        user = User.objects.get(username=f"tg_{tg_id}")
+        card = PermanentCard.objects.get(card_number=user.selected_card)
+        return JsonResponse({'card_number': card.card_number, 'board': card.board})
+    except:
+        # If user hasn't picked a card, default to 1 (or show error)
+        card = PermanentCard.objects.first()
+        return JsonResponse({'card_number': card.card_number, 'board': card.board})
+EOF
+
+# 2. Update URLs
+cat <<EOF > backend/bingo/urls.py
+from django.urls import path
+from .views import live_view, get_user_card
+urlpatterns = [
+    path('live/', live_view),
+    path('user-card-data/<int:tg_id>/', get_user_card),
+]
+EOF
+
+# 3. Update Mini App (live_view.html) to be Dynamic
+cat <<EOF > backend/bingo/templates/live_view.html
 <!DOCTYPE html>
 <html>
 <head>
@@ -53,3 +89,6 @@
     </script>
 </body>
 </html>
+EOF
+
+echo "✅ Dynamic Card Sync Applied!"

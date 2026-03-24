@@ -1,6 +1,6 @@
 from django.urls import path
-from .views import live_view, get_card_data
+from .views import live_view, get_user_card
 urlpatterns = [
-    path('live/', live_view, name='live_view'),
-    path('card-data/<int:card_num>/', get_card_data),
+    path('live/', live_view),
+    path('user-card-data/<int:tg_id>/', get_user_card),
 ]
