@@ -1,8 +1,7 @@
 import os, requests, uuid
-CHAPA_KEY = os.environ.get("CHAPA_SECRET_KEY")
-WEBHOOK = os.environ.get("WEBHOOK_URL")
-
 def init_deposit(user, amount):
+    CHAPA_KEY = os.environ.get("CHAPA_SECRET_KEY")
+    WEBHOOK = os.environ.get("WEBHOOK_URL")
     ref = f"dep-{uuid.uuid4().hex[:6]}"
     payload = {
         "amount": str(amount), "currency": "ETB", "tx_ref": ref,

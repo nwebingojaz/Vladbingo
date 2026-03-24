@@ -1,3 +1,29 @@
+#!/bin/bash
+# VladBingo - Deep Clean & Import Fix
+
+# 1. Ensure all directories have __init__.py (Crucial for Imports!)
+touch backend/bingo/__init__.py
+touch backend/bingo/services/__init__.py
+touch backend/bingo/bot/__init__.py
+
+# 2. Rewrite Chapa Service with correct name
+cat <<EOF > backend/bingo/services/chapa.py
+import os, requests, uuid
+def init_deposit(user, amount):
+    CHAPA_KEY = os.environ.get("CHAPA_SECRET_KEY")
+    WEBHOOK = os.environ.get("WEBHOOK_URL")
+    ref = f"dep-{uuid.uuid4().hex[:6]}"
+    payload = {
+        "amount": str(amount), "currency": "ETB", "tx_ref": ref,
+        "email": f"user_{user.id}@vladbingo.com", "callback_url": WEBHOOK
+    }
+    headers = {"Authorization": f"Bearer {CHAPA_KEY}"}
+    res = requests.post("https://api.chapa.co/v1/transaction/initialize", json=payload, headers=headers)
+    return res.json(), ref
+EOF
+
+# 3. Rewrite Bot Main with Path Insurance
+cat <<'EOF' > backend/bingo/bot/main.py
 import os, sys, django, asyncio
 from pathlib import Path
 from asgiref.sync import sync_to_async
@@ -58,3 +84,6 @@ def run():
     app.run_polling()
 
 if __name__ == "__main__": run()
+EOF
+
+echo "✅ Deep Clean & Path Fix Applied!"
