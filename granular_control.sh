@@ -1,3 +1,35 @@
+#!/bin/bash
+# VladBingo - Granular Card Control (Add/Remove/Clear)
+
+# 1. Ensure Models are correct
+cat <<EOF > backend/bingo/models.py
+from django.db import models
+from django.contrib.auth.models import AbstractUser
+from django.utils import timezone
+
+class User(AbstractUser):
+    operational_credit = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    selected_cards = models.JSONField(default=list)
+    bot_state = models.CharField(max_length=20, default="IDLE") # IDLE, SELECTING, REMOVING, DEPOSITING
+
+class PermanentCard(models.Model):
+    card_number = models.PositiveSmallIntegerField(unique=True)
+    board = models.JSONField()
+
+class GameRound(models.Model):
+    created_at = models.DateTimeField(default=timezone.now)
+    called_numbers = models.JSONField(default=list)
+    status = models.CharField(max_length=16, default="PENDING")
+
+class Transaction(models.Model):
+    agent = models.ForeignKey("User", on_delete=models.CASCADE)
+    timestamp = models.DateTimeField(default=timezone.now)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    type = models.CharField(max_length=20, default="DEPOSIT")
+EOF
+
+# 2. Updated Bot with "Unselect" Option
+cat <<'EOF' > backend/bingo/bot/main.py
 import os, sys, django, asyncio
 from pathlib import Path
 from asgiref.sync import sync_to_async
@@ -105,3 +137,6 @@ def run():
     app.run_polling()
 
 if __name__ == "__main__": run()
+EOF
+
+echo "✅ Granular Control Applied! (Add/Remove Card)"

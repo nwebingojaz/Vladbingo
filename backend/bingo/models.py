@@ -4,7 +4,8 @@ from django.utils import timezone
 
 class User(AbstractUser):
     operational_credit = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    selected_card = models.PositiveSmallIntegerField(default=0) # 0 means no card selected
+    selected_cards = models.JSONField(default=list)
+    bot_state = models.CharField(max_length=20, default="IDLE") # IDLE, SELECTING, REMOVING, DEPOSITING
 
 class PermanentCard(models.Model):
     card_number = models.PositiveSmallIntegerField(unique=True)
