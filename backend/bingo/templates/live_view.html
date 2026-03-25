@@ -21,7 +21,7 @@
     <script>
         const tg = window.Telegram.WebApp;
         const uid = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : 0;
-        fetch('/api/user-card-data/' + uid + '/').then(r=>r.json()).then(data=>{
+        fetch('/api/game-info/' + uid + '/').then(r=>r.json()).then(data=>{
             data.board.forEach(row => row.forEach(val => {
                 const cell = document.createElement('div');
                 cell.className = 'card-cell';

@@ -1,3 +1,8 @@
+#!/bin/bash
+# VladBingo - Final Business Logic & Name Sync
+
+# 1. Update views.py (Correct names: home, live_view, get_game_info, check_win)
+cat <<'EOF' > backend/bingo/views.py
 from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
 from .models import User, PermanentCard, GameRound, Transaction
@@ -63,3 +68,21 @@ def check_win(request, tg_id):
 
 class ChapaWebhookView(import_rest_framework.APIView):
     def post(self, request): return Response({"status": "ok"})
+EOF
+
+# 2. Update urls.py (Matching the names exactly)
+cat <<'EOF' > backend/bingo/urls.py
+from django.urls import path
+from .views import live_view, get_game_info, check_win
+urlpatterns = [
+    path('live/', live_view),
+    path('game-info/<int:tg_id>/', get_game_info),
+    path('check-win/<int:tg_id>/', check_win),
+]
+EOF
+
+# 3. Update Mini App JS to call the correct names
+sed -i 's/user-card-data/game-info/g' backend/bingo/templates/live_view.html
+sed -i 's/check-win/check-win/g' backend/bingo/templates/live_view.html
+
+echo "✅ Business logic and names synchronized!"

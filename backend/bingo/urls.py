@@ -1,7 +1,7 @@
 from django.urls import path
-from .views import live_view, get_user_card, check_win
+from .views import live_view, get_game_info, check_win
 urlpatterns = [
     path('live/', live_view),
-    path('user-card-data/<int:tg_id>/', get_user_card),
+    path('game-info/<int:tg_id>/', get_game_info),
     path('check-win/<int:tg_id>/', check_win),
 ]
