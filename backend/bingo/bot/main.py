@@ -2,71 +2,61 @@ import os, sys, django, asyncio, random
 from pathlib import Path
 from asgiref.sync import sync_to_async
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler
 from channels.layers import get_channel_layer
+from decimal import Decimal
 
+# Setup Paths
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(BASE_DIR))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "vlad_bingo.settings")
 django.setup()
 
 from bingo.models import User, GameRound
-from bingo.services.chapa import init_deposit
 
-def db_get_user(uid, name):
-    return User.objects.get_or_create(username=f"tg_{uid}", defaults={'first_name': name})[0]
+def db_get_user(uid):
+    return User.objects.get_or_create(username=f"tg_{uid}")[0]
 
 async def start(update: Update, context):
-    user = await sync_to_async(db_get_user)(update.effective_user.id, update.effective_user.first_name)
-    user.bot_state = "IDLE"; await sync_to_async(user.save)()
-    cards = ", ".join([f"#{c}" for c in user.selected_cards]) if user.selected_cards else "❌ None"
-    msg = f"🎰 **VLAD BINGO CENTER** 🎰\n\n🎫 **Your Cards:** {cards}\n💰 **Balance:** {user.operational_credit} ETB\n\nChoose an action:"
-    kbd = [[InlineKeyboardButton("🎮 ENTER LIVE HALL", web_app=WebAppInfo(url="https://vlad-bingo-web.onrender.com/api/live/"))],
-           [InlineKeyboardButton("➕ Add Card", callback_data="add"), InlineKeyboardButton("➖ Remove", callback_data="rem")],
-           [InlineKeyboardButton("💳 Deposit", callback_data="dep"), InlineKeyboardButton("🏧 Withdraw", callback_data="wd")],
-           [InlineKeyboardButton("🗑 Clear All", callback_data="clear")]]
+    user = await sync_to_async(db_get_user)(update.effective_user.id)
+    cards_txt = ", ".join([f"#{c}" for c in user.selected_cards]) if user.selected_cards else "None"
+    msg = f"🎰 **VLAD BINGO** 🎰\n💰 Balance: {user.operational_credit} ETB\n🎫 Cards: {cards_txt}\n\nPick Buy-in:"
+    kbd = [[InlineKeyboardButton("💵 20", callback_data="bet_20"), InlineKeyboardButton("💵 40", callback_data="bet_40")],
+           [InlineKeyboardButton("🎮 LIVE HALL", web_app=WebAppInfo(url="https://vlad-bingo-web.onrender.com/api/live/"))]]
     await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(kbd), parse_mode='Markdown')
 
-async def button_handler(update, context):
-    q = update.callback_query; await q.answer()
-    user = await sync_to_async(db_get_user)(q.from_user.id, "")
-    if q.data == "add": user.bot_state = "SELECTING"; await q.edit_message_text("🔢 Type Card # to **ADD**:")
-    elif q.data == "rem": user.bot_state = "REMOVING"; await q.edit_message_text("🔢 Type Card # to **REMOVE**:")
-    elif q.data == "dep": user.bot_state = "DEPOSITING"; await q.edit_message_text("💵 Amount to deposit (Min 20):")
-    elif q.data == "wd": user.bot_state = "WITHDRAWING"; await q.edit_message_text("🏧 Amount to withdraw:")
-    elif q.data == "clear": user.selected_cards = []; await sync_to_async(user.save)(); await q.edit_message_text("🗑 All cards cleared!")
-    await sync_to_async(user.save)()
-
-async def text_handler(update, context):
-    user = await sync_to_async(db_get_user)(update.effective_user.id, "")
-    if not update.message.text.isdigit(): return
-    val = int(update.message.text)
-    if user.bot_state == "SELECTING":
-        user.selected_cards.append(val); await sync_to_async(user.save)()
-        await update.message.reply_text(f"✅ Added Card #{val}! Type /start to play.")
-    elif user.bot_state == "REMOVING" and val in user.selected_cards:
-        user.selected_cards.remove(val); await sync_to_async(user.save)()
-        await update.message.reply_text(f"🗑 Removed Card #{val}!")
-    elif user.bot_state == "DEPOSITING" and val >= 20:
-        res, ref = await sync_to_async(init_deposit)(user, val)
-        await update.message.reply_text(f"💳 [Pay {val} ETB]({res['data']['checkout_url']})", parse_mode='Markdown')
-
-async def new_game(update, context):
+async def new_game(update: Update, context):
     if update.effective_user.username != "nwebingojaz": return
-    game = await sync_to_async(GameRound.objects.create)(status="ACTIVE")
-    await update.message.reply_text(f"🚀 **GAME #{game.id} STARTED!** Check the Hall.")
+    game = await sync_to_async(GameRound.objects.filter(status="LOBBY").first)()
+    if not game or len(game.players) < 3:
+        await update.message.reply_text("❌ Need 3 players to start.")
+        return
+
+    game.status = "ACTIVE"; await sync_to_async(game.save)()
+    await update.message.reply_text(f"🚀 **GAME STARTED!**\nCards playing: {list(game.players.values())}")
+
     nums = list(range(1, 76)); random.shuffle(nums)
     layer = get_channel_layer()
+    
+    winner_found = False
     for n in nums:
+        game.refresh_from_db()
+        if "WON_BY" in game.status:
+            winner_card = game.status.split("_")[-1]
+            await update.message.reply_text(f"🏆 **BINGO!**\nWinner Card: **#{winner_card}**\nGame Over.")
+            winner_found = True
+            break
+        
         game.called_numbers.append(n); await sync_to_async(game.save)()
         await layer.group_send("bingo_live", {"type": "bingo_message", "message": {"action": "call_number", "number": n}})
-        await asyncio.sleep(6)
-
-async def post_init(app): await app.bot.delete_webhook(drop_pending_updates=True)
+        await asyncio.sleep(7)
+    
+    if not winner_found:
+        await update.message.reply_text("🏁 Game ended with no winner.")
 
 def run():
-    app = Application.builder().token(os.environ.get("TELEGRAM_BOT_TOKEN")).post_init(post_init).build()
+    app = Application.builder().token(os.environ.get("TELEGRAM_BOT_TOKEN")).build()
     app.add_handler(CommandHandler("start", start)); app.add_handler(CommandHandler("newgame", new_game))
-    app.add_handler(CallbackQueryHandler(button_handler)); app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
     app.run_polling()
+
 if __name__ == "__main__": run()
