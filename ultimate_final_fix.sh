@@ -1,3 +1,81 @@
+#!/bin/bash
+# VLAD BINGO - THE COMPLETE MASTER SYSTEM
+
+# 1. Ensure all packages are ready
+touch backend/bingo/__init__.py backend/bingo/services/__init__.py backend/bingo/bot/__init__.py
+
+# 2. FULL MODELS (With Balance, Multiple Cards, and Transaction Log)
+cat <<'EOF' > backend/bingo/models.py
+from django.db import models
+from django.contrib.auth.models import AbstractUser
+from django.utils import timezone
+
+class User(AbstractUser):
+    operational_credit = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    selected_cards = models.JSONField(default=list)
+    bot_state = models.CharField(max_length=20, default="IDLE")
+
+class PermanentCard(models.Model):
+    card_number = models.PositiveSmallIntegerField(unique=True)
+    board = models.JSONField()
+
+class GameRound(models.Model):
+    created_at = models.DateTimeField(default=timezone.now)
+    called_numbers = models.JSONField(default=list)
+    status = models.CharField(max_length=16, default="PENDING")
+    amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+class Transaction(models.Model):
+    agent = models.ForeignKey("User", on_delete=models.CASCADE)
+    timestamp = models.DateTimeField(default=timezone.now)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    type = models.CharField(max_length=20, default="DEPOSIT")
+    status = models.CharField(max_length=20, default="SUCCESS")
+EOF
+
+# 3. FULL VIEWS (Win logic + Dynamic Card Sync)
+cat <<'EOF' > backend/bingo/views.py
+from django.shortcuts import render
+from django.http import HttpResponse, JsonResponse
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from .models import User, PermanentCard, GameRound, Transaction
+from decimal import Decimal
+
+def home(request): return HttpResponse("<h1>VladBingo Engine is Live</h1>")
+def live_view(request): return render(request, 'live_view.html')
+
+def get_user_card(request, tg_id):
+    try:
+        user = User.objects.get(username=f"tg_{tg_id}")
+        card_num = user.selected_cards[-1] if user.selected_cards else 1
+        card = PermanentCard.objects.get(card_number=card_num)
+        return JsonResponse({'card_number': card.card_number, 'board': card.board})
+    except:
+        card = PermanentCard.objects.first()
+        return JsonResponse({'card_number': 1, 'board': card.board if card else []})
+
+def check_win(request, tg_id):
+    try:
+        user = User.objects.get(username=f"tg_{tg_id}")
+        game = GameRound.objects.filter(status="ACTIVE").last()
+        card = PermanentCard.objects.get(card_number=user.selected_cards[-1])
+        called_set = set(game.called_numbers)
+        board = card.board
+        won = any(all(c == "FREE" or c in called_set for c in row) for row in board) or \
+              any(all(board[r][c] == "FREE" or board[r][c] in called_set for r in range(5)) for c in range(5))
+        if won:
+            prize = Decimal("100.00")
+            user.operational_credit += prize
+            user.save(); game.status = "ENDED"; game.save()
+            Transaction.objects.create(agent=user, amount=prize, type="WIN", note=f"Game #{game.id}")
+            return JsonResponse({'status': 'WINNER', 'prize': float(prize)})
+        return JsonResponse({'status': 'NOT_YET'})
+    except: return JsonResponse({'status': 'ERROR'})
+EOF
+
+# 4. FULL BOT MAIN (All Buttons Restored + Dealer)
+cat <<'EOF' > backend/bingo/bot/main.py
 import os, sys, django, asyncio, random
 from pathlib import Path
 from asgiref.sync import sync_to_async
@@ -70,3 +148,6 @@ def run():
     app.add_handler(CallbackQueryHandler(button_handler)); app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
     app.run_polling()
 if __name__ == "__main__": run()
+EOF
+
+echo "✅ ULTIMATE SYSTEM RESTORED!"
