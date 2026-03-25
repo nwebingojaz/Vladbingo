@@ -1,3 +1,7 @@
+#!/bin/bash
+# VladBingo - Chapa Final Email & Character Fix
+
+cat <<EOF > backend/bingo/services/chapa.py
 import os, requests, uuid
 
 def init_deposit(user, amount):
@@ -30,3 +34,6 @@ def init_deposit(user, amount):
         return res.json(), ref
     except Exception as e:
         return {"status": "error", "message": str(e)}, None
+EOF
+
+echo "✅ Chapa email and description fixed!"
