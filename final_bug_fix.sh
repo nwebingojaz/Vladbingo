@@ -1,3 +1,8 @@
+#!/bin/bash
+# VladBingo - Final NameError Fix & Business Logic Sync
+
+# 1. Update views.py (Fixed imports and ChapaWebhookView)
+cat <<'EOF' > backend/bingo/views.py
 from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
 from rest_framework.views import APIView
@@ -62,3 +67,6 @@ class ChapaWebhookView(APIView):
     def post(self, request):
         # We will add real balance logic here later, for now just 'ok'
         return Response({"status": "ok"})
+EOF
+
+echo "✅ Typo fixed and views synchronized!"
