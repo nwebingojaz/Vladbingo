@@ -1,3 +1,7 @@
+#!/bin/bash
+# VladBingo - Nuclear Migration Reset
+
+cat <<'EOF' > backend/build.sh
 #!/usr/bin/env bash
 set -o errexit
 
@@ -28,3 +32,7 @@ python manage.py migrate --fake-initial --no-input
 
 # 6. Initialize cards
 python manage.py init_bingo || true
+EOF
+
+chmod +x backend/build.sh
+echo "✅ Nuclear Reset Script Prepared!"
