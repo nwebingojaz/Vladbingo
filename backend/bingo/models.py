@@ -5,7 +5,7 @@ from django.utils import timezone
 class User(AbstractUser):
     operational_credit = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     selected_cards = models.JSONField(default=list)
-    bot_state = models.CharField(max_length=30, default="START") # START, REG_NAME, REG_PHONE, IDLE
+    bot_state = models.CharField(max_length=30, default="IDLE")
     real_name = models.CharField(max_length=100, blank=True)
     phone_number = models.CharField(max_length=20, blank=True)
 
@@ -16,7 +16,7 @@ class PermanentCard(models.Model):
 class GameRound(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
     called_numbers = models.JSONField(default=list)
-    players = models.JSONField(default=dict) 
+    players = models.JSONField(default=dict) # {"tg_id": card_num}
     bet_amount = models.DecimalField(max_digits=10, decimal_places=2, default=20)
     status = models.CharField(max_length=20, default="LOBBY")
 
