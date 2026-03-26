@@ -3,12 +3,15 @@ set -o errexit
 cd backend
 pip install -r requirements.txt
 python manage.py collectstatic --no-input
+
+# KILL OLD SCHEMA
 python manage.py shell <<innerEOF
 from django.db import connection
 with connection.cursor() as cursor:
     cursor.execute("DROP SCHEMA public CASCADE; CREATE SCHEMA public;")
 innerEOF
+
 python manage.py makemigrations bingo --no-input
 python manage.py migrate --no-input
-python manage.py shell -c "from bingo.models import User; User.objects.create_superuser('admin', 'admin@vlad.com', 'VladBingoPassword123')"
+python manage.py shell -c "from bingo.models import User; User.objects.create_superuser('admin', 'admin@vlad.com', 'VladBingo123')"
 python manage.py init_bingo || true
