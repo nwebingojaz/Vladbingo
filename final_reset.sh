@@ -1,3 +1,12 @@
+#!/bin/bash
+# VladBingo - Final System Reset & Synchronization
+
+# 1. Wipe old migrations (Keep the folder clean)
+rm -rf backend/bingo/migrations/*
+touch backend/bingo/migrations/__init__.py
+
+# 2. CREATE MASTER MIGRATION (0001_initial.py)
+cat <<'EOF' > backend/bingo/migrations/0001_initial.py
 from django.db import migrations, models
 import django.utils.timezone
 from django.conf import settings
@@ -59,3 +68,30 @@ class Migration(migrations.Migration):
             ],
         ),
     ]
+EOF
+
+# 3. Update build.sh (The "Force Reset" Command)
+cat <<'EOF' > backend/build.sh
+#!/usr/bin/env bash
+set -o errexit
+cd backend
+pip install -r requirements.txt
+python manage.py collectstatic --no-input
+
+# THE NUCLEAR FIX: Clear old migration history for bingo ONLY
+python manage.py shell <<innerEOF
+from django.db import connection
+with connection.cursor() as cursor:
+    try:
+        cursor.execute("DELETE FROM django_migrations WHERE app='bingo';")
+        print("✅ Cleared bingo migration history")
+    except:
+        pass
+innerEOF
+
+# Apply the new master migration
+python manage.py migrate --fake-initial --no-input
+python manage.py init_bingo || true
+EOF
+
+echo "✅ System Reset Prepared!"
