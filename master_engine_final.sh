@@ -1,3 +1,7 @@
+#!/bin/bash
+# VladBingo - Full Master Engine (Registration + Menu + Dealer)
+
+cat <<'EOF' > backend/bingo/bot/main.py
 import os, sys, django, asyncio, random
 from pathlib import Path
 from asgiref.sync import sync_to_async
@@ -117,3 +121,6 @@ def run():
     app.run_polling()
 
 if __name__ == "__main__": run()
+EOF
+
+echo "✅ Master Engine Restored!"
