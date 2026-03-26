@@ -1,3 +1,38 @@
+#!/bin/bash
+# VladBingo - 5 Minute Auto-Timer & DB Fix
+
+# 1. Full Models Fix (Adding 'note' to Transaction)
+cat <<'EOF' > backend/bingo/models.py
+from django.db import models
+from django.contrib.auth.models import AbstractUser
+from django.utils import timezone
+
+class User(AbstractUser):
+    operational_credit = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    selected_cards = models.JSONField(default=list)
+    bot_state = models.CharField(max_length=20, default="IDLE")
+
+class PermanentCard(models.Model):
+    card_number = models.PositiveSmallIntegerField(unique=True)
+    board = models.JSONField()
+
+class GameRound(models.Model):
+    created_at = models.DateTimeField(default=timezone.now)
+    called_numbers = models.JSONField(default=list)
+    players = models.JSONField(default=dict) 
+    bet_amount = models.DecimalField(max_digits=10, decimal_places=2, default=20)
+    status = models.CharField(max_length=20, default="LOBBY") # LOBBY, STARTING, ACTIVE, ENDED
+
+class Transaction(models.Model):
+    agent = models.ForeignKey("User", on_delete=models.CASCADE)
+    timestamp = models.DateTimeField(default=timezone.now)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    type = models.CharField(max_length=20, default="DEPOSIT")
+    note = models.TextField(default="") # Fixed missing column
+EOF
+
+# 2. Bot Logic with 5-Minute Timer
+cat <<'EOF' > backend/bingo/bot/main.py
 import os, sys, django, asyncio, random
 from pathlib import Path
 from asgiref.sync import sync_to_async
@@ -63,3 +98,30 @@ def run():
     app.run_polling()
 
 if __name__ == "__main__": run()
+EOF
+
+# 3. Update Build Script with SQL Hammer for 'note' column
+cat <<'EOF' > backend/build.sh
+#!/usr/bin/env bash
+set -o errexit
+cd backend
+pip install -r requirements.txt
+python manage.py collectstatic --no-input
+python manage.py makemigrations bingo --no-input
+python manage.py migrate --no-input
+
+# THE DB HAMMER: Ensure 'note' column exists
+python manage.py shell <<innerEOF
+from django.db import connection
+with connection.cursor() as cursor:
+    try:
+        cursor.execute("ALTER TABLE bingo_transaction ADD COLUMN note text DEFAULT '';")
+        print("✅ Added missing note column")
+    except:
+        print("ℹ️ note column already exists")
+innerEOF
+
+python manage.py init_bingo || true
+EOF
+
+echo "✅ Lobby timer and DB fix applied!"

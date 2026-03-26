@@ -16,11 +16,11 @@ class GameRound(models.Model):
     called_numbers = models.JSONField(default=list)
     players = models.JSONField(default=dict) 
     bet_amount = models.DecimalField(max_digits=10, decimal_places=2, default=20)
-    status = models.CharField(max_length=20, default="LOBBY")
+    status = models.CharField(max_length=20, default="LOBBY") # LOBBY, STARTING, ACTIVE, ENDED
 
 class Transaction(models.Model):
     agent = models.ForeignKey("User", on_delete=models.CASCADE)
     timestamp = models.DateTimeField(default=timezone.now)
     amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    # THE FIX: Added default="DEPOSIT"
     type = models.CharField(max_length=20, default="DEPOSIT")
+    note = models.TextField(default="") # Fixed missing column
