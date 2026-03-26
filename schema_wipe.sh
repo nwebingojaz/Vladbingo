@@ -1,3 +1,8 @@
+#!/bin/bash
+# VladBingo - Total Schema Wipe & Fresh Start
+
+# 1. Update build.sh with the Nuclear Wipe Command
+cat <<'EOF' > backend/build.sh
 #!/usr/bin/env bash
 set -o errexit
 cd backend
@@ -20,3 +25,7 @@ python manage.py migrate --no-input
 
 # Re-initialize the 100 Bingo Cards
 python manage.py init_bingo || true
+EOF
+
+chmod +x backend/build.sh
+echo "✅ Schema Wipe Script Prepared!"
