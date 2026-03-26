@@ -1,3 +1,7 @@
+#!/bin/bash
+# VladBingo - Full Menu Restoration & Smart State Logic
+
+cat <<'EOF' > backend/bingo/bot/main.py
 import os, sys, django, asyncio, random
 from pathlib import Path
 from asgiref.sync import sync_to_async
@@ -99,3 +103,6 @@ def run():
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__": run()
+EOF
+
+echo "✅ Full Menu restored!"
