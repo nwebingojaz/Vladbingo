@@ -5,8 +5,11 @@ from rest_framework.response import Response
 from .models import User, PermanentCard, GameRound
 from decimal import Decimal
 
-def home(request): return HttpResponse("<h1>VladBingo Engine: Identity Secure</h1>")
-def live_view(request): return render(request, 'live_view.html')
+def home(request): 
+    return HttpResponse("<h1>VladBingo Engine is Active</h1>")
+
+def live_view(request): 
+    return render(request, 'live_view.html')
 
 def get_game_info(request, game_id, tg_id):
     try:
@@ -38,7 +41,6 @@ def check_win(request, game_id, tg_id):
             if all(board[r][c] == "FREE" or board[r][c] in called_set for r in range(5)): lines += 1
         corners = [board[0][0], board[0][4], board[4][0], board[4][4]]
         if all(c in called_set for c in corners): lines += 1
-        
         is_winner = (float(game.bet_amount) <= 40 and lines >= 2) or (float(game.bet_amount) >= 50 and lines >= 3)
         if is_winner:
             prize = (Decimal(len(game.players)) * game.bet_amount) * Decimal("0.80")
@@ -49,4 +51,6 @@ def check_win(request, game_id, tg_id):
     except: return JsonResponse({'status': 'ERROR'})
 
 class ChapaWebhookView(APIView):
-    permission_classes = []; def post(self, request): return Response({"status": "ok"})
+    permission_classes = []
+    def post(self, request):
+        return Response({"status": "ok"})
