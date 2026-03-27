@@ -1,3 +1,8 @@
+#!/bin/bash
+# VladBingo - Safe Production Launch (Persistent Data)
+
+# 1. Update build.sh (Removed the Wipe command)
+cat <<'EOF' > backend/build.sh
 #!/usr/bin/env bash
 set -o errexit
 cd backend
@@ -25,3 +30,7 @@ innerEOF
 
 # Initialize cards only if empty
 python manage.py init_bingo || true
+EOF
+
+chmod +x backend/build.sh
+echo "✅ Safe Launch script prepared!"
