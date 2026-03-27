@@ -1,3 +1,41 @@
+#!/bin/bash
+# VladBingo - Final Name Sync & Tiered Logic
+
+# 1. Update Models
+cat <<'EOF' > backend/bingo/models.py
+from django.db import models
+from django.contrib.auth.models import AbstractUser
+from django.utils import timezone
+
+class User(AbstractUser):
+    operational_credit = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    selected_cards = models.JSONField(default=list)
+    current_joining_room = models.IntegerField(null=True, blank=True)
+    bot_state = models.CharField(max_length=30, default="REG_NAME")
+    real_name = models.CharField(max_length=100, blank=True)
+    phone_number = models.CharField(max_length=20, blank=True)
+
+class PermanentCard(models.Model):
+    card_number = models.PositiveSmallIntegerField(unique=True)
+    board = models.JSONField()
+
+class GameRound(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    called_numbers = models.JSONField(default=list)
+    players = models.JSONField(default=dict) 
+    bet_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(max_length=20, default="LOBBY")
+
+class Transaction(models.Model):
+    agent = models.ForeignKey("User", on_delete=models.CASCADE)
+    timestamp = models.DateTimeField(default=timezone.now)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    type = models.CharField(max_length=20, default="DEPOSIT")
+    note = models.TextField(default="")
+EOF
+
+# 2. Update Views (ENSURING check_win name is correct)
+cat <<'EOF' > backend/bingo/views.py
 from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
 from rest_framework.views import APIView
@@ -51,3 +89,19 @@ def check_win(request, game_id, tg_id):
 class ChapaWebhookView(APIView):
     permission_classes = []
     def post(self, request): return Response({"status": "ok"})
+EOF
+
+# 3. Update URLs (Ensuring matches with views)
+cat <<'EOF' > backend/bingo/urls.py
+from django.urls import path
+from .views import home, live_view, get_game_info, check_win, ChapaWebhookView
+urlpatterns = [
+    path('', home, name='home'),
+    path('live/', live_view, name='live_view'),
+    path('game-info/<int:game_id>/<int:tg_id>/', get_game_info),
+    path('check-win/<int:game_id>/<int:tg_id>/', check_win),
+    path('chapa-webhook/', ChapaWebhookView.as_view()),
+]
+EOF
+
+echo "✅ Sync Fix Applied!"
