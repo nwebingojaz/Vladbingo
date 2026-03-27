@@ -1,3 +1,8 @@
+#!/bin/bash
+# VladBingo - Force Admin Password Reset
+
+# 1. Update the build script to be extremely aggressive about creating the admin
+cat <<'EOF' > backend/build.sh
 #!/usr/bin/env bash
 set -o errexit
 cd backend
@@ -27,3 +32,6 @@ else:
 innerEOF
 
 python manage.py init_bingo || true
+EOF
+
+echo "✅ Admin reset logic prepared!"
