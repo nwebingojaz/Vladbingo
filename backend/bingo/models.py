@@ -7,8 +7,6 @@ class User(AbstractUser):
     selected_cards = models.JSONField(default=list)
     current_joining_room = models.IntegerField(null=True, blank=True)
     bot_state = models.CharField(max_length=30, default="IDLE")
-    real_name = models.CharField(max_length=100, blank=True)
-    phone_number = models.CharField(max_length=20, blank=True)
 
 class PermanentCard(models.Model):
     card_number = models.PositiveSmallIntegerField(unique=True)
@@ -24,6 +22,6 @@ class GameRound(models.Model):
 class Transaction(models.Model):
     agent = models.ForeignKey("User", on_delete=models.CASCADE)
     timestamp = models.DateTimeField(default=timezone.now)
-    amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
     type = models.CharField(max_length=20, default="DEPOSIT")
     note = models.TextField(default="")

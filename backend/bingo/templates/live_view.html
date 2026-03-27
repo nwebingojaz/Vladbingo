@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>VladBingo Live</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -16,21 +15,22 @@
 </head>
 <body class="p-3">
     <div id="tracker" class="grid grid-cols-1 gap-1 mb-4 p-2 bg-slate-900 rounded-lg"></div>
-    <div class="flex justify-between mb-2 px-2 text-xs font-bold text-gray-400">
-        <div>PRIZE: <span id="prize" class="text-emerald-400">0.00</span> ETB</div>
-        <div>CARD #<span id="card-num">--</span></div>
+    <div class="flex justify-between mb-2 px-2 text-xs font-bold text-gray-400 uppercase">
+        <div>Prize: <span id="prize" class="text-emerald-400">0.00</span> ETB</div>
+        <div>Card #<span id="card-num">--</span></div>
     </div>
     <div id="user-card" class="grid grid-cols-5 gap-1 bg-slate-800 p-2 rounded-xl border-2 border-slate-700 shadow-2xl"></div>
     <button id="bingo-btn" class="mt-6 w-full py-4 bg-yellow-500 text-black font-black text-xl rounded-lg shadow-lg">BINGO! 📢</button>
     <script>
         const tg = window.Telegram.WebApp; const uid = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : 0;
+        const params = new URLSearchParams(window.location.search); const gameId = params.get("game_id") || 1;
         const tracker = document.getElementById('tracker');
         ['B','I','N','G','O'].forEach((l, idx) => {
             let h = '<div class="flex gap-1 items-center"><div class="text-yellow-500 font-bold w-4 text-[10px]">'+l+'</div>';
             for(let i=(idx*15)+1; i<=(idx*15)+15; i++) h += '<div id="t-'+i+'" class="num-dot">'+i+'</div>';
             tracker.innerHTML += h + '</div>';
         });
-        fetch('/api/game-info/' + uid + '/').then(r=>r.json()).then(data=>{
+        fetch('/api/game-info/' + gameId + '/' + uid + '/').then(r=>r.json()).then(data=>{
             document.getElementById('card-num').innerText = data.card_number;
             document.getElementById('prize').innerText = data.prize;
             data.board.forEach(row => row.forEach(val => {
@@ -42,16 +42,13 @@
             }));
             data.called_numbers.forEach(n => { document.getElementById('t-'+n).classList.add('called'); });
         });
-        const socket = new WebSocket('wss://' + window.location.host + '/ws/game/live/');
+        const socket = new WebSocket('wss://' + window.location.host + '/ws/game/' + gameId + '/');
         socket.onmessage = (e) => {
             const m = JSON.parse(e.data);
-            if(m.action === 'call_number') {
-                const dot = document.getElementById('t-' + m.number);
-                if(dot) dot.classList.add('called');
-            }
+            if(m.action === 'call_number') { document.getElementById('t-' + m.number).classList.add('called'); }
         };
         document.getElementById('bingo-btn').onclick = () => {
-            fetch('/api/check-win/' + uid + '/').then(r=>r.json()).then(d => {
+            fetch('/api/check-win/' + gameId + '/' + uid + '/').then(r=>r.json()).then(d => {
                 if(d.status === 'WINNER') alert("🏆 BINGO! You won " + d.prize + " ETB!");
                 else alert("❌ Not a Bingo yet!");
             });
