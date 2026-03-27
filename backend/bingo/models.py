@@ -5,7 +5,7 @@ from django.utils import timezone
 class User(AbstractUser):
     operational_credit = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     selected_cards = models.JSONField(default=list)
-    current_room_context = models.IntegerField(null=True, blank=True)
+    current_room_id = models.IntegerField(null=True, blank=True)
     bot_state = models.CharField(max_length=30, default="REG_NAME")
     real_name = models.CharField(max_length=100, blank=True)
     phone_number = models.CharField(max_length=20, blank=True)
