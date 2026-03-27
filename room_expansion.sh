@@ -1,3 +1,7 @@
+#!/bin/bash
+# VladBingo - Room Expansion (20, 30, 40, 50, 100)
+
+cat <<'EOF' > backend/bingo/bot/main.py
 import os, sys, django, asyncio, random
 from pathlib import Path
 from asgiref.sync import sync_to_async
@@ -88,3 +92,6 @@ def run():
     app.run_polling()
 
 if __name__ == "__main__": run()
+EOF
+
+echo "✅ Room expansion applied!"
