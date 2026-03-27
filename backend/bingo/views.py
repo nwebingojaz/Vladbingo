@@ -4,57 +4,38 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from .models import User, PermanentCard, GameRound, Transaction
 from decimal import Decimal
+import os, requests
 
-def home(request): return HttpResponse("<h1>VladBingo Business is LIVE</h1>")
+def home(request): return HttpResponse("<h1>VladBingo Engine: Online</h1>")
 def live_view(request): return render(request, 'live_view.html')
 
 def get_game_info(request, game_id, tg_id):
     try:
         user = User.objects.get(username=f"tg_{tg_id}")
         game = GameRound.objects.get(id=game_id)
-        prize = float(len(game.players) * game.bet_amount) * 0.80 # 20% cut for you
-        u_cards = game.players.get(str(tg_id), [1])
-        card_num = u_cards[0] if isinstance(u_cards, list) else u_cards
+        prize = float(len(game.players) * game.bet_amount) * 0.80
+        card_num = game.players.get(str(tg_id), 1)
         card = PermanentCard.objects.get(card_number=card_num)
-        return JsonResponse({
-            'card_number': card.card_number, 'board': card.board,
-            'prize': round(prize, 2), 'status': game.status, 'called_numbers': game.called_numbers
-        })
-    except: return JsonResponse({'error': 'Sync Error'})
-
-def check_win(request, game_id, tg_id):
-    try:
-        user = User.objects.get(username=f"tg_{tg_id}")
-        game = GameRound.objects.get(id=game_id)
-        if game.status != "ACTIVE": return JsonResponse({'status': 'NOT_ACTIVE'})
-        if "WON" in game.status: return JsonResponse({'status': 'ALREADY_WON'})
-        
-        u_cards = game.players.get(str(tg_id))
-        card_num = u_cards[0] if isinstance(u_cards, list) else u_cards
-        card = PermanentCard.objects.get(card_number=card_num)
-        called_set = set(game.called_numbers)
-        board = card.board
-        
-        lines = 0
-        for row in board:
-            if all(c == "FREE" or c in called_set for c in row): lines += 1
-        for c in range(5):
-            if all(board[r][c] == "FREE" or board[r][c] in called_set for r in range(5)): lines += 1
-        if all(board[i][i] == "FREE" or board[i][i] in called_set for i in range(5)): lines += 1
-        if all(board[i][4-i] == "FREE" or board[i][4-i] in called_set for i in range(5)): lines += 1
-        corners = [board[0][0], board[0][4], board[4][0], board[4][4]]
-        if all(c in called_set for c in corners): lines += 1
-        
-        is_winner = (float(game.bet_amount) <= 40 and lines >= 2) or (float(game.bet_amount) >= 50 and lines >= 3)
-        if is_winner:
-            prize = (Decimal(len(game.players)) * game.bet_amount) * Decimal("0.80")
-            user.operational_credit += prize; user.save()
-            game.status = f"WON_BY_{card.card_number}"; game.save()
-            return JsonResponse({'status': 'WINNER', 'prize': float(prize)})
-        return JsonResponse({'status': 'NOT_YET'})
-    except: return JsonResponse({'status': 'ERROR'})
+        return JsonResponse({'card_number': card.card_number, 'board': card.board, 'prize': round(prize, 2), 'status': game.status, 'called_numbers': game.called_numbers})
+    except: return JsonResponse({'error': 'Error'})
 
 class ChapaWebhookView(APIView):
     permission_classes = []
     def post(self, request):
-        return Response({"status": "ok"})
+        data = request.data
+        if data.get('status') == 'success':
+            ref = data.get('tx_ref') # Format: vlad_USERID_unique
+            try:
+                u_id = ref.split('_')[1]
+                amount = Decimal(data.get('amount'))
+                user = User.objects.get(id=u_id)
+                user.operational_credit += amount
+                user.save()
+                # Notify User on Telegram
+                bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+                tg_id = user.username.split('_')[1]
+                msg = f"💰 **DEPOSIT SUCCESS!**\n\n{amount} ETB added.\nNew Balance: {user.operational_credit} ETB"
+                requests.get(f"https://api.telegram.org/bot{bot_token}/sendMessage?chat_id={tg_id}&text={msg}&parse_mode=Markdown")
+                return Response(status=200)
+            except: pass
+        return Response(status=200) # Always return 200 to Chapa

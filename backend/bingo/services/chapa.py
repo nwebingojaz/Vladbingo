@@ -1,32 +1,13 @@
 import os, requests, uuid
-
 def init_deposit(user, amount):
-    CHAPA_KEY = os.environ.get("CHAPA_SECRET_KEY")
-    WEBHOOK = os.environ.get("WEBHOOK_URL")
-    
-    if not CHAPA_KEY:
-        return {"status": "error", "message": "Secret Key missing"}, None
-        
-    ref = f"dep-{uuid.uuid4().hex[:6]}"
-    
-    # THE FIX: 
-    # 1. Use your business email for everyone
-    # 2. Removed the colon from description to satisfy Chapa's rules
+    # THE SECRET: We hide the user ID in the reference so the Webhook can find them
+    ref = f"vlad_{user.id}_{uuid.uuid4().hex[:4]}"
     payload = {
-        "amount": str(amount),
-        "currency": "ETB",
-        "tx_ref": ref,
+        "amount": str(amount), "currency": "ETB", "tx_ref": ref,
         "email": "bababingo22@gmail.com", 
-        "callback_url": WEBHOOK,
-        "customization": {
-            "title": "Bingo Deposit",
-            "description": f"Deposit for User ID {user.id}" 
-        }
+        "callback_url": "https://vlad-bingo-web.onrender.com/api/chapa-webhook/",
+        "customization": {"title": "Bingo Deposit"}
     }
-    headers = {"Authorization": f"Bearer {CHAPA_KEY}"}
-    
-    try:
-        res = requests.post("https://api.chapa.co/v1/transaction/initialize", json=payload, headers=headers, timeout=10)
-        return res.json(), ref
-    except Exception as e:
-        return {"status": "error", "message": str(e)}, None
+    headers = {"Authorization": f"Bearer {os.environ.get('CHAPA_SECRET_KEY')}"}
+    res = requests.post("https://api.chapa.co/v1/transaction/initialize", json=payload, headers=headers)
+    return res.json(), ref
