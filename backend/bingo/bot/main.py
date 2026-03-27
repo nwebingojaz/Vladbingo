@@ -13,23 +13,24 @@ from bingo.models import User, GameRound
 def db_op(uid, action, val=None):
     user, _ = User.objects.get_or_create(username=f"tg_{uid}")
     if action == "state": user.bot_state = val
+    elif action == "name": user.real_name = val; user.bot_state = "IDLE"
+    elif action == "phone": user.phone_number = val; user.bot_state = "IDLE"
     user.save(); return user
 
 async def start(update: Update, context):
     user = await sync_to_async(db_op)(update.effective_user.id, "get")
     if not user.real_name:
         await sync_to_async(db_op)(user.id, "state", "REG_NAME")
-        await update.message.reply_text("👋 Welcome! Please enter your **Full Name** to register:")
+        await update.message.reply_text("👋 Welcome! Please enter your Full Name to register:")
         return
     if not user.phone_number:
         btn = [[KeyboardButton("📲 Share Phone Number", request_contact=True)]]
         await update.message.reply_text("Tap below to verify your phone:", reply_markup=ReplyKeyboardMarkup(btn, one_time_keyboard=True, resize_keyboard=True))
         return
-    msg = f"🎰 **VLAD BINGO** 🎰\n👤 Player: {user.real_name}\n💰 Balance: {user.operational_credit} ETB\n\nPick a Room:"
+    msg = f"🎰 **VLAD BINGO** 🎰\n👤 Player: {user.real_name}\n💰 Balance: {user.operational_credit} ETB\n\nPick a Room to Join:"
     kbd = [[InlineKeyboardButton("💵 20", callback_data="r_20"), InlineKeyboardButton("💵 30", callback_data="r_30"), InlineKeyboardButton("💵 40", callback_data="r_40")],
            [InlineKeyboardButton("💵 50", callback_data="r_50"), InlineKeyboardButton("💵 100", callback_data="r_100")],
-           [InlineKeyboardButton("🎮 ENTER HALL", web_app=WebAppInfo(url="https://vlad-bingo-web.onrender.com/api/live/"))],
-           [InlineKeyboardButton("💳 Deposit", callback_data="dep"), InlineKeyboardButton("🗑 Clear All", callback_data="clear")]]
+           [InlineKeyboardButton("💳 Deposit", callback_data="dep"), InlineKeyboardButton("🗑 Clear", callback_data="clear")]]
     await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(kbd), parse_mode='Markdown')
 
 async def game_dealer(game_id):
@@ -54,30 +55,27 @@ async def btn_handler(update, context):
         game, _ = await sync_to_async(GameRound.objects.get_or_create)(status="LOBBY", bet_amount=amt)
         user.current_joining_room = game.id; user.bot_state = "PICKING"; await sync_to_async(user.save)()
         await q.edit_message_text(f"🎟 **Room {amt} ETB.** Type lucky Card # (1-100):")
-    elif q.data == "dep": user.bot_state = "DEPOSITING"; await sync_to_async(user.save)(); await q.edit_message_text("💵 Amount to deposit? (Min 20):")
-    elif q.data == "clear": user.selected_cards = []; await sync_to_async(user.save)(); await q.edit_message_text("🗑 Cards Cleared!")
+    elif q.data == "dep": 
+        user.bot_state = "DEPOSITING"; await sync_to_async(user.save)()
+        await q.edit_message_text("💵 Amount to deposit? (Min 20):")
 
 async def text_handler(update, context):
     uid = update.effective_user.id; user = await sync_to_async(db_op)(uid, "get")
-    text = update.message.text
     if user.bot_state == "REG_NAME":
-        user.real_name = text; user.bot_state = "IDLE"; await sync_to_async(user.save)()
-        await update.message.reply_text(f"✅ Hello {text}!"); await start(update, context)
-    elif text.isdigit():
-        val = int(text)
+        user.real_name = update.message.text; user.bot_state = "IDLE"; await sync_to_async(user.save)()
+        await update.message.reply_text(f"✅ Hello {user.real_name}!"); await start(update, context)
+    elif update.message.text.isdigit():
+        val = int(update.message.text)
         if user.bot_state == "PICKING":
             game = await sync_to_async(GameRound.objects.get)(id=user.current_joining_room)
             if val in game.players.values(): await update.message.reply_text("🚫 Taken!"); return
             user.operational_credit -= game.bet_amount; user.selected_cards.append(val); user.bot_state = "IDLE"; await sync_to_async(user.save)()
             game.players[str(uid)] = val; await sync_to_async(game.save)()
+            url = f"https://vlad-bingo-web.onrender.com/api/live/?game_id={game.id}"
             if len(game.players) == 3:
                 game.status = "STARTING"; await sync_to_async(game.save)()
-                asyncio.create_task(game_dealer(game.id)); await update.message.reply_text("🔥 **LOBBY FULL!** 5 mins to start.")
-            else: await update.message.reply_text(f"✅ Joined! Lobby {len(game.players)}/3")
-        elif user.bot_state == "DEPOSITING" and val >= 20:
-            from bingo.services.chapa import init_deposit
-            res, ref = await sync_to_async(init_deposit)(user, val)
-            await update.message.reply_text(f"💳 [Pay {val} ETB Now]({res['data']['checkout_url']})", parse_mode='Markdown')
+                asyncio.create_task(game_dealer(game.id)); await update.message.reply_text(f"🔥 **LOBBY FULL!** 5 mins to start.\n[ENTER HALL]({url})", parse_mode='Markdown')
+            else: await update.message.reply_text(f"✅ Joined! Lobby {len(game.players)}/3. [ENTER HALL]({url})", parse_mode='Markdown')
 
 async def contact_handler(update: Update, context):
     user = await sync_to_async(db_op)(update.effective_user.id, "get")
