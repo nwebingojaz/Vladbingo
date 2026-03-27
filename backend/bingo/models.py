@@ -18,8 +18,8 @@ class GameRound(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     called_numbers = models.JSONField(default=list)
     players = models.JSONField(default=dict) 
-    bet_amount = models.DecimalField(max_digits=10, decimal_places=2, default=20)
-    status = models.CharField(max_length=20, default="LOBBY")
+    bet_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(max_length=20, default="LOBBY") # LOBBY, STARTING, ACTIVE, WON_BY_X
 
 class Transaction(models.Model):
     agent = models.ForeignKey("User", on_delete=models.CASCADE)
