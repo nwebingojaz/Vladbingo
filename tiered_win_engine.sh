@@ -1,3 +1,8 @@
+#!/bin/bash
+# VladBingo - Tiered Win Engine (Corners = 1 Line)
+
+# 1. Update Views.py (The Logic Core)
+cat <<'EOF' > backend/bingo/views.py
 from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
 from .models import User, PermanentCard, GameRound, Transaction
@@ -80,3 +85,6 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 class ChapaWebhookView(APIView):
     permission_classes = []; def post(self, request): return Response({"status": "ok"})
+EOF
+
+echo "✅ Tiered Win Engine logic updated!"
