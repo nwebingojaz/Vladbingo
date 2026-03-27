@@ -20,3 +20,10 @@ class GameRound(models.Model):
     players = models.JSONField(default=dict) # {"tg_id": card_num}
     bet_amount = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=20, default="LOBBY") # LOBBY, STARTING, ACTIVE, WON_BY_X
+
+class Transaction(models.Model):
+    agent = models.ForeignKey("User", on_delete=models.CASCADE)
+    timestamp = models.DateTimeField(default=timezone.now)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    type = models.CharField(max_length=20, default="DEPOSIT")
+    note = models.TextField(default="")
