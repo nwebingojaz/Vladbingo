@@ -1,3 +1,8 @@
+#!/bin/bash
+# VladBingo - Infinite Loop Engine (End -> 1 Min Wait -> New Game)
+
+# 1. Update Bot Main (The Automated Cycle)
+cat <<'EOF' > backend/bingo/bot/main.py
 import os, sys, django, asyncio, random
 from pathlib import Path
 from asgiref.sync import sync_to_async
@@ -69,3 +74,9 @@ def run():
     app.run_polling()
 
 if __name__ == "__main__": run()
+EOF
+
+# 2. Update Mini App HTML (Show "GAME OVER" message)
+sed -i 's/alert("BINGO/if(m.action==="game_over"){document.getElementById("game-status").innerText="RESETTING...";setTimeout(()=>location.reload(), 5000);} alert("BINGO/g' backend/bingo/templates/live_view.html
+
+echo "✅ Infinite Loop Engine Applied!"
