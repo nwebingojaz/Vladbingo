@@ -1,3 +1,7 @@
+#!/bin/bash
+# VladBingo - Admin Password & Staff Permission Hammer
+
+cat <<'EOF' > backend/build.sh
 #!/usr/bin/env bash
 set -o errexit
 cd backend
@@ -25,3 +29,7 @@ innerEOF
 
 # 4. Card Init
 python manage.py init_bingo || true
+EOF
+
+chmod +x backend/build.sh
+echo "✅ Admin Hammer logic applied!"
