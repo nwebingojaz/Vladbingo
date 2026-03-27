@@ -10,12 +10,15 @@ def get_game_info(request, game_id, tg_id):
     try:
         user = User.objects.get(username=f"tg_{tg_id}")
         game = GameRound.objects.get(id=game_id)
-        prize = float(len(game.players) * game.bet_amount) * 0.80 # 20% Cut
+        # Prize is 80% of pool (20% cut for you)
+        prize = float(len(game.players) * game.bet_amount) * 0.80 
+        # Find which card this user is using in this specific room
         card_num = game.players.get(str(tg_id), 1)
         card = PermanentCard.objects.get(card_number=card_num)
         return JsonResponse({
             'card_number': card.card_number, 'board': card.board,
-            'prize': round(prize, 2), 'status': game.status, 'called_numbers': game.called_numbers
+            'prize': round(prize, 2), 'status': game.status,
+            'called_numbers': game.called_numbers
         })
     except: return JsonResponse({'error': 'Sync Error'})
 
@@ -33,9 +36,9 @@ def check_win(request, game_id, tg_id):
             if all(board[r][c] == "FREE" or board[r][c] in called_set for r in range(5)): lines += 1
         corners = [board[0][0], board[0][4], board[4][0], board[4][4]]
         if all(c in called_set for c in corners): lines += 1
-        
-        is_winner = (float(game.bet_amount) <= 40 and lines >= 2) or (float(game.bet_amount) >= 50 and lines >= 3)
-        if is_winner:
+        # Tiered Logic
+        won = (float(game.bet_amount) <= 40 and lines >= 2) or (float(game.bet_amount) >= 50 and lines >= 3)
+        if won:
             prize = (Decimal(len(game.players)) * game.bet_amount) * Decimal("0.80")
             user.operational_credit += prize; user.save()
             game.status = f"WON_BY_{card.card_number}"; game.save()
@@ -46,5 +49,4 @@ def check_win(request, game_id, tg_id):
 from rest_framework.views import APIView
 from rest_framework.response import Response
 class ChapaWebhookView(APIView):
-    permission_classes = []
-    def post(self, request): return Response({"status": "ok"})
+    permission_classes = []; def post(self, request): return Response({"status": "ok"})
