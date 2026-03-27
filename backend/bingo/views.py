@@ -5,16 +5,16 @@ from rest_framework.response import Response
 from .models import User, PermanentCard, GameRound, Transaction
 from decimal import Decimal
 
-def home(request): return HttpResponse("<h1>VladBingo Business Engine is LIVE</h1>")
+def home(request): return HttpResponse("<h1>VladBingo Business is LIVE</h1>")
 def live_view(request): return render(request, 'live_view.html')
 
 def get_game_info(request, game_id, tg_id):
     try:
         user = User.objects.get(username=f"tg_{tg_id}")
         game = GameRound.objects.get(id=game_id)
-        # 20% BUSINESS CUT
-        prize = float(len(game.players) * game.bet_amount) * 0.80 
-        card_num = game.players.get(str(tg_id), 1)
+        prize = float(len(game.players) * game.bet_amount) * 0.80 # 20% cut for you
+        u_cards = game.players.get(str(tg_id), [1])
+        card_num = u_cards[0] if isinstance(u_cards, list) else u_cards
         card = PermanentCard.objects.get(card_number=card_num)
         return JsonResponse({
             'card_number': card.card_number, 'board': card.board,
@@ -28,9 +28,14 @@ def check_win(request, game_id, tg_id):
         game = GameRound.objects.get(id=game_id)
         if game.status != "ACTIVE": return JsonResponse({'status': 'NOT_ACTIVE'})
         if "WON" in game.status: return JsonResponse({'status': 'ALREADY_WON'})
-        card_num = game.players.get(str(tg_id))
+        
+        u_cards = game.players.get(str(tg_id))
+        card_num = u_cards[0] if isinstance(u_cards, list) else u_cards
         card = PermanentCard.objects.get(card_number=card_num)
-        called_set = set(game.called_numbers); board = card.board; lines = 0
+        called_set = set(game.called_numbers)
+        board = card.board
+        
+        lines = 0
         for row in board:
             if all(c == "FREE" or c in called_set for c in row): lines += 1
         for c in range(5):
@@ -40,9 +45,8 @@ def check_win(request, game_id, tg_id):
         corners = [board[0][0], board[0][4], board[4][0], board[4][4]]
         if all(c in called_set for c in corners): lines += 1
         
-        # LOGIC: 20-40 (2 lines), 50-100 (3 lines). Corners always count as a line.
-        won = (float(game.bet_amount) <= 40 and lines >= 2) or (float(game.bet_amount) >= 50 and lines >= 3)
-        if won:
+        is_winner = (float(game.bet_amount) <= 40 and lines >= 2) or (float(game.bet_amount) >= 50 and lines >= 3)
+        if is_winner:
             prize = (Decimal(len(game.players)) * game.bet_amount) * Decimal("0.80")
             user.operational_credit += prize; user.save()
             game.status = f"WON_BY_{card.card_number}"; game.save()
@@ -51,4 +55,6 @@ def check_win(request, game_id, tg_id):
     except: return JsonResponse({'status': 'ERROR'})
 
 class ChapaWebhookView(APIView):
-    permission_classes = []; def post(self, request): return Response({"status": "ok"})
+    permission_classes = []
+    def post(self, request):
+        return Response({"status": "ok"})

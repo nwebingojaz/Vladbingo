@@ -1,10 +1,7 @@
 #!/bin/bash
-# VLAD BINGO - BUSINESS V4 (FINAL PRODUCTION SYNC)
+# VLAD BINGO - FINAL INDUSTRIAL ENGINE (20% CUT + TIERED WINS)
 
-# 1. DIRECTORIES
-mkdir -p backend/bingo/bot backend/bingo/services backend/bingo/management/commands backend/bingo/templates backend/vlad_bingo
-
-# 2. MODELS
+# 1. MODELS
 cat <<'EOF' > backend/bingo/models.py
 from django.db import models
 from django.contrib.auth.models import AbstractUser
@@ -25,7 +22,7 @@ class PermanentCard(models.Model):
 class GameRound(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     called_numbers = models.JSONField(default=list)
-    players = models.JSONField(default=dict) # {"tg_id": card_num}
+    players = models.JSONField(default=dict) 
     bet_amount = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=20, default="LOBBY")
 
@@ -37,7 +34,7 @@ class Transaction(models.Model):
     note = models.TextField(default="")
 EOF
 
-# 3. VIEWS (Tiered Wins + 20% Cut + Sync)
+# 2. VIEWS (Fixed Syntax + 20% Profit + Tiered Rules)
 cat <<'EOF' > backend/bingo/views.py
 from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
@@ -46,16 +43,16 @@ from rest_framework.response import Response
 from .models import User, PermanentCard, GameRound, Transaction
 from decimal import Decimal
 
-def home(request): return HttpResponse("<h1>VladBingo Business Engine is LIVE</h1>")
+def home(request): return HttpResponse("<h1>VladBingo Business is LIVE</h1>")
 def live_view(request): return render(request, 'live_view.html')
 
 def get_game_info(request, game_id, tg_id):
     try:
         user = User.objects.get(username=f"tg_{tg_id}")
         game = GameRound.objects.get(id=game_id)
-        # 20% BUSINESS CUT
-        prize = float(len(game.players) * game.bet_amount) * 0.80 
-        card_num = game.players.get(str(tg_id), 1)
+        prize = float(len(game.players) * game.bet_amount) * 0.80 # 20% cut for you
+        u_cards = game.players.get(str(tg_id), [1])
+        card_num = u_cards[0] if isinstance(u_cards, list) else u_cards
         card = PermanentCard.objects.get(card_number=card_num)
         return JsonResponse({
             'card_number': card.card_number, 'board': card.board,
@@ -69,9 +66,14 @@ def check_win(request, game_id, tg_id):
         game = GameRound.objects.get(id=game_id)
         if game.status != "ACTIVE": return JsonResponse({'status': 'NOT_ACTIVE'})
         if "WON" in game.status: return JsonResponse({'status': 'ALREADY_WON'})
-        card_num = game.players.get(str(tg_id))
+        
+        u_cards = game.players.get(str(tg_id))
+        card_num = u_cards[0] if isinstance(u_cards, list) else u_cards
         card = PermanentCard.objects.get(card_number=card_num)
-        called_set = set(game.called_numbers); board = card.board; lines = 0
+        called_set = set(game.called_numbers)
+        board = card.board
+        
+        lines = 0
         for row in board:
             if all(c == "FREE" or c in called_set for c in row): lines += 1
         for c in range(5):
@@ -81,9 +83,8 @@ def check_win(request, game_id, tg_id):
         corners = [board[0][0], board[0][4], board[4][0], board[4][4]]
         if all(c in called_set for c in corners): lines += 1
         
-        # LOGIC: 20-40 (2 lines), 50-100 (3 lines). Corners always count as a line.
-        won = (float(game.bet_amount) <= 40 and lines >= 2) or (float(game.bet_amount) >= 50 and lines >= 3)
-        if won:
+        is_winner = (float(game.bet_amount) <= 40 and lines >= 2) or (float(game.bet_amount) >= 50 and lines >= 3)
+        if is_winner:
             prize = (Decimal(len(game.players)) * game.bet_amount) * Decimal("0.80")
             user.operational_credit += prize; user.save()
             game.status = f"WON_BY_{card.card_number}"; game.save()
@@ -92,10 +93,12 @@ def check_win(request, game_id, tg_id):
     except: return JsonResponse({'status': 'ERROR'})
 
 class ChapaWebhookView(APIView):
-    permission_classes = []; def post(self, request): return Response({"status": "ok"})
+    permission_classes = []
+    def post(self, request):
+        return Response({"status": "ok"})
 EOF
 
-# 4. BOT MAIN (Auto-Timer + Registration + Multi-Room)
+# 3. BOT MAIN
 cat <<'EOF' > backend/bingo/bot/main.py
 import os, sys, django, asyncio, random
 from pathlib import Path
@@ -115,7 +118,7 @@ def db_op(uid, action, val=None):
     user.save(); return user
 
 async def game_dealer(game_id):
-    await asyncio.sleep(300) # 5 MINUTE TIMER
+    await asyncio.sleep(300)
     game = await sync_to_async(GameRound.objects.get)(id=game_id)
     game.status = "ACTIVE"; await sync_to_async(game.save)()
     nums = list(range(1, 76)); random.shuffle(nums)
@@ -131,13 +134,13 @@ async def start(update: Update, context):
     user = await sync_to_async(db_op)(update.effective_user.id, "get")
     if not user.real_name:
         await sync_to_async(db_op)(user.id, "state", "REG_NAME")
-        await update.message.reply_text("👋 Welcome! Please enter your Full Name:")
+        await update.message.reply_text("👋 Welcome! Please enter your **Full Name** to register:")
         return
     if not user.phone_number:
         btn = [[KeyboardButton("📲 Share Phone", request_contact=True)]]
         await update.message.reply_text("Tap to verify your phone:", reply_markup=ReplyKeyboardMarkup(btn, one_time_keyboard=True, resize_keyboard=True))
         return
-
+    
     active_games = await sync_to_async(lambda: list(GameRound.objects.filter(status__in=["LOBBY","STARTING","ACTIVE"])))()
     user_games = [g for g in active_games if str(update.effective_user.id) in g.players]
     kbd = []
@@ -146,7 +149,7 @@ async def start(update: Update, context):
         kbd.append([InlineKeyboardButton(f"🎮 ENTER {int(g.bet_amount)} ETB HALL (Room #{g.id})", web_app=WebAppInfo(url=url))])
     
     kbd.append([InlineKeyboardButton("💵 20", callback_data="r_20"), InlineKeyboardButton("💵 40", callback_data="r_40"), InlineKeyboardButton("💵 100", callback_data="r_100")])
-    kbd.append([InlineKeyboardButton("💳 Deposit", callback_data="dep"), InlineKeyboardButton("🗑 Clear All", callback_data="clear")])
+    kbd.append([InlineKeyboardButton("💳 Deposit", callback_data="dep"), InlineKeyboardButton("🗑 Clear", callback_data="clear")])
     msg = f"🎰 **VLAD BINGO** 🎰\n👤 Player: {user.real_name}\n💰 Balance: {user.operational_credit} ETB\n\nPick a room:"
     await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(kbd), parse_mode='Markdown')
 
@@ -158,7 +161,7 @@ async def btn_handler(update, context):
         if user.operational_credit < amt: await q.edit_message_text("❌ Low Balance!"); return
         game, _ = await sync_to_async(GameRound.objects.get_or_create)(status="LOBBY", bet_amount=amt)
         user.current_joining_room = game.id; user.bot_state = "PICKING"; await sync_to_async(user.save)()
-        await q.edit_message_text(f"🎟 **{amt} ETB Room.** Type Card # (1-100):")
+        await q.edit_message_text(f"🎟 **Room {amt} ETB.** Type Card # (1-100):")
     elif q.data == "dep": 
         user.bot_state = "DEPOSITING"; await sync_to_async(user.save)(); await q.edit_message_text("💵 Deposit amount? (Min 20):")
 
@@ -178,40 +181,28 @@ async def text_handler(update, context):
             if len(game.players) == 3:
                 game.status = "STARTING"; await sync_to_async(game.save)()
                 asyncio.create_task(game_dealer(game.id)); await update.message.reply_text("🔥 **LOBBY FULL!** 5 mins until start.")
-            else: await update.message.reply_text(f"✅ Joined {game.bet_amount} ETB Lobby!")
+            else: await update.message.reply_text(f"✅ Joined Lobby!")
         elif user.bot_state == "DEPOSITING" and val >= 20:
             from bingo.services.chapa import init_deposit
             res, ref = await sync_to_async(init_deposit)(user, val)
-            await update.message.reply_text(f"💳 [Pay {val} ETB]({res['data']['checkout_url']})", parse_mode='Markdown')
+            await update.message.reply_text(f"💳 [Pay {val} ETB Now]({res['data']['checkout_url']})", parse_mode='Markdown')
 
-async def contact_handler(update, context):
+async def contact_handler(update: Update, context):
     user = await sync_to_async(db_op)(update.effective_user.id, "get")
     user.phone_number = update.message.contact.phone_number; user.bot_state = "IDLE"; await sync_to_async(user.save)()
     await update.message.reply_text("🎉 Verified!", reply_markup=ReplyKeyboardRemove()); await start(update, context)
 
+async def post_init(app): await app.bot.delete_webhook(drop_pending_updates=True)
+
 def run():
-    app = Application.builder().token(os.environ.get("TELEGRAM_BOT_TOKEN")).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(btn_handler))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
-    app.add_handler(MessageHandler(filters.CONTACT, contact_handler))
+    app = Application.builder().token(os.environ.get("TELEGRAM_BOT_TOKEN")).post_init(post_init).build()
+    app.add_handler(CommandHandler("start", start)); app.add_handler(CallbackQueryHandler(btn_handler))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler)); app.add_handler(MessageHandler(filters.CONTACT, contact_handler))
     app.run_polling()
 if __name__ == "__main__": run()
 EOF
 
-# 5. SYNC URLS
-cat <<'EOF' > backend/bingo/urls.py
-from django.urls import path
-from .views import live_view, get_game_info, check_win, ChapaWebhookView
-urlpatterns = [
-    path('live/', live_view, name='live_view'),
-    path('game-info/<int:game_id>/<int:tg_id>/', get_game_info),
-    path('check-win/<int:game_id>/<int:tg_id>/', check_win),
-    path('chapa-webhook/', ChapaWebhookView.as_view()),
-]
-EOF
-
-# 6. MASTER BUILD
+# 3. BUILD SCRIPT (Safe reset)
 cat <<'EOF' > backend/build.sh
 #!/usr/bin/env bash
 set -o errexit
@@ -230,4 +221,4 @@ python manage.py init_bingo || true
 EOF
 chmod +x backend/build.sh
 
-echo "✅ INDESTRUCTIBLE MASTER SYSTEM READY!"
+echo "✅ FINAL INDUSTRIAL ENGINE READY!"
