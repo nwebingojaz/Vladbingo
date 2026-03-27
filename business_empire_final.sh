@@ -1,10 +1,7 @@
 #!/bin/bash
-# VLAD BINGO - THE TOTAL BUSINESS EMPIRE (5 ROOMS + 20% CUT + AUTO-TIMER)
+# VLAD BINGO - THE COMPLETE BUSINESS EMPIRE (SYNCED & FINAL)
 
-# 1. CORE DIRECTORIES
-mkdir -p backend/bingo/bot backend/bingo/services backend/bingo/management/commands backend/bingo/templates backend/vlad_bingo
-
-# 2. FULL MODELS (Everything included)
+# 1. FULL MODELS
 cat <<'EOF' > backend/bingo/models.py
 from django.db import models
 from django.contrib.auth.models import AbstractUser
@@ -25,9 +22,9 @@ class PermanentCard(models.Model):
 class GameRound(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     called_numbers = models.JSONField(default=list)
-    players = models.JSONField(default=dict) # {"tg_id": card_num}
+    players = models.JSONField(default=dict) 
     bet_amount = models.DecimalField(max_digits=10, decimal_places=2)
-    status = models.CharField(max_length=20, default="LOBBY") # LOBBY, STARTING, ACTIVE, WON_BY_X
+    status = models.CharField(max_length=20, default="LOBBY")
 
 class Transaction(models.Model):
     agent = models.ForeignKey("User", on_delete=models.CASCADE)
@@ -37,7 +34,7 @@ class Transaction(models.Model):
     note = models.TextField(default="")
 EOF
 
-# 3. FULL VIEWS (20% Cut + Tiered Win Rules)
+# 2. FULL VIEWS (Tiered Win Logic + 20% Cut)
 cat <<'EOF' > backend/bingo/views.py
 from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
@@ -46,14 +43,14 @@ from rest_framework.response import Response
 from .models import User, PermanentCard, GameRound, Transaction
 from decimal import Decimal
 
-def home(request): return HttpResponse("<h1>VladBingo Engine: Professional Tier</h1>")
+def home(request): return HttpResponse("<h1>VladBingo Engine: Online</h1>")
 def live_view(request): return render(request, 'live_view.html')
 
 def get_game_info(request, game_id, tg_id):
     try:
         user = User.objects.get(username=f"tg_{tg_id}")
         game = GameRound.objects.get(id=game_id)
-        prize = float(len(game.players) * game.bet_amount) * 0.80 # 20% cut for you
+        prize = float(len(game.players) * game.bet_amount) * 0.80 
         card_num = game.players.get(str(tg_id), 1)
         card = PermanentCard.objects.get(card_number=card_num)
         return JsonResponse({
@@ -75,12 +72,13 @@ def check_win(request, game_id, tg_id):
             if all(c == "FREE" or c in called_set for c in row): lines += 1
         for c in range(5):
             if all(board[r][c] == "FREE" or board[r][c] in called_set for r in range(5)): lines += 1
+        if all(board[i][i] == "FREE" or board[i][i] in called_set for i in range(5)): lines += 1
+        if all(board[i][4-i] == "FREE" or board[i][4-i] in called_set for i in range(5)): lines += 1
         corners = [board[0][0], board[0][4], board[4][0], board[4][4]]
         if all(c in called_set for c in corners): lines += 1
         
-        # RULES: 20-40 needs 2 lines, 50-100 needs 3 lines
-        won = (float(game.bet_amount) <= 40 and lines >= 2) or (float(game.bet_amount) >= 50 and lines >= 3)
-        if won:
+        is_winner = (float(game.bet_amount) <= 40 and lines >= 2) or (float(game.bet_amount) >= 50 and lines >= 3)
+        if is_winner:
             prize = (Decimal(len(game.players)) * game.bet_amount) * Decimal("0.80")
             user.operational_credit += prize; user.save()
             game.status = f"WON_BY_{card.card_number}"; game.save()
@@ -92,7 +90,7 @@ class ChapaWebhookView(APIView):
     permission_classes = []; def post(self, request): return Response({"status": "ok"})
 EOF
 
-# 4. FULL BOT MAIN (5 Rooms + Timer + Registration)
+# 3. FULL BOT MAIN (Registration + Multi-Room Lobby + 5-Min Timer)
 cat <<'EOF' > backend/bingo/bot/main.py
 import os, sys, django, asyncio, random
 from pathlib import Path
@@ -106,28 +104,26 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(BASE_DIR)); os.environ.setdefault("DJANGO_SETTINGS_MODULE", "vlad_bingo.settings"); django.setup()
 from bingo.models import User, GameRound
 
-def db_op(uid, action, val=None, name=None):
+def db_op(uid, action, val=None):
     user, _ = User.objects.get_or_create(username=f"tg_{uid}")
     if action == "state": user.bot_state = val
-    elif action == "name": user.real_name = val; user.bot_state = "IDLE"
-    elif action == "phone": user.phone_number = val; user.bot_state = "IDLE"
     user.save(); return user
 
 async def start(update: Update, context):
     user = await sync_to_async(db_op)(update.effective_user.id, "get")
     if not user.real_name:
         await sync_to_async(db_op)(user.id, "state", "REG_NAME")
-        await update.message.reply_text("👋 **Welcome!** Please enter your Full Name to register:")
+        await update.message.reply_text("👋 Welcome! Please enter your **Full Name** to register:")
         return
     if not user.phone_number:
         btn = [[KeyboardButton("📲 Share Phone Number", request_contact=True)]]
-        await update.message.reply_text("One more step! Tap below to verify your phone:", reply_markup=ReplyKeyboardMarkup(btn, one_time_keyboard=True, resize_keyboard=True))
+        await update.message.reply_text("Tap below to verify your phone:", reply_markup=ReplyKeyboardMarkup(btn, one_time_keyboard=True, resize_keyboard=True))
         return
-
-    msg = f"🎰 **VLAD BINGO** 🎰\n👤 Player: {user.real_name}\n💰 Balance: {user.operational_credit} ETB\n\nPick a Room to Join:"
+    msg = f"🎰 **VLAD BINGO** 🎰\n👤 Player: {user.real_name}\n💰 Balance: {user.operational_credit} ETB\n\nPick a Room:"
     kbd = [[InlineKeyboardButton("💵 20", callback_data="r_20"), InlineKeyboardButton("💵 30", callback_data="r_30"), InlineKeyboardButton("💵 40", callback_data="r_40")],
            [InlineKeyboardButton("💵 50", callback_data="r_50"), InlineKeyboardButton("💵 100", callback_data="r_100")],
-           [InlineKeyboardButton("🎮 ENTER HALL", web_app=WebAppInfo(url="https://vlad-bingo-web.onrender.com/api/live/"))]]
+           [InlineKeyboardButton("🎮 ENTER HALL", web_app=WebAppInfo(url="https://vlad-bingo-web.onrender.com/api/live/"))],
+           [InlineKeyboardButton("💳 Deposit", callback_data="dep"), InlineKeyboardButton("🗑 Clear All", callback_data="clear")]]
     await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(kbd), parse_mode='Markdown')
 
 async def game_dealer(game_id):
@@ -152,41 +148,59 @@ async def btn_handler(update, context):
         game, _ = await sync_to_async(GameRound.objects.get_or_create)(status="LOBBY", bet_amount=amt)
         user.current_joining_room = game.id; user.bot_state = "PICKING"; await sync_to_async(user.save)()
         await q.edit_message_text(f"🎟 **Room {amt} ETB.** Type lucky Card # (1-100):")
+    elif q.data == "dep": user.bot_state = "DEPOSITING"; await sync_to_async(user.save)(); await q.edit_message_text("💵 Amount to deposit? (Min 20):")
+    elif q.data == "clear": user.selected_cards = []; await sync_to_async(user.save)(); await q.edit_message_text("🗑 Cards Cleared!")
 
 async def text_handler(update, context):
     uid = update.effective_user.id; user = await sync_to_async(db_op)(uid, "get")
     text = update.message.text
     if user.bot_state == "REG_NAME":
-        await sync_to_async(db_op)(uid, "name", text); await update.message.reply_text(f"✅ Hello {text}!"); await start(update, context)
-    elif text.isdigit() and user.bot_state == "PICKING":
-        val = int(text); game = await sync_to_async(GameRound.objects.get)(id=user.current_joining_room)
-        if val in game.players.values(): await update.message.reply_text("🚫 Taken!"); return
-        user.operational_credit -= game.bet_amount; user.selected_cards.append(val); user.bot_state = "IDLE"; await sync_to_async(user.save)()
-        game.players[str(uid)] = val; await sync_to_async(game.save)()
-        if len(game.players) == 3:
-            game.status = "STARTING"; await sync_to_async(game.save)()
-            asyncio.create_task(game_dealer(game.id)); await update.message.reply_text("🔥 **LOBBY FULL!** 5 mins to start.")
-        else: await update.message.reply_text(f"✅ Joined! Lobby {len(game.players)}/3")
+        user.real_name = text; user.bot_state = "IDLE"; await sync_to_async(user.save)()
+        await update.message.reply_text(f"✅ Hello {text}!"); await start(update, context)
+    elif text.isdigit():
+        val = int(text)
+        if user.bot_state == "PICKING":
+            game = await sync_to_async(GameRound.objects.get)(id=user.current_joining_room)
+            if val in game.players.values(): await update.message.reply_text("🚫 Taken!"); return
+            user.operational_credit -= game.bet_amount; user.selected_cards.append(val); user.bot_state = "IDLE"; await sync_to_async(user.save)()
+            game.players[str(uid)] = val; await sync_to_async(game.save)()
+            if len(game.players) == 3:
+                game.status = "STARTING"; await sync_to_async(game.save)()
+                asyncio.create_task(game_dealer(game.id)); await update.message.reply_text("🔥 **LOBBY FULL!** 5 mins to start.")
+            else: await update.message.reply_text(f"✅ Joined! Lobby {len(game.players)}/3")
+        elif user.bot_state == "DEPOSITING" and val >= 20:
+            from bingo.services.chapa import init_deposit
+            res, ref = await sync_to_async(init_deposit)(user, val)
+            await update.message.reply_text(f"💳 [Pay {val} ETB Now]({res['data']['checkout_url']})", parse_mode='Markdown')
+
+async def contact_handler(update: Update, context):
+    user = await sync_to_async(db_op)(update.effective_user.id, "get")
+    user.phone_number = update.message.contact.phone_number; user.bot_state = "IDLE"; await sync_to_async(user.save)()
+    await update.message.reply_text("🎉 Verified!", reply_markup=ReplyKeyboardRemove()); await start(update, context)
 
 async def post_init(app): await app.bot.delete_webhook(drop_pending_updates=True)
 
 def run():
     app = Application.builder().token(os.environ.get("TELEGRAM_BOT_TOKEN")).post_init(post_init).build()
-    app.add_handler(CommandHandler("start", start)); app.add_handler(CallbackQueryHandler(btn_handler))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler)); app.run_polling()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(btn_handler))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
+    app.add_handler(MessageHandler(filters.CONTACT, contact_handler))
+    app.run_polling()
 if __name__ == "__main__": run()
 EOF
 
-# 5. ADMIN & SYNC
+# 4. ADMIN & SYNC
 cat <<'EOF' > backend/bingo/admin.py
 from django.contrib import admin
 from .models import User, PermanentCard, GameRound, Transaction
+admin.site.register(User)
 admin.site.register(PermanentCard)
 admin.site.register(GameRound)
 admin.site.register(Transaction)
 EOF
 
-# 6. BUILD SCRIPT
+# 5. BUILD SCRIPT
 cat <<'EOF' > backend/build.sh
 #!/usr/bin/env bash
 set -o errexit
@@ -205,4 +219,4 @@ python manage.py init_bingo || true
 EOF
 
 chmod +x backend/build.sh
-echo "✅ TOTAL BUSINESS EMPIRE READY!"
+echo "✅ TOTAL BUSINESS ENGINE RESTORED!"

@@ -5,14 +5,14 @@ from rest_framework.response import Response
 from .models import User, PermanentCard, GameRound, Transaction
 from decimal import Decimal
 
-def home(request): return HttpResponse("<h1>VladBingo Engine: Professional Tier</h1>")
+def home(request): return HttpResponse("<h1>VladBingo Engine: Online</h1>")
 def live_view(request): return render(request, 'live_view.html')
 
 def get_game_info(request, game_id, tg_id):
     try:
         user = User.objects.get(username=f"tg_{tg_id}")
         game = GameRound.objects.get(id=game_id)
-        prize = float(len(game.players) * game.bet_amount) * 0.80 # 20% cut for you
+        prize = float(len(game.players) * game.bet_amount) * 0.80 
         card_num = game.players.get(str(tg_id), 1)
         card = PermanentCard.objects.get(card_number=card_num)
         return JsonResponse({
@@ -34,12 +34,13 @@ def check_win(request, game_id, tg_id):
             if all(c == "FREE" or c in called_set for c in row): lines += 1
         for c in range(5):
             if all(board[r][c] == "FREE" or board[r][c] in called_set for r in range(5)): lines += 1
+        if all(board[i][i] == "FREE" or board[i][i] in called_set for i in range(5)): lines += 1
+        if all(board[i][4-i] == "FREE" or board[i][4-i] in called_set for i in range(5)): lines += 1
         corners = [board[0][0], board[0][4], board[4][0], board[4][4]]
         if all(c in called_set for c in corners): lines += 1
         
-        # RULES: 20-40 needs 2 lines, 50-100 needs 3 lines
-        won = (float(game.bet_amount) <= 40 and lines >= 2) or (float(game.bet_amount) >= 50 and lines >= 3)
-        if won:
+        is_winner = (float(game.bet_amount) <= 40 and lines >= 2) or (float(game.bet_amount) >= 50 and lines >= 3)
+        if is_winner:
             prize = (Decimal(len(game.players)) * game.bet_amount) * Decimal("0.80")
             user.operational_credit += prize; user.save()
             game.status = f"WON_BY_{card.card_number}"; game.save()
