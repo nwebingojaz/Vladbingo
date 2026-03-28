@@ -1,5 +1,6 @@
 from django.urls import path
-from .views import home, live_view, get_game_info, check_win, lobby_info, join_room, ChapaWebhookView
+from .views import home, live_view, lobby_info, join_room, get_game_info, check_win, ChapaWebhookView
+
 urlpatterns = [
     path('', home, name='home'),
     path('live/', live_view, name='live_view'),
