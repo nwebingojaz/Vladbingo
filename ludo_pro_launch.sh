@@ -1,3 +1,32 @@
+#!/bin/bash
+# VLAD BINGO - LUDO PRO EDITION (200 CARDS + LIVE SELECTION)
+
+# 1. MODELS (Support 200 cards and Player States)
+cat <<'EOF' > backend/bingo/models.py
+from django.db import models
+from django.contrib.auth.models import AbstractUser
+from django.utils import timezone
+
+class User(AbstractUser):
+    operational_credit = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    selected_cards = models.JSONField(default=list)
+    bot_state = models.CharField(max_length=30, default="IDLE")
+
+class PermanentCard(models.Model):
+    card_number = models.PositiveSmallIntegerField(unique=True)
+    board = models.JSONField()
+
+class GameRound(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    called_numbers = models.JSONField(default=list)
+    # players = {"tg_id": {"card": 12, "paid": True}}
+    players = models.JSONField(default=dict) 
+    bet_amount = models.DecimalField(max_digits=10, decimal_places=2, default=20)
+    status = models.CharField(max_length=20, default="LOBBY") # LOBBY, ACTIVE, ENDED
+EOF
+
+# 2. MINI APP UI (Lobby -> Selector -> Hall)
+cat <<'EOF' > backend/bingo/templates/live_view.html
 <!DOCTYPE html>
 <html>
 <head>
@@ -122,3 +151,64 @@
     </script>
 </body>
 </html>
+EOF
+
+# 3. API LOGIC (VIEWS.PY)
+cat <<'EOF' > backend/bingo/views.py
+from django.shortcuts import render
+from django.http import JsonResponse
+from .models import User, GameRound, PermanentCard
+from decimal import Decimal
+
+def live_view(request): return render(request, 'live_view.html')
+
+def lobby_info(request, tg_id):
+    user, _ = User.objects.get_or_create(username=f"tg_{tg_id}")
+    active_game = GameRound.objects.filter(status="ACTIVE").last()
+    has_joined = active_game.id if (active_game and str(tg_id) in active_game.players) else None
+    return JsonResponse({'balance': float(user.operational_credit), 'active_game': has_joined})
+
+def join_room(request, tg_id, bet, card_num):
+    user = User.objects.get(username=f"tg_{tg_id}")
+    if user.operational_credit < bet: return JsonResponse({'status': 'error', 'error': 'Insufficient Balance'})
+    game, _ = GameRound.objects.get_or_create(status="LOBBY", bet_amount=bet)
+    user.operational_credit -= Decimal(bet); user.save()
+    game.players[str(tg_id)] = card_num; game.save()
+    return JsonResponse({'status': 'ok'})
+
+def get_game_info(request, game_id, tg_id):
+    game = GameRound.objects.get(id=game_id)
+    user = User.objects.get(username=f"tg_{tg_id}")
+    card_num = game.players.get(str(tg_id), 1)
+    card = PermanentCard.objects.get(card_number=card_num)
+    prize = float(len(game.players) * game.bet_amount) * 0.80
+    return JsonResponse({'board': card.board, 'prize': round(prize, 2), 'bet': float(game.bet_amount), 'called_numbers': game.called_numbers})
+
+def check_win(request, tg_id):
+    return JsonResponse({'status': 'NOT_YET'})
+EOF
+
+# 4. BOT CENTER (Simple Entrance)
+cat <<'EOF' > backend/bingo/bot/main.py
+import os, sys, django, asyncio
+from pathlib import Path
+from asgiref.sync import sync_to_async
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+from telegram.ext import Application, CommandHandler
+
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+sys.path.append(str(BASE_DIR)); os.environ.setdefault("DJANGO_SETTINGS_MODULE", "vlad_bingo.settings"); django.setup()
+
+async def start(update, context):
+    msg = f"🎰 **VLAD BINGO PRO** 🎰\nEnter the Lobby to play:"
+    kbd = [[InlineKeyboardButton("🎮 OPEN LOBBY", web_app=WebAppInfo(url="https://vlad-bingo-web.onrender.com/api/live/"))]]
+    await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(kbd), parse_mode='Markdown')
+
+def run():
+    app = Application.builder().token(os.environ.get("TELEGRAM_BOT_TOKEN")).build()
+    app.add_handler(CommandHandler("start", start))
+    app.run_polling()
+if __name__ == "__main__": run()
+EOF
+
+echo "✅ NEXT-LUDO CLONE ENGINE APPLIED!"
