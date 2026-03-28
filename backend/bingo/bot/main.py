@@ -33,22 +33,21 @@ async def start(update: Update, context):
     user = await sync_to_async(db_op)(update.effective_user.id, "get")
     if not user.real_name:
         await sync_to_async(db_op)(user.id, "state", "REG_NAME")
-        return await update.message.reply_text("👋 Welcome! Please enter your Full Name:")
+        return await update.message.reply_text("👋 Welcome! Please enter your **Full Name**:")
     if not user.phone_number:
         btn = [[KeyboardButton("📲 Share Phone", request_contact=True)]]
         return await update.message.reply_text("Tap to verify phone:", reply_markup=ReplyKeyboardMarkup(btn, one_time_keyboard=True, resize_keyboard=True))
     
-    active_games = await sync_to_async(lambda: list(GameRound.objects.filter(status__in=["LOBBY","STARTING","ACTIVE"])))()
+    active_games = await sync_to_async(lambda: list(GameRound.objects.exclude(status="ENDED")))()
     user_games = [g for g in active_games if str(update.effective_user.id) in g.players]
     kbd = []
     for g in user_games:
         url = f"https://vlad-bingo-web.onrender.com/api/live/?game_id={g.id}"
         kbd.append([InlineKeyboardButton(f"🎮 ENTER {int(g.bet_amount)} ETB HALL", web_app=WebAppInfo(url=url))])
     
-    kbd.append([InlineKeyboardButton("💵 Join 10", callback_data="r_10"), InlineKeyboardButton("💵 Join 20", callback_data="r_20")])
+    kbd.append([InlineKeyboardButton("💵 Join 10", callback_data="r_10"), InlineKeyboardButton("💵 Join 20", callback_data="r_20"), InlineKeyboardButton("💵 Join 40", callback_data="r_40")])
     kbd.append([InlineKeyboardButton("💵 Join 50", callback_data="r_50"), InlineKeyboardButton("💵 Join 100", callback_data="r_100")])
     kbd.append([InlineKeyboardButton("💳 Deposit", callback_data="dep"), InlineKeyboardButton("🗑 Clear/Refund", callback_data="clear")])
-    
     msg = f"🎰 **VLAD BINGO** 🎰\n👤 Player: {user.real_name}\n💰 Balance: {user.operational_credit} ETB"
     await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(kbd), parse_mode='Markdown')
 
@@ -59,37 +58,4 @@ async def btn_handler(update, context):
         amt = int(q.data.split("_")[1])
         if user.operational_credit < amt: await q.edit_message_text("❌ Low Balance!"); return
         game, _ = await sync_to_async(GameRound.objects.get_or_create)(status="LOBBY", bet_amount=amt)
-        user.current_room_id = game.id; user.bot_state = "PICKING"; await sync_to_async(user.save)()
-        await q.edit_message_text(f"🎟 **{amt} ETB Room.** Type Card # (1-100):")
-    elif q.data == "clear":
-        # Refund logic: Return money for all cards in LOBBY status
-        games = await sync_to_async(lambda: list(GameRound.objects.filter(status="LOBBY")))()
-        for g in games:
-            if str(uid) in g.players:
-                user.operational_credit += g.bet_amount
-                del g.players[str(uid)]; await sync_to_async(g.save)()
-        user.selected_cards = []; await sync_to_async(user.save)()
-        await q.edit_message_text("🗑 Cards cleared and money refunded!")
-
-async def text_handler(update, context):
-    uid = update.effective_user.id; user = await sync_to_async(db_op)(uid, "get")
-    if user.bot_state == "REG_NAME":
-        await sync_to_async(db_op)(uid, "name", update.message.text); await start(update, context)
-    elif update.message.text.isdigit() and user.bot_state == "PICKING":
-        val = int(update.message.text); game = await sync_to_async(GameRound.objects.get)(id=user.current_room_id)
-        if val in game.players.values(): await update.message.reply_text("🚫 Taken!"); return
-        user.operational_credit -= game.bet_amount; user.selected_cards.append(val); user.bot_state = "IDLE"
-        game.players[str(uid)] = val; await sync_to_async(user.save)(); await sync_to_async(game.save)()
-        if len(game.players) == 3: asyncio.create_task(game_dealer(game.id))
-        await update.message.reply_text("✅ Card Added!"); await start(update, context)
-
-async def contact_handler(update, context):
-    await sync_to_async(db_op)(update.effective_user.id, "phone", update.message.contact.phone_number)
-    await update.message.reply_text("✅ Verified!", reply_markup=ReplyKeyboardRemove()); await start(update, context)
-
-def run():
-    app = Application.builder().token(os.environ.get("TELEGRAM_BOT_TOKEN")).build()
-    app.add_handler(CommandHandler("start", start)); app.add_handler(CallbackQueryHandler(btn_handler))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler)); app.add_handler(MessageHandler(filters.CONTACT, contact_handler))
-    app.run_polling()
-if __name__ == "__main__": run()
+        user.current_room_id =
