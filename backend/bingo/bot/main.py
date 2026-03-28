@@ -16,19 +16,6 @@ def db_op(uid, action, val=None):
     elif action == "phone": user.phone_number = val; user.bot_state = "IDLE"
     user.save(); return user
 
-async def game_dealer(game_id):
-    await asyncio.sleep(300) # 5 Min Timer
-    game = await sync_to_async(GameRound.objects.get)(id=game_id)
-    game.status = "ACTIVE"; await sync_to_async(game.save)()
-    nums = list(range(1, 76)); random.shuffle(nums)
-    layer = get_channel_layer()
-    for n in nums:
-        game.refresh_from_db()
-        if "WON" in game.status or game.status == "ENDED": break
-        game.called_numbers.append(n); await sync_to_async(game.save)()
-        await layer.group_send("bingo_live", {"type": "bingo_message", "message": {"action": "call_number", "number": n}})
-        await asyncio.sleep(7)
-
 async def start(update: Update, context):
     user = await sync_to_async(db_op)(update.effective_user.id, "get")
     if not user.real_name:
@@ -46,32 +33,13 @@ async def start(update: Update, context):
         [InlineKeyboardButton("Transactions 📜", callback_data="hi"), InlineKeyboardButton("Balance 💰", callback_data="ba")],
         [InlineKeyboardButton("Join Group ↗️", url="https://t.me/+t8ito3eKejo4OGU0"), InlineKeyboardButton("Contact Us", callback_data="co")]
     ]
-    msg = f"🎰 **VLAD BINGO PLATFORM** 🎰\n\n👤 **የመለያ መረጃዎ:**\n📛 **Username:** @{update.effective_user.username}\n📱 **Phone:** {user.phone_number}\n💰 **Balance:** {user.operational_credit} ETB"
+    msg = f"🎰 **VLAD BINGO PLATFORM** 🎰\n\n👤 **የመለያ መረጃዎ:**\n📛 **Username:** @{update.effective_user.username}\n💰 **Balance:** {user.operational_credit} ETB"
     await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(kbd), parse_mode='Markdown')
-
-async def btn_handler(update, context):
-    q = update.callback_query; await q.answer(); uid = q.from_user.id
-    user = await sync_to_async(db_op)(uid, "get")
-    if q.data == "ba": await q.edit_message_text(f"💰 Balance: {user.operational_credit} ETB. Type /start to return.")
-    elif q.data == "dep": await sync_to_async(db_op)(uid, "state", "DEPOSITING"); await q.edit_message_text("💵 Amount to deposit? (Min 20):")
-
-async def text_handler(update, context):
-    uid = update.effective_user.id; user = await sync_to_async(db_op)(uid, "get")
-    text = update.message.text
-    if user.bot_state == "REG_NAME":
-        await sync_to_async(db_op)(uid, "name", text); await start(update, context)
-    elif text.isdigit() and user.bot_state == "DEPOSITING" and int(text) >= 20:
-        from bingo.services.chapa import init_deposit
-        res, ref = await sync_to_async(init_deposit)(user, int(text))
-        await update.message.reply_text(f"💳 [Pay {text} ETB Now]({res['data']['checkout_url']})", parse_mode='Markdown')
-
-async def contact_handler(update: Update, context):
-    await sync_to_async(db_op)(update.effective_user.id, "phone", update.message.contact.phone_number)
-    await update.message.reply_text("✅ Verified!", reply_markup=ReplyKeyboardRemove()); await start(update, context)
 
 def run():
     app = Application.builder().token(os.environ.get("TELEGRAM_BOT_TOKEN")).post_init(lambda a: a.bot.delete_webhook(drop_pending_updates=True)).build()
-    app.add_handler(CommandHandler("start", start)); app.add_handler(CallbackQueryHandler(btn_handler))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler)); app.add_handler(MessageHandler(filters.CONTACT, contact_handler))
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, lambda u,c: None))
+    app.add_handler(MessageHandler(filters.CONTACT, lambda u,c: None))
     app.run_polling()
 if __name__ == "__main__": run()
