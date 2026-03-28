@@ -19,7 +19,7 @@ def join_room(request, tg_id, bet, card_num):
     if card_num in game.players.values(): return JsonResponse({'error': 'Taken'})
     user.operational_credit -= Decimal(bet); user.save()
     game.players[str(tg_id)] = card_num; game.save()
-    return JsonResponse({'status': 'ok'})
+    return JsonResponse({'status': 'ok', 'game_id': game.id})
 
 def get_game_info(request, game_id, tg_id):
     try:

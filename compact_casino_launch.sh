@@ -1,3 +1,8 @@
+#!/bin/bash
+# VLAD BINGO - COMPACT CASINO (FIXED NAVIGATION + SMALL BUTTONS)
+
+# 1. MINI APP UI (Ultra-Compressed)
+cat <<'EOF' > backend/bingo/templates/live_view.html
 <!DOCTYPE html>
 <html>
 <head>
@@ -118,3 +123,9 @@
     </script>
 </body>
 </html>
+EOF
+
+# 2. UPDATE JOIN_ROOM VIEW (Return Game ID)
+sed -i "s/return JsonResponse({'status': 'ok'})/return JsonResponse({'status': 'ok', 'game_id': game.id})/g" backend/bingo/views.py
+
+echo "✅ UI Compressed & Navigation Fixed!"
