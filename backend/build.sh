@@ -3,11 +3,13 @@ set -o errexit
 cd backend
 pip install -r requirements.txt
 python manage.py collectstatic --no-input
-# THE NUCLEAR WIPE: Fixes the column already exists error forever
 python manage.py shell <<innerEOF
 from django.db import connection
 with connection.cursor() as cursor:
-    cursor.execute("DROP SCHEMA public CASCADE; CREATE SCHEMA public;")
+    try:
+        cursor.execute("DROP SCHEMA public CASCADE; CREATE SCHEMA public;")
+        print("✅ Clean Slate!")
+    except: pass
 innerEOF
 python manage.py makemigrations bingo --no-input
 python manage.py migrate --no-input
