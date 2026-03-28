@@ -2,131 +2,82 @@
 <html>
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>VladBingo Pro</title>
+    <title>Vlad Bingo Pro</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background-color: #0b1d1a; color: white; font-family: sans-serif; overflow-x: hidden; }
-        /* The River Grid */
-        .river-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; padding: 10px; background: #071412; border-radius: 10px; height: 350px; overflow-y: auto; }
-        .river-cell { background: #132a26; border: 1px solid #1c3d38; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: bold; border-radius: 4px; color: #4ade80; cursor: pointer; }
-        .river-cell.selected { background: #000; color: #94a3b8; border-color: #000; }
-        .river-cell.mine { background: #10b981 !important; color: white !important; border-color: #34d399; transform: scale(1.1); }
-        
-        /* Bottom Preview Area */
-        .preview-box { background: #071412; border: 2px solid #10b981; border-radius: 15px; padding: 10px; width: 140px; }
-        .preview-cell { font-size: 0.6rem; text-align: center; color: #4ade80; height: 20px; border: 0.1px solid #1c3d38; display: flex; align-items: center; justify-content: center; }
-        
-        /* Action Buttons */
-        .btn-action { background: #10b981; color: #0b1d1a; padding: 12px; border-radius: 10px; font-weight: 900; text-transform: uppercase; font-size: 0.8rem; width: 100%; box-shadow: 0 4px 0 #065f46; transition: 0.1s; }
-        .btn-action:active { transform: translateY(4px); box-shadow: none; }
-        
-        /* Red Error Modal */
-        .modal-err { position: fixed; top: 20%; left: 50%; transform: translateX(-50%); background: #1e1b1b; border: 2px solid #ef4444; border-radius: 15px; padding: 20px; width: 85%; z-index: 100; text-align: center; box-shadow: 0 0 30px rgba(239, 68, 68, 0.4); }
-        .hidden { display: none; }
+        body { background-color: #0b1220; color: white; font-family: sans-serif; overflow-x: hidden; }
+        .tier-card { border-radius: 12px; padding: 15px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; cursor: pointer; border: 2px solid #1f2937; background: #111827; }
+        .tier-enabled { background: linear-gradient(135deg, #065f46, #059669); border-color: #10b981; }
+        .num-dot { width: 14px; height: 14px; border-radius: 50%; background: #1e293b; font-size: 0.5rem; display: flex; align-items: center; justify-content: center; border: 1px solid #334155; }
+        .called { background: #fbbf24 !important; color: black !important; }
+        .card-cell { background: #1e293b; aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center; font-weight: bold; border-radius: 6px; border: 1px solid #334155; }
+        .marked { background: #10b981 !important; }
+        .view-hidden { display: none; }
     </style>
 </head>
 <body class="p-3">
-    <!-- TOP BAR -->
-    <div class="flex justify-between items-center mb-4">
-        <div class="flex items-center gap-2 bg-slate-900/50 p-2 rounded-lg border border-slate-800">
-            <div class="bg-yellow-500 text-black p-1 rounded-md text-xs">💰</div>
-            <div class="font-black text-sm"><span id="user-bal">0.00</span> ETB</div>
+    <div class="flex justify-between items-center mb-4 bg-slate-800/50 p-2 rounded-xl border border-slate-700">
+        <div class="text-sm font-bold text-emerald-400">💰 <span id="header-bal">0.00</span> ETB</div>
+        <button onclick="location.reload()" class="text-[9px] bg-slate-700 px-2 py-1 rounded font-bold">REFRESH 🔄</button>
+    </div>
+
+    <div id="view-lobby">
+        <h2 class="text-[10px] font-bold text-gray-500 uppercase mb-3 tracking-widest">Select Room</h2>
+        <div id="room-list"></div>
+    </div>
+
+    <div id="view-hall" class="view-hidden">
+        <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 mb-3 flex justify-between items-center">
+            <div><div class="text-[8px] text-gray-400 font-bold">Prize</div><div class="text-xl font-black text-emerald-400"><span id="prize">0</span> ETB</div></div>
+            <div id="game-status" class="text-[10px] font-bold text-yellow-500 animate-pulse">LOBBY</div>
         </div>
-        <div class="font-black text-emerald-400 italic">NEXT VLAD GAMES</div>
-    </div>
-
-    <!-- ERROR MODAL -->
-    <div id="modal-err" class="modal-err hidden">
-        <div class="bg-red-500 w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-3">❌</div>
-        <h2 class="text-white font-bold text-lg mb-1">Error</h2>
-        <p class="text-red-400 text-xs mb-4">Insufficient Balance</p>
-        <button onclick="hideErr()" class="w-full py-2 bg-slate-800 rounded-lg font-bold">CLOSE</button>
-    </div>
-
-    <!-- VIEW: SELECTOR (The River) -->
-    <div id="view-selector">
-        <div class="river-grid mb-4" id="river"></div>
-        
-        <div class="flex gap-3 items-end">
-            <!-- Card Preview (Left) -->
-            <div class="preview-box">
-                <div class="grid grid-cols-5 gap-0.5" id="preview-grid"></div>
-                <div class="text-[10px] text-center mt-2 text-emerald-500 font-bold">Card #<span id="preview-num">--</span></div>
-            </div>
-            
-            <!-- Controls (Right) -->
-            <div class="flex-1 space-y-3">
-                <button onclick="pickRandom()" class="btn-action" style="background: #1c3d38; color: #4ade80; border: 1px solid #10b981;">🎲 RANDOM</button>
-                <button onclick="requestStart()" class="btn-action">▶ START!</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- VIEW: HALL (Hidden initially) -->
-    <div id="view-hall" class="hidden text-center">
-        <h1 class="text-yellow-500 font-black mb-4 tracking-widest">LIVE BINGO HALL</h1>
-        <div id="tracker" class="grid grid-cols-1 gap-1 mb-4 p-2 bg-black/40 rounded-xl border border-emerald-900/30"></div>
-        <div id="hall-card" class="grid grid-cols-5 gap-1.5 bg-slate-800 p-2 rounded-2xl border-2 border-slate-700 shadow-2xl"></div>
+        <div id="tracker" class="grid grid-cols-1 gap-1 mb-4 p-2 bg-slate-950 rounded-lg border border-slate-900"></div>
+        <div id="user-card" class="grid grid-cols-5 gap-1 bg-slate-800 p-2 rounded-xl border-2 border-slate-700 shadow-2xl mb-4"></div>
+        <button id="bingo-btn" class="w-full py-4 bg-yellow-500 text-black font-black text-lg rounded-xl shadow-lg">BINGO! 📢</button>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp; const uid = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : 0;
-        let selectedId = null; let activeBet = 20; // Default room
-
-        function hideErr() { document.getElementById('modal-err').classList.add('hidden'); }
-        function showHall() { document.getElementById('view-selector').classList.add('hidden'); document.getElementById('view-hall').classList.remove('hidden'); }
-
-        // 1. Build the River (1-200)
-        const river = document.getElementById('river');
-        for(let i=1; i<=200; i++) {
-            let div = document.createElement('div'); div.className = 'river-cell'; div.id = 'r-'+i; div.innerText = i;
-            div.onclick = () => selectCard(i);
-            river.appendChild(div);
-        }
-
-        function selectCard(num) {
-            selectedId = num;
-            // Highlight in river
-            Array.from(river.children).forEach(c=>c.classList.remove('mine'));
-            document.getElementById('r-'+num).classList.add('mine');
-            // Fetch preview
-            fetch('/api/card-data/' + num + '/').then(r=>r.json()).then(d => {
-                const prev = document.getElementById('preview-grid'); prev.innerHTML = '';
-                document.getElementById('preview-num').innerText = num;
-                d.board.forEach(row => row.forEach(val => {
-                    let c = document.createElement('div'); c.className = 'preview-cell';
-                    c.innerText = val === 'FREE' ? 'X' : val;
-                    prev.appendChild(c);
-                }));
+        function init() {
+            fetch('/api/lobby-info/' + uid + '/').then(r=>r.json()).then(d => {
+                document.getElementById('header-bal').innerText = d.balance.toFixed(2);
+                const list = document.getElementById('room-list'); list.innerHTML = '';
+                [10, 20, 40, 50, 100].forEach(amt => {
+                    let active = d.balance >= amt;
+                    list.innerHTML += `<div onclick="${active ? 'joinRoom('+amt+')' : ''}" class="tier-card ${active ? 'tier-enabled' : ''}"><div class="font-black text-lg">BINGO ${amt}</div><div class="text-[9px] font-bold">WIN ~${amt*4}</div></div>`;
+                });
+                if(d.active_game) { document.getElementById('view-lobby').classList.add('view-hidden'); document.getElementById('view-hall').classList.remove('view-hidden'); loadHall(d.active_game); }
             });
         }
-
-        function pickRandom() { selectCard(Math.floor(Math.random() * 200) + 1); }
-
-        function requestStart() {
-            if(!selectedId) return alert("Select a card first!");
-            fetch(`/api/join-room/${uid}/${activeBet}/${selectedId}/`).then(r=>r.json()).then(d => {
-                if(d.status === 'ok') location.reload();
-                else document.getElementById('modal-err').classList.remove('hidden');
-            });
-        }
-
-        // Initialize Balance & Check if user is already in a game
-        fetch('/api/lobby-info/' + uid + '/').then(r=>r.json()).then(d => {
-            document.getElementById('user-bal').innerText = d.balance.toFixed(2);
-            if(d.active_game) { showHall(); loadHall(d.active_game); }
-        });
-
+        function joinRoom(amt) { fetch(`/api/join-room/${uid}/${amt}/1/`).then(r=>r.json()).then(()=>location.reload()); }
         function loadHall(gid) {
-            const tr = document.getElementById('tracker');
+            const tr = document.getElementById('tracker'); tr.innerHTML = '';
             ['B','I','N','G','O'].forEach((l, idx) => {
-                let h = `<div class="flex gap-1 items-center"><div class="text-yellow-500 font-bold w-4 text-[8px]">${l}</div>`;
+                let h = `<div class="flex gap-1 items-center"><div class="text-yellow-500 font-bold w-4 text-[7px]">${l}</div>`;
                 for(let i=(idx*15)+1; i<=(idx*15)+15; i++) h += `<div id="t-${i}" class="num-dot">${i}</div>`;
                 tr.innerHTML += h + '</div>';
             });
-            // Fetch game data and build the big hall card... (Previous Hall Logic)
+            fetch(`/api/game-info/${gid}/${uid}/`).then(r=>r.json()).then(d => {
+                document.getElementById('prize').innerText = d.prize;
+                d.board.forEach(row => row.forEach(val => {
+                    const c = document.createElement('div'); c.className = 'card-cell'; c.innerText = val === 'FREE' ? '★' : val;
+                    if(val === 'FREE') c.classList.add('marked'); c.onclick = () => c.classList.toggle('marked');
+                    document.getElementById('user-card').appendChild(c);
+                }));
+            });
+            const ws = new WebSocket('wss://' + window.location.host + '/ws/game/' + gid + '/');
+            ws.onmessage = (e) => {
+                const m = JSON.parse(e.data);
+                if(m.action === 'call_number') document.getElementById('t-' + m.number).classList.add('called');
+            };
         }
+        document.getElementById('bingo-btn').onclick = () => {
+            fetch('/api/check-win/' + uid + '/').then(r=>r.json()).then(d => {
+                if(d.status === 'WINNER') { alert("🏆 BINGO!"); location.reload(); } else alert("❌ Not yet!");
+            });
+        };
+        init();
     </script>
 </body>
 </html>
