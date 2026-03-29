@@ -32,11 +32,9 @@ def lobby_info(request, tg_id):
     return JsonResponse({'balance': float(user.operational_credit), 'rooms': room_data, 'active_game_id': active_game.id if active_game else None})
 
 def get_history(request, tg_id):
-    # Global Winners
     recent_winners = GameRound.objects.filter(status="ENDED").order_by('-id')[:15]
     winners_data = [{'game_id': g.id, 'winner': g.winner_username or "None", 'called': f"{len(g.called_numbers)}/75", 'prize': float(g.winner_prize)} for g in recent_winners]
     
-    # Personal Bets
     my_games = GameRound.objects.filter(players__has_key=str(tg_id)).order_by('-id')[:15]
     my_bets_data = []
     for g in my_games:
