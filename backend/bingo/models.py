@@ -16,7 +16,7 @@ class PermanentCard(models.Model):
 class GameRound(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     called_numbers = models.JSONField(default=list)
-    players = models.JSONField(default=dict) # {"tg_id": card_num}
+    players = models.JSONField(default=dict)
     bet_amount = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=20, default="LOBBY")
     winner_username = models.CharField(max_length=100, null=True, blank=True)

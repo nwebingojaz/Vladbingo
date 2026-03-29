@@ -4,6 +4,9 @@ from .models import User, PermanentCard, GameRound, Transaction
 from django.utils import timezone
 from decimal import Decimal
 
+def home(request):
+    return HttpResponse("<h1>VLAD BINGO ENGINE IS ACTIVE</h1>")
+
 def live_view(request):
     return render(request, 'live_view.html')
 
