@@ -10,6 +10,12 @@ def home(request):
 def live_view(request):
     return render(request, 'live_view.html')
 
+def get_card_data(request, num):
+    try:
+        card = PermanentCard.objects.get(card_number=num)
+        return JsonResponse({"board": card.board})
+    except: return JsonResponse({"error": "not found"}, status=404)
+
 def lobby_info(request, tg_id):
     user, _ = User.objects.get_or_create(username=f"tg_{tg_id}")
     active_game = GameRound.objects.filter(status="LOBBY", bet_amount=10).first()
@@ -32,30 +38,3 @@ def join_room(request, tg_id, bet, card_num):
     game.players[str(tg_id)] = card_num
     game.save(); user.operational_credit -= Decimal(bet); user.save()
     return JsonResponse({'status': 'ok'})
-
-def get_game_info(request, game_id, tg_id):
-    game = GameRound.objects.get(id=game_id)
-    card_num = game.players.get(str(tg_id), 1)
-    card = PermanentCard.objects.get(card_number=card_num)
-    prize = (Decimal(len(game.players)) * game.bet_amount) * Decimal("0.80")
-    return JsonResponse({'board': card.board, 'called': game.called_numbers, 'prize': float(prize), 'status': game.status})
-
-def check_win(request, game_id, tg_id):
-    user = User.objects.get(username=f"tg_{tg_id}")
-    game = GameRound.objects.get(id=game_id)
-    if game.status != "ACTIVE": return JsonResponse({'status': 'WAITING'})
-    card_num = game.players.get(str(tg_id)); card = PermanentCard.objects.get(card_number=card_num)
-    called_set = set(game.called_numbers); board = card.board; lines = 0
-    for r in range(5):
-        if all(board[r][c] == "FREE" or board[r][c] in called_set for c in range(5)): lines += 1
-        if all(board[c][r] == "FREE" or board[c][r] in called_set for r in range(5)): lines += 1
-    corners = [board[0][0], board[0][4], board[4][0], board[4][4]]
-    if all(c == "FREE" or c in called_set for c in corners): lines += 1
-    threshold = 2 if float(game.bet_amount) <= 40 else 3
-    if lines >= threshold:
-        prize = (Decimal(len(game.players)) * game.bet_amount) * Decimal("0.80")
-        user.operational_credit += prize; user.save()
-        game.status = "ENDED"; game.winner_username = user.username; game.winner_prize = prize
-        game.finished_at = timezone.now(); game.save()
-        return JsonResponse({'status': 'WINNER', 'prize': float(prize)})
-    return JsonResponse({'status': 'NOT_YET'})
