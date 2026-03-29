@@ -1,14 +1,12 @@
 #!/bin/bash
-echo "🚀 STARTING VLAD BINGO PRO MASTER SETUP..."
+echo "🚀 Starting VLAD BINGO PRO Master Update..."
 
-# 1. SETUP FOLDERS
-cd ~/vladbingo/backend
+# Ensure directories exist
 mkdir -p bingo/templates
-mkdir -p bingo/services
 mkdir -p bingo/bot
 
-# 2. CREATE MODELS (Adding Winner & History tracking)
-cat << 'EOF' > bingo/models.py
+# 1. Update Models
+cat << 'INNER' > bingo/models.py
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
@@ -33,10 +31,10 @@ class GameRound(models.Model):
     winner_username = models.CharField(max_length=100, null=True, blank=True)
     winner_prize = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     finished_at = models.DateTimeField(null=True, blank=True)
-EOF
+INNER
 
-# 3. CREATE VIEWS (History API + Timer Logic)
-cat << 'EOF' > bingo/views.py
+# 2. Update Views
+cat << 'INNER' > bingo/views.py
 from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
 from .models import User, PermanentCard, GameRound
@@ -48,18 +46,21 @@ def live_view(request):
 
 def lobby_info(request, tg_id):
     user, _ = User.objects.get_or_create(username=f"tg_{tg_id}")
-    # Default to 10 Birr Room
     active_game = GameRound.objects.filter(status="LOBBY", bet_amount=10).first()
     time_left = 0
     if active_game:
         elapsed = (timezone.now() - active_game.created_at).total_seconds()
-        time_left = max(0, 60 - int(elapsed)) # 1 Minute Timer
+        time_left = max(0, 60 - int(elapsed))
     
     joined_id = active_game.id if (active_game and str(tg_id) in active_game.players) else None
-    return JsonResponse({'balance': float(user.operational_credit), 'active_game': joined_id, 'time_left': time_left})
+    return JsonResponse({
+        'balance': float(user.operational_credit), 
+        'active_game': joined_id,
+        'time_left': time_left
+    })
 
 def get_history(request):
-    history = GameRound.objects.filter(status="ENDED").order_by('-id')[:15]
+    history = GameRound.objects.filter(status="ENDED").order_by('-id')[:10]
     data = [{'game_id': g.id, 'winner': g.winner_username or "None", 'called': f"{len(g.called_numbers)}/75", 'prize': float(g.winner_prize)} for g in history]
     return JsonResponse({'history': data})
 
@@ -72,10 +73,10 @@ def join_room(request, tg_id, bet, card_num):
     user.operational_credit -= Decimal(bet)
     user.save()
     return JsonResponse({'status': 'ok'})
-EOF
+INNER
 
-# 4. CREATE FINAL VLAD UI (Emerald Pro Theme)
-cat << 'EOF' > bingo/templates/live_view.html
+# 3. Update HTML
+cat << 'INNER' > bingo/templates/live_view.html
 <!DOCTYPE html>
 <html>
 <head>
@@ -87,126 +88,89 @@ cat << 'EOF' > bingo/templates/live_view.html
         body { background-color: #0b2e24; color: white; font-family: sans-serif; overflow: hidden; }
         .header-bg { background: #111827; border-bottom: 2px solid #10b981; }
         .card-num { height: 32px; background: #1a3a32; border: 1px solid #2d5a4e; border-radius: 4px; font-size: 0.65rem; font-weight: bold; color: #4ade80; }
-        .card-num.active { background: #10b981 !important; color: white; border-color: white; transform: scale(1.1); box-shadow: 0 0 10px #10b981; }
-        .modal { background: rgba(0,0,0,0.95); position: fixed; inset: 0; z-index: 100; padding: 20px; }
+        .card-num.active { background: #10b981 !important; color: white; border-color: white; transform: scale(1.1); }
+        .modal { background: rgba(0,0,0,0.9); position: fixed; inset: 0; z-index: 100; padding: 20px; }
         .hidden { display: none; }
-        .history-row { background: #1a3a32; margin-bottom: 4px; padding: 8px; border-radius: 6px; font-size: 10px; display: grid; grid-template-columns: 1fr 2.5fr 1fr 1fr; }
+        .history-row { background: #1a3a32; margin-bottom: 4px; padding: 8px; border-radius: 6px; font-size: 10px; display: grid; grid-template-columns: 1fr 2fr 1fr 1fr; }
     </style>
 </head>
 <body class="antialiased select-none">
-    <!-- VLAD PRO HEADER -->
     <div class="header-bg p-3 flex justify-between items-center shadow-lg">
         <div class="flex items-center gap-2">
             <div class="bg-emerald-500 p-1 rounded font-black text-[10px] text-black italic">VLAD</div>
-            <div class="font-black text-xs uppercase tracking-tighter">BINGO PRO</div>
+            <div class="font-black text-xs uppercase">BINGO PRO</div>
         </div>
-        <div class="bg-slate-800 px-3 py-1 rounded-full border border-slate-700 flex items-center gap-2">
+        <div class="bg-slate-800 px-3 py-1 rounded-full flex items-center gap-2">
             <span class="text-yellow-400">👛</span><span id="bal-header" class="font-bold text-xs">0.00</span>
         </div>
     </div>
-
-    <!-- SUB-NAV -->
     <div class="bg-emerald-950/50 p-2 flex justify-around text-[9px] font-bold text-emerald-300 uppercase border-b border-emerald-900">
-        <div>🎲 Room: 10 Birr</div>
-        <div onclick="openHistory()">📜 History</div>
-        <div onclick="location.reload()">🔄 Refresh</div>
+        <div>🎲 Tier: 10</div><div onclick="openHistory()">📜 History</div><div onclick="location.reload()">🔄 Refresh</div>
     </div>
-
-    <!-- TIMER BAR -->
     <div class="bg-black/40 p-1 text-center border-b border-white/5">
-        <span class="text-[10px] text-emerald-400 font-bold uppercase tracking-widest">Lobby Closes: </span>
+        <span class="text-[10px] text-emerald-400 font-bold uppercase">Lobby Closes: </span>
         <span id="timer" class="text-[10px] font-mono font-black text-white ml-1">00:00</span>
     </div>
-
-    <!-- MAIN VIEW -->
     <div id="v-selector" class="p-4">
-        <div id="grid-200" class="grid grid-cols-10 gap-1 h-80 overflow-y-auto mb-6 p-2 bg-black/20 rounded-xl border border-white/5"></div>
-        <div class="flex gap-4 items-center">
-            <div id="prev-box" class="flex-1 bg-emerald-950/50 p-3 rounded-xl border border-emerald-500/30 text-center">
-                <div class="text-[10px] uppercase opacity-50">Card Selected</div>
-                <div id="prev-num" class="text-xl font-black text-emerald-400">#---</div>
-            </div>
-            <button onclick="joinGame()" class="flex-[2] py-5 bg-emerald-500 rounded-2xl font-black text-xl shadow-xl active:scale-95 transition-all">▶ START!</button>
-        </div>
+        <div id="grid-200" class="grid grid-cols-10 gap-1 h-72 overflow-y-auto mb-6 p-2 bg-black/20 rounded-xl"></div>
+        <button onclick="joinGame()" class="w-full py-4 bg-emerald-500 rounded-xl font-black text-lg shadow-lg active:scale-95">▶ START!</button>
     </div>
-
-    <!-- HISTORY MODAL -->
     <div id="m-history" class="modal hidden">
-        <div class="flex justify-between items-center mb-6 border-b border-emerald-500 pb-3">
-            <h2 class="text-emerald-400 font-black italic uppercase tracking-tighter text-lg">Bets History</h2>
-            <button onclick="closeHistory()" class="text-2xl text-gray-400">✕</button>
+        <div class="flex justify-between items-center mb-4 border-b border-emerald-500 pb-2">
+            <h2 class="text-emerald-400 font-black italic uppercase">History</h2>
+            <button onclick="closeHistory()" class="text-xl">✕</button>
         </div>
-        <div class="grid grid-cols-4 text-[8px] text-emerald-500 font-bold mb-3 uppercase px-2">
-            <span>ID</span><span>Winner</span><span>Called</span><span>Prize</span>
-        </div>
-        <div id="history-list" class="h-full overflow-y-auto pb-20"></div>
+        <div id="history-list"></div>
     </div>
-
     <script>
         const tg = window.Telegram.WebApp; const uid = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : 0;
         let myCard = null;
-
         function initGrid() {
             const g = document.getElementById('grid-200'); g.innerHTML = '';
             for(let i=1; i<=200; i++) {
                 let b = document.createElement('button'); b.className="card-num"; b.id="c-"+i; b.innerText=i;
-                b.onclick=()=> { 
-                    myCard=i; 
-                    document.querySelectorAll('.card-num').forEach(el=>el.classList.remove('active')); 
-                    b.classList.add('active'); 
-                    document.getElementById('prev-num').innerText = "#"+i;
-                };
+                b.onclick=()=> { myCard=i; document.querySelectorAll('.card-num').forEach(el=>el.classList.remove('active')); b.classList.add('active'); };
                 g.appendChild(b);
             }
         }
-
         function openHistory() {
             document.getElementById('m-history').classList.remove('hidden');
             fetch('/api/history/').then(r=>r.json()).then(d => {
                 const list = document.getElementById('history-list'); list.innerHTML = '';
-                d.history.forEach(h => {
-                    list.innerHTML += `<div class="history-row">
-                        <span>#${h.game_id}</span>
-                        <span class="text-emerald-400 font-bold">@${h.winner}</span>
-                        <span>${h.called}</span>
-                        <span class="text-white font-black">${h.prize}</span>
-                    </div>`;
-                });
+                d.history.forEach(h => { list.innerHTML += `<div class="history-row"><span>#${h.game_id}</span><span class="text-emerald-400">@${h.winner}</span><span>${h.called}</span><span class="font-bold">${h.prize}</span></div>`; });
             });
         }
-
         function closeHistory() { document.getElementById('m-history').classList.add('hidden'); }
-
         function joinGame() {
-            if(!myCard) return alert("Select a card first!");
-            fetch(`/api/join-room/${uid}/10/${myCard}/`).then(r=>r.json()).then(d => {
-                if(d.status==='ok') location.reload(); else alert(d.error || "Low Balance!");
-            });
+            if(!myCard) return alert("Select Card!");
+            fetch(`/api/join-room/${uid}/10/${myCard}/`).then(r=>r.json()).then(d => { if(d.status==='ok') location.reload(); else alert(d.error); });
         }
-
         initGrid();
-        fetch('/api/lobby-info/' + uid + '/').then(r=>r.json()).then(d => {
+        fetch('/api/lobby-info/'+uid+'/').then(r=>r.json()).then(d => {
             document.getElementById('bal-header').innerText = d.balance.toFixed(2);
             let timeLeft = d.time_left;
             const tEl = document.getElementById('timer');
-            const itv = setInterval(() => {
-                if(timeLeft <= 0) { tEl.innerText = "00:00"; clearInterval(itv); return; }
-                timeLeft--;
-                let m = Math.floor(timeLeft/60), s = timeLeft%60;
-                tEl.innerText = m + ":" + (s < 10 ? "0" + s : s);
-            }, 1000);
+            setInterval(() => { if(timeLeft > 0) { timeLeft--; let m=Math.floor(timeLeft/60), s=timeLeft%60; tEl.innerText=m+":"+(s<10?"0"+s:s); } }, 1000);
         });
     </script>
 </body>
 </html>
-EOF
+INNER
 
-# 5. RUN DATABASE SETUP
-python manage.py makemigrations bingo
-python manage.py migrate
-python manage.py init_bingo
+# 4. Update URLs
+cat << 'INNER' > bingo/urls.py
+from django.urls import path
+from .views import live_view, lobby_info, join_room, get_history
+urlpatterns = [
+    path('live/', live_view),
+    path('lobby-info/<int:tg_id>/', lobby_info),
+    path('join-room/<int:tg_id>/<int:bet>/<int:card_num>/', join_room),
+    path('history/', get_history),
+]
+INNER
 
-echo "✅ VLAD BINGO PRO MASTER SETUP COMPLETE!"
-echo "➡️ Start Tab 1: python manage.py run_dealer"
-echo "➡️ Start Tab 2: python manage.py runserver 0.0.0.0:8000"
-echo "➡️ Start Tab 3: python bingo/bot/main.py"
+# 5. Run Migrations
+python3 manage.py makemigrations bingo
+python3 manage.py migrate
+
+echo "✅ VLAD BINGO PRO is Updated!"
