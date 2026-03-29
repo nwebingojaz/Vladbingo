@@ -3,7 +3,6 @@ set -o errexit
 cd backend
 pip install -r requirements.txt
 python manage.py collectstatic --no-input
-# THE NUCLEAR WIPE: Fixes the column already exists error forever
 python manage.py shell <<innerEOF
 from django.db import connection
 with connection.cursor() as cursor:
