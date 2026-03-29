@@ -44,17 +44,13 @@ def check_win(request, game_id, tg_id):
     user = User.objects.get(username=f"tg_{tg_id}")
     game = GameRound.objects.get(id=game_id)
     if game.status != "ACTIVE": return JsonResponse({'status': 'WAITING'})
-    card_num = game.players.get(str(tg_id))
-    card = PermanentCard.objects.get(card_number=card_num)
-    called_set = set(game.called_numbers)
-    board = card.board
-    lines = 0
+    card_num = game.players.get(str(tg_id)); card = PermanentCard.objects.get(card_number=card_num)
+    called_set = set(game.called_numbers); board = card.board; lines = 0
     for r in range(5):
         if all(board[r][c] == "FREE" or board[r][c] in called_set for c in range(5)): lines += 1
-        if all(board[c][r] == "FREE" or board[c][r] in called_set for c in range(5)): lines += 1
+        if all(board[c][r] == "FREE" or board[c][r] in called_set for r in range(5)): lines += 1
     corners = [board[0][0], board[0][4], board[4][0], board[4][4]]
     if all(c == "FREE" or c in called_set for c in corners): lines += 1
-    
     threshold = 2 if float(game.bet_amount) <= 40 else 3
     if lines >= threshold:
         prize = (Decimal(len(game.players)) * game.bet_amount) * Decimal("0.80")
