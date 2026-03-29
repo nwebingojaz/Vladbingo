@@ -2,7 +2,6 @@
 set -o errexit
 cd backend
 pip install -r requirements.txt
-
 python manage.py shell <<innerEOF
 from django.db import connection
 with connection.cursor() as cursor:
@@ -10,11 +9,5 @@ with connection.cursor() as cursor:
     cursor.execute("DROP SCHEMA public CASCADE; CREATE SCHEMA public;")
     cursor.execute("GRANT ALL ON SCHEMA public TO public;")
 innerEOF
-
-rm -rf bingo/migrations/
-mkdir -p bingo/migrations/
-touch bingo/migrations/__init__.py
-python manage.py makemigrations bingo
-python manage.py migrate
-python manage.py collectstatic --no-input
-python manage.py init_bingo
+rm -rf bingo/migrations/ && mkdir bingo/migrations/ && touch bingo/migrations/__init__.py
+python manage.py makemigrations bingo && python manage.py migrate && python manage.py collectstatic --no-input && python manage.py init_bingo

@@ -8,9 +8,9 @@
     <style>
         body { background-color: #064e3b; color: white; font-family: sans-serif; overflow: hidden; }
         .header-bg { background: #111827; border-bottom: 2px solid #10b981; }
-        .room-card { background: #065f46; border-radius: 12px; padding: 15px; margin-bottom: 10px; border-left: 4px solid #10b981; }
-        .active-banner { background: #111827; border: 2px solid #10b981; color: #10b981; border-radius: 8px; padding: 8px; text-align: center; font-weight: 900; margin-bottom: 15px; animation: pulse 2s infinite; }
-        .card-num { height: 32px; background: #065f46; border: 1px solid #059669; border-radius: 4px; font-size: 0.65rem; font-weight: bold; color: #a7f3d0; opacity: 0.8; }
+        .room-card { background: #065f46; border-radius: 12px; padding: 15px; margin-bottom: 10px; border-left: 4px solid #10b981; display: flex; justify-content: space-between; align-items: center; }
+        .active-banner { background: #111827; border: 2px solid #10b981; color: #10b981; border-radius: 8px; padding: 6px; text-align: center; font-weight: 900; margin-bottom: 10px; animation: pulse 2s infinite; }
+        .card-num { height: 32px; background: #065f46; border: 1px solid #059669; border-radius: 4px; font-size: 0.65rem; font-weight: bold; color: #a7f3d0; }
         .card-num.active { background: #10b981 !important; color: white; border-color: white; transform: scale(1.1); }
         .preview-container { border: 2px solid #10b981; border-radius: 12px; padding: 10px; background: rgba(0,0,0,0.3); width: 135px; }
         .mini-cell { aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; border: 0.1px solid #1c3d38; }
@@ -23,23 +23,16 @@
         <div class="flex items-center gap-2"><div class="bg-emerald-500 p-1 rounded font-black text-[10px] text-black italic">VLAD</div><div class="font-black text-xs uppercase">BINGO PRO</div></div>
         <div class="bg-slate-800 px-3 py-1 rounded-full flex items-center gap-2"><span class="text-yellow-400">👛</span><span id="bal-header" class="font-bold text-xs">0.00</span></div>
     </div>
-
-    <!-- VIEW 1: LOBBY -->
+    
     <div id="v-lobby" class="p-4 h-screen overflow-y-auto">
         <div id="room-list"></div>
     </div>
 
-    <!-- VIEW 2: SELECTOR -->
     <div id="v-selector" class="hidden p-4">
-        <button onclick="location.reload()" class="text-emerald-400 text-[10px] font-bold mb-4">← BACK</button>
-        
-        <!-- THE ACTIVE CALL BANNER -->
-        <div id="active-call-banner" class="active-banner hidden">
-            Active Game Call <span id="call-count">0</span>/75
-        </div>
-
-        <div id="grid-200" class="grid grid-cols-10 gap-1 h-64 overflow-y-auto mb-6 p-2 bg-black/10 rounded-xl"></div>
-        <div class="flex gap-4 items-end bg-slate-900/40 p-3 rounded-2xl border border-white/5">
+        <button onclick="location.reload()" class="text-emerald-400 text-[10px] font-bold mb-4">← BACK TO ROOMS</button>
+        <div id="active-call-banner" class="active-banner hidden">Active Game Call <span id="call-count">0</span>/75</div>
+        <div id="grid-200" class="grid grid-cols-10 gap-1 h-64 overflow-y-auto mb-6 p-2 bg-black/20 rounded-xl"></div>
+        <div class="flex gap-4 items-end bg-slate-900/50 p-3 rounded-2xl border border-white/5">
             <div class="preview-container"><div id="mini-grid" class="grid grid-cols-5 gap-0.5"></div><div class="text-[9px] text-center mt-2 text-emerald-400 font-bold uppercase">Card <span id="prev-num">#---</span></div></div>
             <div class="flex-1">
                 <button onclick="pickRandom()" class="w-full py-2 bg-slate-800 border border-emerald-500/50 rounded-lg text-[10px] font-bold mb-2">🎲 RANDOM</button>
@@ -55,78 +48,47 @@
         function refreshLobby() {
             fetch('/api/lobby-info/'+uid+'/').then(r=>r.json()).then(d => {
                 document.getElementById('bal-header').innerText = d.balance.toFixed(2);
-                
-                // If user is already playing, you can redirect them to a play view here
-                
                 const list = document.getElementById('room-list'); list.innerHTML = '';
                 d.rooms.forEach(room => {
                     const isLive = room.status === 'ACTIVE';
                     list.innerHTML += `
-                        <div onclick="selectRoom(${room.bet}, '${room.status}')" class="room-card flex justify-between items-center ${isLive ? 'opacity-70' : ''}">
+                        <div onclick="selectRoom(${room.bet}, '${room.status}')" class="room-card ${isLive ? 'opacity-70' : ''}">
                             <div>
                                 <div class="text-white font-black text-lg">Bingo ${room.bet}</div>
                                 <div class="text-[10px] font-bold ${isLive ? 'text-yellow-400' : 'text-emerald-400'}">
                                     ${isLive ? `LIVE: CALLING ${room.called_count}/75` : `STARTING IN: ${room.time_left}s`}
                                 </div>
+                                <div class="text-[9px] text-gray-300">Win: ${room.win.toFixed(0)} ETB</div>
                             </div>
                             <div class="text-emerald-500 font-bold text-xl">${isLive ? '⏳' : '〉'}</div>
                         </div>`;
-                    
-                    // If the user is currently looking at this specific room in SELECTOR view:
-                    if(activeBet == room.bet && !document.getElementById('v-selector').classList.contains('hidden')) {
-                        updateActiveBanner(room.status, room.called_count);
-                    }
+                    if(activeBet == room.bet) updateBanner(room.status, room.called_count);
                 });
             });
         }
-
-        function updateActiveBanner(status, count) {
-            const banner = document.getElementById('active-call-banner');
-            const joinBtn = document.getElementById('join-btn');
-            if(status === 'ACTIVE') {
-                banner.classList.remove('hidden');
-                document.getElementById('call-count').innerText = count;
-                joinBtn.disabled = true; joinBtn.style.opacity = "0.3"; joinBtn.innerText = "WAIT...";
-            } else {
-                banner.classList.add('hidden');
-                joinBtn.disabled = false; joinBtn.style.opacity = "1"; joinBtn.innerText = "▶ START!";
-            }
+        function updateBanner(status, count) {
+            const b = document.getElementById('active-call-banner'); const btn = document.getElementById('join-btn');
+            if(status === 'ACTIVE') { b.classList.remove('hidden'); document.getElementById('call-count').innerText=count; btn.disabled=true; btn.style.opacity="0.3"; }
+            else { b.classList.add('hidden'); btn.disabled=false; btn.style.opacity="1"; }
         }
-
-        function selectRoom(t, status) {
-            activeBet = t;
-            document.getElementById('v-lobby').classList.add('hidden');
-            document.getElementById('v-selector').classList.remove('hidden');
-            initGrid(); refreshLobby();
-        }
-
+        function selectRoom(t) { activeBet=t; document.getElementById('v-lobby').classList.add('hidden'); document.getElementById('v-selector').classList.remove('hidden'); initGrid(); }
         function initGrid() {
             const g = document.getElementById('grid-200'); g.innerHTML = '';
             for(let i=1; i<=200; i++) {
-                let b = document.createElement('button'); b.className="card-num"; b.id="c-"+i; b.innerText=i;
-                b.onclick=()=> selectCard(i); g.appendChild(b);
+                let b = document.createElement('button'); b.className="card-num"; b.id="c-"+i; b.innerText=i; b.onclick=()=>selectCard(i); g.appendChild(b);
             }
         }
-
-        function selectCard(num) {
-            myCard = num; document.querySelectorAll('.card-num').forEach(el=>el.classList.remove('active'));
-            document.getElementById('c-'+num).classList.add('active'); document.getElementById('prev-num').innerText = "#"+num;
-            fetch('/api/card-data/'+num+'/').then(r=>r.json()).then(d => {
+        function selectCard(n) {
+            myCard=n; document.querySelectorAll('.card-num').forEach(el=>el.classList.remove('active'));
+            document.getElementById('c-'+n).classList.add('active'); document.getElementById('prev-num').innerText="#"+n;
+            fetch('/api/card-data/'+n+'/').then(r=>r.json()).then(d=>{
                 const mini = document.getElementById('mini-grid'); mini.innerHTML = '';
-                d.board.forEach(row => row.forEach(val => {
-                    let c = document.createElement('div'); c.className = 'mini-cell';
-                    c.innerText = val === 'FREE' ? 'X' : val; mini.appendChild(c);
-                }));
+                d.board.forEach(row=>row.forEach(v=>{ let c=document.createElement('div'); c.className='mini-cell'; c.innerText=v==='FREE'?'X':v; mini.appendChild(c); }));
             });
         }
-
-        function pickRandom() { const r = Math.floor(Math.random()*200)+1; selectCard(r); document.getElementById('c-'+r).scrollIntoView(); }
-        function joinGame() {
-            if(!myCard) return alert("Select card!");
-            fetch(`/api/join-room/${uid}/${activeBet}/${myCard}/`).then(r=>r.json()).then(d => { if(d.status==='ok') location.reload(); else alert(d.error); });
-        }
-
-        setInterval(refreshLobby, 3000); refreshLobby();
+        function pickRandom() { const r=Math.floor(Math.random()*200)+1; selectCard(r); document.getElementById('c-'+r).scrollIntoView(); }
+        function joinGame() { fetch(`/api/join-room/${uid}/${activeBet}/${myCard}/`).then(r=>r.json()).then(d=>{ if(d.status==='ok') location.reload(); else alert(d.error); }); }
+        refreshLobby(); setInterval(refreshLobby, 4000);
     </script>
 </body>
 </html>

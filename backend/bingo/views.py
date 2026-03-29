@@ -28,7 +28,7 @@ def lobby_info(request, tg_id):
             'id': r['id'], 'bet': float(r['bet_amount']), 'players': p_count,
             'win': float(r['bet_amount'] * p_count) * 0.8,
             'status': r['status'],
-            'called_count': len(r['called_numbers']), # THE KEY DATA
+            'called_count': len(r['called_numbers']),
             'time_left': max(0, 60 - int(elapsed))
         })
     active_game = GameRound.objects.filter(players__has_key=str(tg_id)).exclude(status="ENDED").last()
@@ -38,7 +38,7 @@ def join_room(request, tg_id, bet, card_num):
     user = User.objects.get(username=f"tg_{tg_id}")
     if user.operational_credit < Decimal(str(bet)): return JsonResponse({'status': 'error', 'error': 'Low Balance'})
     game = GameRound.objects.filter(status="LOBBY", bet_amount=bet).first()
-    if not game: return JsonResponse({'status': 'error', 'error': 'Game Active. Wait for next round.'})
+    if not game: return JsonResponse({'status': 'error', 'error': 'No Lobby'})
     game.players[str(tg_id)] = card_num
     game.save(); user.operational_credit -= Decimal(str(bet)); user.save()
     return JsonResponse({'status': 'ok'})
@@ -49,3 +49,8 @@ def get_game_info(request, game_id, tg_id):
     card = PermanentCard.objects.get(card_number=card_num)
     prize = (Decimal(len(game.players)) * game.bet_amount) * Decimal("0.80")
     return JsonResponse({'board': card.board, 'called': game.called_numbers, 'prize': float(prize), 'status': game.status})
+
+def get_history(request):
+    history = GameRound.objects.filter(status="ENDED").order_by('-id')[:15]
+    data = [{'game_id': g.id, 'winner': g.winner_username or "None", 'called': f"{len(g.called_numbers)}/75", 'prize': float(g.winner_prize)} for g in history]
+    return JsonResponse({'history': data})
