@@ -29,7 +29,7 @@
         <div>🎲 Room: 10 Birr</div><div onclick="openHistory()">📜 History</div><div onclick="location.reload()">🔄 Refresh</div>
     </div>
     <div class="bg-black/40 p-1 text-center border-b border-white/5">
-        <span class="text-[10px] text-emerald-400 font-bold uppercase tracking-widest">Lobby Closes: </span>
+        <span class="text-[10px] text-emerald-400 font-bold uppercase">Lobby Closes: </span>
         <span id="timer" class="text-[10px] font-mono font-black text-white ml-1">01:00</span>
     </div>
     <div id="v-selector" class="p-4">
@@ -63,7 +63,7 @@
         }
         function closeHistory() { document.getElementById('m-history').classList.add('hidden'); }
         function joinGame() {
-            if(!myCard) return alert("Select a card!");
+            if(!myCard) return alert("Select card!");
             fetch(`/api/join-room/${uid}/10/${myCard}/`).then(r=>r.json()).then(d => { if(d.status==='ok') location.reload(); else alert(d.error); });
         }
         initGrid();

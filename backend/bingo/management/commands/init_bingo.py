@@ -1,28 +1,12 @@
-from django.core.management.base import BaseCommand
-from django.db import connection
-from bingo.models import PermanentCard
 import random
+from django.core.management.base import BaseCommand
+from bingo.models import PermanentCard, GameRound
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        # Shield: Check if table actually exists before querying
-        tables = connection.introspection.table_names()
-        if "bingo_permanentcard" not in tables:
-            self.stdout.write("Table 'bingo_permanentcard' not found. skipping init.")
-            return
-
-        if PermanentCard.objects.exists():
-            self.stdout.write("Cards already exist. skipping.")
-            return
-        
-        self.stdout.write("Generating 100 Bingo Cards...")
-        for i in range(1, 101):
-            board = []
-            ranges = [(1,15), (16,30), (31,45), (46,60), (61,75)]
-            for r in ranges:
-                col = random.sample(range(r[0], r[1]+1), 5)
-                board.append(col)
-            rows = [[board[c][r] for c in range(5)] for r in range(5)]
-            rows[2][2] = "FREE"
-            PermanentCard.objects.create(card_number=i, board=rows)
-        self.stdout.write("Success!")
+        if not PermanentCard.objects.exists():
+            for i in range(1, 101):
+                board = [[random.randint(1,75) for _ in range(5)] for _ in range(5)]
+                board[2][2] = "FREE"
+                PermanentCard.objects.create(card_number=i, board=board)
+        GameRound.objects.get_or_create(bet_amount=10, status="LOBBY")
