@@ -1,3 +1,8 @@
+#!/bin/bash
+# VLAD BINGO - LIVE CARD PREVIEW & NAVIGATION FIX
+
+# 1. Update the Mini App (Adding the Preview Grid)
+cat <<'EOF' > backend/bingo/templates/live_view.html
 <!DOCTYPE html>
 <html>
 <head>
@@ -104,3 +109,6 @@
     </script>
 </body>
 </html>
+EOF
+
+echo "✅ Preview Engine & UI Fixed!"
