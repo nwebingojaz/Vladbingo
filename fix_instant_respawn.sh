@@ -1,3 +1,53 @@
+#!/bin/bash
+echo "🎰 REMOVING DEAD TIME: Rooms will now respawn instantly..."
+
+cd ~/vladbingo/backend
+
+# 1. Update the Dealer Loop to INSTANTLY create new lobbies (No 60s wait)
+cat << 'INNER' > bingo/management/commands/run_dealer.py
+import time, random
+from django.core.management.base import BaseCommand
+from django.utils import timezone
+from bingo.models import GameRound
+
+class Command(BaseCommand):
+    def handle(self, *args, **options):
+        self.stdout.write("VLAD BINGO DEALER: INSTANT RESPAWN ACTIVE")
+        TIERS = [10, 20, 30, 40, 50, 100]
+
+        while True:
+            now = timezone.now()
+            for tier in TIERS:
+                room = GameRound.objects.filter(bet_amount=tier).exclude(status="ENDED").first()
+                
+                # INSTANT RESPAWN: If no lobby/active room exists, make one immediately
+                if not room:
+                    room = GameRound.objects.create(bet_amount=tier, status="LOBBY")
+                    self.stdout.write(f"New {tier} ETB Lobby Created instantly.")
+                
+                elif room.status == "LOBBY":
+                    elapsed = (now - room.created_at).total_seconds()
+                    if elapsed >= 60:
+                        room.status = "ACTIVE"
+                        room.save()
+                
+                elif room.status == "ACTIVE":
+                    called = room.called_numbers
+                    if len(called) < 75:
+                        remaining = [n for n in range(1, 76) if n not in called]
+                        if remaining:
+                            called.append(random.choice(remaining))
+                            room.called_numbers = called
+                            room.save()
+                    else:
+                        room.status = "ENDED"
+                        room.finished_at = now
+                        room.save()
+            time.sleep(4)
+INNER
+
+# 2. Update views.py to ensure the API never hides the rooms
+cat << 'INNER' > bingo/views.py
 from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
 from .models import User, PermanentCard, GameRound, Transaction
@@ -80,3 +130,11 @@ def check_win(request, game_id, tg_id):
         game.finished_at = timezone.now(); game.save()
         return JsonResponse({'status': 'WINNER', 'prize': float(prize)})
     return JsonResponse({'status': 'NOT_YET'})
+INNER
+
+# 3. Push to GitHub
+cd ~/vladbingo
+git add .
+git commit -m "Engine: Instant Lobby Respawn (No Dead Time)"
+git push -f origin main
+echo "✅ INSTANT RESPAWN DEPLOYED! Rooms will never disappear."
