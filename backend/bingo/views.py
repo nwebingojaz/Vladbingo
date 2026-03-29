@@ -54,3 +54,23 @@ def get_history(request):
     history = GameRound.objects.filter(status="ENDED").order_by('-id')[:15]
     data = [{'game_id': g.id, 'winner': g.winner_username or "None", 'called': f"{len(g.called_numbers)}/75", 'prize': float(g.winner_prize)} for g in history]
     return JsonResponse({'history': data})
+
+def check_win(request, game_id, tg_id):
+    user = User.objects.get(username=f"tg_{tg_id}")
+    game = GameRound.objects.get(id=game_id)
+    if game.status != "ACTIVE": return JsonResponse({'status': 'WAITING'})
+    card_num = game.players.get(str(tg_id)); card = PermanentCard.objects.get(card_number=card_num)
+    called_set = set(game.called_numbers); board = card.board; lines = 0
+    for r in range(5):
+        if all(board[r][c] == "FREE" or board[r][c] in called_set for c in range(5)): lines += 1
+        if all(board[c][r] == "FREE" or board[c][r] in called_set for r in range(5)): lines += 1
+    corners = [board[0][0], board[0][4], board[4][0], board[4][4]]
+    if all(c == "FREE" or c in called_set for c in corners): lines += 1
+    threshold = 2 if float(game.bet_amount) <= 40 else 3
+    if lines >= threshold:
+        prize = (Decimal(len(game.players)) * game.bet_amount) * Decimal("0.80")
+        user.operational_credit += prize; user.save()
+        game.status = "ENDED"; game.winner_username = user.username; game.winner_prize = prize
+        game.finished_at = timezone.now(); game.save()
+        return JsonResponse({'status': 'WINNER', 'prize': float(prize)})
+    return JsonResponse({'status': 'NOT_YET'})
