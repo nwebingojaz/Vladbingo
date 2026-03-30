@@ -1,3 +1,7 @@
+#!/bin/bash
+cd ~/vladbingo/backend
+
+cat << 'INNER' > bingo/templates/live_view.html
 <!DOCTYPE html>
 <html>
 <head>
@@ -179,3 +183,10 @@
     </script>
 </body>
 </html>
+INNER
+
+cd ~/vladbingo
+git add .
+git commit -m "UI: Fixed top timer syncing with active room"
+git push -f origin main
+echo "✅ TIMER SYNC FIXED! Push successful."
