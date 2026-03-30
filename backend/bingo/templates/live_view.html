@@ -27,6 +27,7 @@
     </style>
 </head>
 <body class="antialiased select-none">
+    <!-- HEADER -->
     <div class="header-bg p-3 flex justify-between items-center shadow-lg">
         <div class="flex items-center gap-2"><div class="bg-blue-600 p-1 rounded font-black text-[10px] text-white italic">VLAD</div><div class="font-black text-xs uppercase text-white">BINGO PRO</div></div>
         <div class="flex items-center gap-2">
@@ -35,23 +36,28 @@
         </div>
     </div>
     
-    <div class="bg-slate-900/80 p-2 flex justify-around text-[9px] font-bold text-blue-400 uppercase border-b border-blue-900/50">
-        <div>🎲 Room: <span id="nav-room">10</span></div>
+    <!-- SUB-NAV WITH PRIZE (GIFT BOX) -->
+    <div class="bg-slate-900/80 p-2 flex justify-around items-center text-[9px] font-bold text-blue-400 uppercase border-b border-blue-900/50">
+        <div>🎲 Room: <span id="nav-room" class="text-white">10</span></div>
+        <div>🎁 Win: <span id="nav-prize" class="text-white text-[11px]">0</span></div>
         <div onclick="openHistory()">📜 History</div>
         <div onclick="location.reload()">🔄 Refresh</div>
     </div>
     
+    <!-- TIMER -->
     <div class="bg-black/60 p-1 text-center border-b border-white/5">
         <span class="text-[10px] text-blue-400 font-bold uppercase">Lobby Closes: </span>
         <span id="timer" class="text-[10px] font-mono font-black text-white ml-1">00:00</span>
     </div>
     
+    <!-- LOBBY -->
     <div id="v-lobby" class="p-4 h-screen overflow-y-auto pb-32">
         <div id="room-list"></div>
     </div>
 
+    <!-- SELECTOR -->
     <div id="v-selector" class="hidden p-4">
-        <button onclick="location.reload()" class="text-blue-400 text-[10px] font-bold mb-3">← BACK TO ROOMS</button>
+        <button onclick="showLobby()" class="text-blue-400 text-[10px] font-bold mb-3 flex items-center gap-1">← BACK TO ROOMS</button>
         <div id="active-call-banner" class="active-banner hidden">Active Game Call <span id="call-count">0</span>/75</div>
         <div id="grid-200" class="grid grid-cols-10 gap-1 h-64 overflow-y-auto mb-6 p-2 bg-black/30 rounded-xl"></div>
         <div class="flex gap-4 items-end bg-slate-800/50 p-3 rounded-2xl border border-white/5">
@@ -63,6 +69,7 @@
         </div>
     </div>
 
+    <!-- HISTORY MODAL -->
     <div id="m-history" class="modal">
         <div class="flex justify-between items-center mb-2">
             <h2 class="text-blue-400 font-black italic uppercase text-lg">My Bets History</h2>
@@ -78,6 +85,7 @@
     <script>
         const tg = window.Telegram.WebApp; const uid = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : 0;
         let activeBet = 10; let myCard = null; let historyData = {winners: [], my_bets: []};
+        let currentRoomTime = 0; let currentRoomStatus = 'LOBBY';
 
         function handleDeposit() { tg.showAlert("Redirecting to secure Chapa Payment Gateway..."); }
 
@@ -88,14 +96,14 @@
                 d.rooms.forEach(room => {
                     const isLive = room.status === 'ACTIVE';
                     list.innerHTML += `
-                        <div onclick="selectRoom(${room.bet})" class="room-card ${isLive ? 'live' : ''}">
+                        <div onclick="selectRoom(${room.bet})" class="room-card ${isLive ? 'live' : ''} cursor-pointer">
                             <div class="flex justify-between w-full">
                                 <div>
                                     <div class="text-white font-black text-xl">Bingo ${room.bet}</div>
                                     <div class="text-[11px] font-bold ${isLive ? 'text-red-400' : 'text-blue-400'} mt-1">
                                         ${isLive ? 'LIVE: CALLING ' + room.called_count + '/75' : 'STARTING IN: ' + room.time_left + 's'}
                                     </div>
-                                    <div class="text-[10px] text-gray-400 mt-1">Win: <span class="text-white">${room.win.toFixed(0)} ETB</span></div>
+                                    <div class="text-[10px] text-gray-400 mt-1">Win: <span class="text-white font-bold">${room.win.toFixed(0)} ETB</span></div>
                                 </div>
                                 <div class="flex flex-col items-end justify-center">
                                     <div class="${isLive ? 'text-red-500' : 'text-blue-500'} font-bold text-2xl">${isLive ? '⏳' : '▶'}</div>
@@ -104,27 +112,46 @@
                             </div>
                         </div>`;
                     
-                    // THE FIX: Only update the top timer for the room we clicked on!
+                    // SYNC DATA FOR THE ACTIVE ROOM VIEW
                     if(activeBet == room.bet) {
+                        currentRoomTime = room.time_left;
+                        currentRoomStatus = room.status;
+                        document.getElementById('nav-prize').innerText = room.win.toFixed(0);
                         updateBanner(room.status, room.called_count);
-                        if(isLive) {
-                            document.getElementById('timer').innerText = "PLAYING...";
-                        } else {
-                            let m = Math.floor(room.time_left / 60);
-                            let s = room.time_left % 60;
-                            document.getElementById('timer').innerText = m + ":" + (s < 10 ? "0" + s : s);
-                        }
                     }
                 });
             });
         }
+
+        // SMOOTH LOCAL TIMER (Ticks every 1 second without waiting for network)
+        setInterval(() => {
+            const tEl = document.getElementById('timer');
+            if(currentRoomStatus === 'ACTIVE') {
+                tEl.innerText = "PLAYING...";
+                tEl.classList.add('text-red-400');
+            } else {
+                tEl.classList.remove('text-red-400');
+                if(currentRoomTime > 0) currentRoomTime--;
+                let m = Math.floor(currentRoomTime / 60);
+                let s = currentRoomTime % 60;
+                tEl.innerText = m + ":" + (s < 10 ? "0" + s : s);
+            }
+        }, 1000);
 
         function updateBanner(status, count) {
             const b = document.getElementById('active-call-banner'); const btn = document.getElementById('join-btn');
             if(status === 'ACTIVE') { b.classList.remove('hidden'); document.getElementById('call-count').innerText=count; btn.disabled=true; btn.style.opacity="0.3"; btn.innerText="WAITING...";}
             else { b.classList.add('hidden'); btn.disabled=false; btn.style.opacity="1"; btn.innerText="▶ START!";}
         }
-        function selectRoom(t) { activeBet=t; document.getElementById('nav-room').innerText=t; document.getElementById('v-lobby').classList.add('hidden'); document.getElementById('v-selector').classList.remove('hidden'); initGrid(); refreshLobby(); }
+        
+        function showLobby() { document.getElementById('v-selector').classList.add('hidden'); document.getElementById('v-lobby').classList.remove('hidden'); }
+        
+        function selectRoom(t) { 
+            activeBet=t; document.getElementById('nav-room').innerText=t; 
+            document.getElementById('v-lobby').classList.add('hidden'); 
+            document.getElementById('v-selector').classList.remove('hidden'); 
+            initGrid(); refreshLobby(); 
+        }
         
         function initGrid() {
             const g = document.getElementById('grid-200'); g.innerHTML = '';
@@ -144,10 +171,7 @@
         function pickRandom() { const r=Math.floor(Math.random()*200)+1; selectCard(r); }
         function joinGame() { fetch(`/api/join-room/${uid}/${activeBet}/${myCard}/`).then(r=>r.json()).then(d=>{ if(d.status==='ok') location.reload(); else tg.showAlert(d.error); }); }
 
-        function openHistory() {
-            document.getElementById('m-history').style.display = 'flex';
-            fetch('/api/history/'+uid+'/').then(r=>r.json()).then(d => { historyData = d; switchTab('bets'); });
-        }
+        function openHistory() { document.getElementById('m-history').style.display = 'flex'; fetch('/api/history/'+uid+'/').then(r=>r.json()).then(d => { historyData = d; switchTab('bets'); }); }
         function closeHistory() { document.getElementById('m-history').style.display = 'none'; }
         
         function switchTab(tab) {
@@ -174,8 +198,7 @@
             }
         }
         
-        // Polling set to 1 second for a smooth ticking clock!
-        refreshLobby(); setInterval(refreshLobby, 1000);
+        refreshLobby(); setInterval(refreshLobby, 3000); // Network sync every 3s
     </script>
 </body>
 </html>
