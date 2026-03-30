@@ -1,3 +1,10 @@
+#!/bin/bash
+echo "🛠 FIXING RENDER SSL DROP ERROR..."
+
+cd ~/vladbingo/backend
+
+# Rewrite build.sh without the aggressive connection killer
+cat << 'INNER' > build.sh
 #!/usr/bin/env bash
 set -o errexit
 cd backend
@@ -30,3 +37,10 @@ python manage.py migrate bingo
 
 echo "Step 3: Initializing Authentic Bingo Rooms..."
 python manage.py init_bingo
+INNER
+
+cd ~/vladbingo
+git add .
+git commit -m "Fix: Removed aggressive connection killer to prevent SSL Drop"
+git push -f origin main
+echo "✅ FIXED! Render is building the final Interactive version now."
