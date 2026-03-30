@@ -25,7 +25,6 @@ def lobby_info(request, tg_id):
             'id': r['id'], 'bet': float(r['bet_amount']), 'players': p_count,
             'win': float(r['bet_amount'] * p_count) * 0.8,
             'status': r['status'],
-            'called_numbers': r['called_numbers'],
             'called_count': len(r['called_numbers']),
             'time_left': max(0, 60 - int(elapsed))
         })
@@ -33,16 +32,10 @@ def lobby_info(request, tg_id):
     return JsonResponse({'balance': float(user.operational_credit), 'rooms': room_data, 'active_game_id': active_game.id if active_game else None})
 
 def get_history(request, tg_id):
-    recent_winners = GameRound.objects.filter(status="ENDED").order_by('-id')[:15]
-    winners_data = [{'game_id': g.id, 'winner': g.winner_username or "None", 'called': f"{len(g.called_numbers)}/75", 'prize': float(g.winner_prize)} for g in recent_winners]
+    history = GameRound.objects.filter(status="ENDED").order_by('-id')[:15]
+    winners_data = [{'game_id': g.id, 'winner': g.winner_username or "None", 'called': f"{len(g.called_numbers)}/75", 'prize': float(g.winner_prize)} for g in history]
     my_games = GameRound.objects.filter(players__has_key=str(tg_id)).order_by('-id')[:15]
-    my_bets_data = []
-    for g in my_games:
-        won = (g.winner_username == f"tg_{tg_id}")
-        my_bets_data.append({
-            'game_id': g.id, 'bet': float(g.bet_amount), 'card': g.players.get(str(tg_id)),
-            'status': "WON" if won else "LOST", 'prize': float(g.winner_prize) if won else 0
-        })
+    my_bets_data = [{'game_id': g.id, 'bet': float(g.bet_amount), 'card': g.players.get(str(tg_id)), 'status': "WON" if g.winner_username == f"tg_{tg_id}" else "LOST", 'prize': float(g.winner_prize) if g.winner_username == f"tg_{tg_id}" else 0} for g in my_games]
     return JsonResponse({'winners': winners_data, 'my_bets': my_bets_data})
 
 def join_room(request, tg_id, bet, card_num):
@@ -67,13 +60,25 @@ def check_win(request, game_id, tg_id):
     user = User.objects.get(username=f"tg_{tg_id}")
     game = GameRound.objects.get(id=game_id)
     if game.status != "ACTIVE": return JsonResponse({'status': 'WAITING'})
-    card_num = game.players.get(str(tg_id)); card = PermanentCard.objects.get(card_number=card_num)
-    called_set = set(game.called_numbers); board = card.board; lines = 0
+    
+    card_num = game.players.get(str(tg_id))
+    card = PermanentCard.objects.get(card_number=card_num)
+    
+    # NEW MANUAL LOGIC: Only count numbers the user ACTUALLY MARKED
+    marked_str = request.GET.get('marked', '')
+    marked_nums = [int(x) for x in marked_str.split(',') if x.isdigit()]
+    
+    valid_marks = set(game.called_numbers).intersection(set(marked_nums))
+    called_set = valid_marks
+    called_set.add("FREE") # Center is always a free space
+    
+    board = card.board; lines = 0
     for r in range(5):
         if all(board[r][c] == "FREE" or board[r][c] in called_set for c in range(5)): lines += 1
         if all(board[c][r] == "FREE" or board[c][r] in called_set for r in range(5)): lines += 1
     corners = [board[0][0], board[0][4], board[4][0], board[4][4]]
     if all(c == "FREE" or c in called_set for c in corners): lines += 1
+    
     threshold = 2 if float(game.bet_amount) <= 40 else 3
     if lines >= threshold:
         prize = (Decimal(len(game.players)) * game.bet_amount) * Decimal("0.80")
