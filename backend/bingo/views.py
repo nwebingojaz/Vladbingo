@@ -15,8 +15,7 @@ def get_card_data(request, num):
 
 def lobby_info(request, tg_id):
     user, _ = User.objects.get_or_create(username=f"tg_{tg_id}")
-    # FIX: order_by('bet_amount') guarantees 10, 20, 30, 40... order!
-    rooms = GameRound.objects.exclude(status="ENDED").order_by('bet_amount').values('id', 'bet_amount', 'players', 'created_at', 'status', 'called_numbers')
+    rooms = GameRound.objects.exclude(status="ENDED").values('id', 'bet_amount', 'players', 'created_at', 'status', 'called_numbers')
     room_data = []
     now = timezone.now()
     for r in rooms:
@@ -26,6 +25,7 @@ def lobby_info(request, tg_id):
             'id': r['id'], 'bet': float(r['bet_amount']), 'players': p_count,
             'win': float(r['bet_amount'] * p_count) * 0.8,
             'status': r['status'],
+            'called_numbers': r['called_numbers'],
             'called_count': len(r['called_numbers']),
             'time_left': max(0, 60 - int(elapsed))
         })
