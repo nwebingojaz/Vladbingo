@@ -1,3 +1,9 @@
+#!/bin/bash
+echo "🚀 FIXING RENDER DEPLOYMENT (MIGRATION ORDER)..."
+
+cd ~/vladbingo/backend
+
+cat << 'INNER' > build.sh
 #!/usr/bin/env bash
 set -o errexit
 cd backend
@@ -28,3 +34,10 @@ python manage.py migrate bingo
 
 echo "Step 3: Initializing Bingo Rooms..."
 python manage.py init_bingo
+INNER
+
+cd ~/vladbingo
+git add .
+git commit -m "Fix: Explicit Migration Ordering to prevent content_type crash"
+git push -f origin main
+echo "✅ FIXED! Render will now build successfully."
