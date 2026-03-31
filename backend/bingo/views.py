@@ -64,26 +64,37 @@ def check_win(request, game_id, tg_id):
     card_num = game.players.get(str(tg_id))
     card = PermanentCard.objects.get(card_number=card_num)
     
-    # NEW MANUAL LOGIC: Only count numbers the user ACTUALLY MARKED
+    # STRICT LOGIC: Get numbers the user ACTUALLY tapped
     marked_str = request.GET.get('marked', '')
     marked_nums = [int(x) for x in marked_str.split(',') if x.isdigit()]
     
+    # Intersect: Only count numbers that were CALLED by dealer AND MARKED by user
     valid_marks = set(game.called_numbers).intersection(set(marked_nums))
-    called_set = valid_marks
-    called_set.add("FREE") # Center is always a free space
+    valid_marks.add("FREE") # Center is always free
     
     board = card.board; lines = 0
-    for r in range(5):
-        if all(board[r][c] == "FREE" or board[r][c] in called_set for c in range(5)): lines += 1
-        if all(board[c][r] == "FREE" or board[c][r] in called_set for r in range(5)): lines += 1
-    corners = [board[0][0], board[0][4], board[4][0], board[4][4]]
-    if all(c == "FREE" or c in called_set for c in corners): lines += 1
     
+    # Check Rows and Columns
+    for i in range(5):
+        if all(board[i][c] == "FREE" or board[i][c] in valid_marks for c in range(5)): lines += 1
+        if all(board[r][i] == "FREE" or board[r][i] in valid_marks for r in range(5)): lines += 1
+        
+    # Check Diagonals
+    if all(board[i][i] == "FREE" or board[i][i] in valid_marks for i in range(5)): lines += 1
+    if all(board[i][4-i] == "FREE" or board[i][4-i] in valid_marks for i in range(5)): lines += 1
+        
+    # Check 4 Corners
+    corners = [board[0][0], board[0][4], board[4][0], board[4][4]]
+    if all(c == "FREE" or c in valid_marks for c in corners): lines += 1
+    
+    # Rooms 10-40 need 2 lines. Rooms 50-100 need 3 lines.
     threshold = 2 if float(game.bet_amount) <= 40 else 3
+    
     if lines >= threshold:
         prize = (Decimal(len(game.players)) * game.bet_amount) * Decimal("0.80")
         user.operational_credit += prize; user.save()
         game.status = "ENDED"; game.winner_username = user.username; game.winner_prize = prize
         game.finished_at = timezone.now(); game.save()
         return JsonResponse({'status': 'WINNER', 'prize': float(prize)})
+        
     return JsonResponse({'status': 'NOT_YET'})

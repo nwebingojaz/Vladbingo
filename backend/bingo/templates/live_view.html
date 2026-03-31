@@ -12,7 +12,7 @@
         .room-card.live { border-left-color: #ef4444; opacity: 0.8; }
         .active-banner { background: #0b0f19; border: 2px solid #ef4444; color: #ef4444; border-radius: 8px; padding: 6px; text-align: center; font-weight: 900; margin-bottom: 10px; animation: pulse 2s infinite; }
         .card-num { height: 32px; background: #1e293b; border: 1px solid #3b82f6; border-radius: 4px; font-size: 0.65rem; font-weight: bold; color: #93c5fd; }
-        .card-num.active { background: #3b82f6 !important; color: white; border-color: white; transform: scale(1.1); }
+        .card-num.active { background: #3b82f6 !important; color: white; border-color: white; transform: scale(1.1); box-shadow: 0 0 10px #3b82f6; }
         .preview-container { border: 2px solid #3b82f6; border-radius: 12px; padding: 10px; background: rgba(0,0,0,0.4); width: 135px; }
         .mini-cell { aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; border: 0.1px solid #1e3a8a; color: #93c5fd;}
         
@@ -40,9 +40,6 @@
 </head>
 <body class="antialiased select-none">
     
-    <!-- NOT BINGO YET TOAST -->
-    <div id="toast-msg" class="fixed top-14 left-1/2 transform -translate-x-1/2 bg-red-600 text-white font-black py-3 px-8 rounded-full shadow-2xl transition-opacity duration-300 opacity-0 z-[200] pointer-events-none text-sm tracking-widest border-2 border-red-400">NOT BINGO YET!</div>
-
     <!-- HEADER -->
     <div class="header-bg p-3 flex justify-between items-center shadow-lg">
         <div class="flex items-center gap-2"><div class="bg-blue-600 p-1 rounded font-black text-[10px] text-white italic">VLAD</div><div class="font-black text-xs uppercase text-white">BINGO PRO</div></div>
@@ -128,12 +125,6 @@
         function handleDeposit() { tg.showAlert("Redirecting to secure Chapa Payment Gateway..."); }
         function appLoop() { if (myActiveGameId) { updatePlayHall(); } else { refreshLobby(); } }
 
-        function showToast(msg) {
-            const t = document.getElementById('toast-msg');
-            t.innerText = msg; t.style.opacity = '1';
-            setTimeout(() => { t.style.opacity = '0'; }, 2000);
-        }
-
         function buildTracker(containerId) {
             const container = document.getElementById(containerId);
             if (container.children.length > 0) return;
@@ -197,7 +188,6 @@
                 
                 d.called.forEach(num => { const dot = document.getElementById('play-tracker-dot-'+num); if(dot) dot.classList.add('called'); });
 
-                // ONLY RENDER THE 5x5 CARD ONCE! (So we don't erase the user's manual taps)
                 const pc = document.getElementById('play-card');
                 if(pc.children.length === 0) {
                     d.board.forEach(row => row.forEach(val => {
@@ -209,7 +199,6 @@
                         } else {
                             cell.innerText = val;
                             cell.classList.add('text-blue-200');
-                            // MANUAL CLICK LOGIC
                             cell.onclick = function() {
                                 this.classList.toggle('bg-red-500');
                                 this.classList.toggle('text-white');
@@ -225,29 +214,27 @@
         }
 
         function hitBingo() {
-            // Check what the user actually marked
             let marked = [];
             document.querySelectorAll('#play-card .is-marked').forEach(el => {
                 if(el.innerText !== '⭐') marked.push(el.innerText);
             });
+            if(marked.length === 0) return tg.showPopup({title: "⚠️ Hold on!", message: "You haven't marked any numbers yet!"});
             
             fetch(`/api/check-win/${myActiveGameId}/${uid}/?marked=${marked.join(',')}`).then(r=>r.json()).then(d => {
                 if (d.status === 'WINNER') {
-                    // SHOW CELEBRATION
                     document.getElementById('m-win').style.display = 'flex';
                     document.getElementById('win-card-num').innerText = myCard;
                     const grid = document.getElementById('win-card-grid'); grid.innerHTML = '';
                     document.querySelectorAll('#play-card > div').forEach(cell => {
-                        let clone = cell.cloneNode(true);
-                        clone.className = 'win-grid-cell';
+                        let clone = cell.cloneNode(true); clone.className = 'win-grid-cell';
                         if (clone.classList.contains('is-marked')) { clone.classList.add('bg-red-500', 'text-white', 'border-red-600'); } 
                         else { clone.classList.add('bg-white', 'text-gray-800', 'border-gray-200'); }
                         if (clone.innerText === '⭐') { clone.classList.remove('bg-red-500', 'bg-white', 'text-gray-800'); clone.classList.add('bg-blue-100', 'text-yellow-500'); }
                         grid.appendChild(clone);
                     });
                 } 
-                else if (d.status === 'NOT_YET') { showToast("NOT BINGO YET!"); } 
-                else { showToast("WAITING FOR NUMBERS..."); }
+                else if (d.status === 'NOT_YET') { tg.showPopup({title: "❌ Not Bingo Yet!", message: "You missed a number or don't have enough lines for this room! Keep watching."}); } 
+                else { tg.showPopup({title: "⏳ Waiting...", message: "Waiting for the dealer to draw more numbers."}); }
             });
         }
 
