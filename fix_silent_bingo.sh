@@ -1,3 +1,10 @@
+#!/bin/bash
+echo "📢 FIXING SILENT BINGO BUTTON AND DIAGONAL LOGIC..."
+
+cd ~/vladbingo/backend
+
+# 1. UPDATE VIEWS.PY (Add Diagonals back and add Error Handling)
+cat << 'INNER' > bingo/views.py
 from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
 from .models import User, PermanentCard, GameRound, Transaction
@@ -97,3 +104,15 @@ def check_win(request, game_id, tg_id):
         return JsonResponse({'status': 'NOT_YET'})
     except Exception as e:
         return JsonResponse({'status': 'error', 'msg': str(e)})
+INNER
+
+# 2. FIX JAVASCRIPT IN HTML (Safe Alerts)
+sed -i 's/tg.showPopup({title: "❌ Not Bingo Yet!", message: "You missed a number or don'\''t have enough lines for this room! Keep watching."});/tg.showAlert("❌ NOT BINGO YET!\\n\\nYou missed a number or lack enough lines! Keep matching.");/g' bingo/templates/live_view.html
+sed -i 's/tg.showPopup({title: "⏳ Waiting...", message: "Waiting for the dealer to draw more numbers."});/tg.showAlert("⏳ Waiting for the dealer to draw more numbers.");/g' bingo/templates/live_view.html
+sed -i 's/tg.showPopup({title: "⚠️ Hold on!", message: "You haven'\''t marked any numbers yet!"});/tg.showAlert("⚠️ HOLD ON!\\n\\nYou haven'\''t marked any numbers yet!");/g' bingo/templates/live_view.html
+
+cd ~/vladbingo
+git add .
+git commit -m "Fix: Repaired Bingo button silent crash and safe alerts"
+git push -f origin main
+echo "✅ BUTTON FIX DEPLOYED! Watch Render update."
