@@ -1,3 +1,7 @@
+#!/bin/bash
+cd ~/vladbingo/backend
+
+cat << 'INNER' > build.sh
 #!/usr/bin/env bash
 set -o errexit
 cd backend
@@ -46,3 +50,10 @@ python manage.py migrate bingo
 
 echo "Step 3: Initializing Authentic Bingo Rooms..."
 python manage.py init_bingo
+INNER
+
+cd ~/vladbingo
+git add .
+git commit -m "Fix: Aggressive Raw SQL Database Purge"
+git push -f origin main
+echo "✅ PUSHED! Render will now successfully wipe and rebuild."
