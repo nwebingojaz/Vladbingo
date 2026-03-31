@@ -1,3 +1,7 @@
+#!/bin/bash
+cd ~/vladbingo/backend
+
+cat << 'INNER' > build.sh
 #!/usr/bin/env bash
 set -o errexit
 cd backend
@@ -28,3 +32,10 @@ python manage.py migrate
 
 echo "Initializing Authentic Bingo Rooms..."
 python manage.py init_bingo
+INNER
+
+cd ~/vladbingo
+git add .
+git commit -m "Fix: Reordered makemigrations before migrate to solve Dependency Error"
+git push -f origin main
+echo "✅ FIXED! Render is building now."
