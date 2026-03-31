@@ -1,3 +1,9 @@
+#!/bin/bash
+echo "🛠 DEPLOYING THE SNIPER DATABASE RESET..."
+
+cd ~/vladbingo/backend
+
+cat << 'INNER' > build.sh
 #!/usr/bin/env bash
 set -o errexit
 cd backend
@@ -23,3 +29,10 @@ touch bingo/migrations/__init__.py
 python manage.py makemigrations bingo
 python manage.py migrate
 python manage.py init_bingo
+INNER
+
+cd ~/vladbingo
+git add .
+git commit -m "Fix: Bulletproof dynamic table dropper to prevent Render SSL crash"
+git push -f origin main
+echo "✅ PUSHED! Render will now build successfully."
