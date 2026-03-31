@@ -4,9 +4,29 @@ from bingo.models import PermanentCard, GameRound
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        if not PermanentCard.objects.exists():
-            for i in range(1, 101):
-                board = [[random.randint(1,75) for _ in range(5)] for _ in range(5)]
-                board[2][2] = "FREE"
-                PermanentCard.objects.create(card_number=i, board=board)
-        GameRound.objects.get_or_create(bet_amount=10, status="LOBBY")
+        # Always wipe and rebuild cards to ensure authentic layout
+        PermanentCard.objects.all().delete()
+        
+        self.stdout.write("Generating 200 Authentic B-I-N-G-O Cards...")
+        for i in range(1, 201):
+            # Strict Column Rules
+            b = random.sample(range(1, 16), 5)
+            i_col = random.sample(range(16, 31), 5)
+            n = random.sample(range(31, 46), 5)
+            g = random.sample(range(46, 61), 5)
+            o = random.sample(range(61, 76), 5)
+            
+            n[2] = "FREE" # The center space
+            
+            # Transpose columns into rows for the 5x5 Grid UI
+            board = []
+            for row_idx in range(5):
+                board.append([b[row_idx], i_col[row_idx], n[row_idx], g[row_idx], o[row_idx]])
+            
+            PermanentCard.objects.create(card_number=i, board=board)
+            
+        # Ensure rooms exist
+        for t in [10, 20, 30, 40, 50, 100]:
+            GameRound.objects.get_or_create(bet_amount=t, status="LOBBY")
+            
+        self.stdout.write("✅ Authentic Cards Generated!")
