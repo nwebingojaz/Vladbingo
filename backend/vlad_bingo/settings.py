@@ -5,10 +5,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "vlad-bingo-final-key")
 DEBUG = True # Keep True for now so we can see any remaining errors
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = ['*']  # Allows any URL to connect
 
-# THE KEY FIX FOR ADMIN 403:
-CSRF_TRUSTED_ORIGINS = ["https://vlad-bingo-web.onrender.com"]
+CSRF_TRUSTED_ORIGINS = [
+    'https://vladbingo-dmzg.onrender.com',
+]
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 INSTALLED_APPS = [
