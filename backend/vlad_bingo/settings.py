@@ -8,7 +8,7 @@ DEBUG = True # Keep True for now so we can see any remaining errors
 ALLOWED_HOSTS = ["*"]
 
 # THE KEY FIX FOR ADMIN 403:
-CSRF_TRUSTED_ORIGINS = ["https://vlad-bingo-web.onrender.com"]
+CSRF_TRUSTED_ORIGINS = ["https://vladbingo-dmzg.onrender.com"]
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 INSTALLED_APPS = [

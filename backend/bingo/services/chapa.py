@@ -5,7 +5,7 @@ def init_deposit(user, amount):
     payload = {
         "amount": str(amount), "currency": "ETB", "tx_ref": ref,
         "email": "bababingo22@gmail.com", 
-        "callback_url": "https://vlad-bingo-web.onrender.com/api/chapa-webhook/",
+        "callback_url": "https://vladbingo-dmzg.onrender.com/api/chapa-webhook/",
         "customization": {"title": "Bingo Deposit"}
     }
     headers = {"Authorization": f"Bearer {os.environ.get('CHAPA_SECRET_KEY')}"}

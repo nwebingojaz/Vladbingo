@@ -26,7 +26,7 @@ def db_op(uid, action, val=None):
 async def send_main_menu(update: Update, user):
     photo_url = "https://images.unsplash.com/photo-1518133910546-b6c2fb7d79e3?q=80&w=1000&auto=format&fit=crop"
     caption = f"🎰 **VLAD BINGO PRO** 🎰\n\nWelcome back, **{user.real_name}**!\n💰 **Balance:** {user.operational_credit} ETB\n\nChoose an option below:"
-    web_app_url = "https://vlad-bingo-web.onrender.com/api/live/"
+    web_app_url = "https://vladbingo-dmzg.onrender.com/api/live/"
     
     keyboard = [
         [InlineKeyboardButton("Play Games 🎮", web_app=WebAppInfo(url=web_app_url))],
