@@ -1,15 +1,22 @@
-import os, dj_database_url
+import os
+import dj_database_url
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "vlad-bingo-final-key")
-DEBUG = True # Keep True for now so we can see any remaining errors
+DEBUG = True 
 
 ALLOWED_HOSTS = ["*"]
 
-# THE KEY FIX FOR ADMIN 403:
-CSRF_TRUSTED_ORIGINS = ["https://vladbingo-dmzg.onrender.com"]
+# THE KEY FIXES FOR SECURE ACCESS
+CSRF_TRUSTED_ORIGINS = [
+    "https://vladbingo-dmzg.onrender.com", 
+    "https://*.onrender.com"
+]
+
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+SECURE_SSL_REDIRECT = False # Set to True later if you have SSL issues
 
 INSTALLED_APPS = [
     "django.contrib.admin", "django.contrib.auth", "django.contrib.contenttypes",
@@ -25,6 +32,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.context_processors.messages", # Corrected path
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -48,7 +56,12 @@ TEMPLATES = [{
 WSGI_APPLICATION = "vlad_bingo.wsgi.application"
 ASGI_APPLICATION = "vlad_bingo.asgi.application"
 
-DATABASES = {'default': dj_database_url.config(conn_max_age=600)}
+DATABASES = {
+    'default': dj_database_url.config(
+        default=os.environ.get("DATABASE_URL"),
+        conn_max_age=600
+    )
+}
 
 CHANNEL_LAYERS = {
     "default": {
