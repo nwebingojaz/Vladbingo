@@ -8,7 +8,6 @@ DEBUG = True
 
 ALLOWED_HOSTS = ["*"]
 
-# THE KEY FIXES FOR SECURE ACCESS
 CSRF_TRUSTED_ORIGINS = [
     "https://vladbingo-dmzg.onrender.com", 
     "https://*.onrender.com"
@@ -16,12 +15,19 @@ CSRF_TRUSTED_ORIGINS = [
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_HOST = True
-SECURE_SSL_REDIRECT = False # Set to True later if you have SSL issues
+SECURE_SSL_REDIRECT = False
 
 INSTALLED_APPS = [
-    "django.contrib.admin", "django.contrib.auth", "django.contrib.contenttypes",
-    "django.contrib.sessions", "django.contrib.messages", "django.contrib.staticfiles",
-    "rest_framework", "corsheaders", "channels", "bingo",
+    "django.contrib.admin", 
+    "django.contrib.auth", 
+    "django.contrib.contenttypes",
+    "django.contrib.sessions", 
+    "django.contrib.messages", 
+    "django.contrib.staticfiles",
+    "rest_framework", 
+    "corsheaders", 
+    "channels", 
+    "bingo",
 ]
 
 MIDDLEWARE = [
@@ -32,8 +38,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "django.contrib.messages.context_processors.messages", # Corrected path
-    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware", # Removed context_processor from here!
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
@@ -48,7 +53,7 @@ TEMPLATES = [{
             "django.template.context_processors.debug",
             "django.template.context_processors.request",
             "django.contrib.auth.context_processors.auth",
-            "django.contrib.messages.context_processors.messages",
+            "django.contrib.messages.context_processors.messages", # This is where it belongs!
         ],
     },
 }]
