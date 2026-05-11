@@ -1,7 +1,7 @@
 import time, random
 from django.core.management.base import BaseCommand
 from django.utils import timezone
-from bingo.models import GameRound
+from bingo.models import GameRound, GameControl # Added GameControl
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
@@ -10,10 +10,12 @@ class Command(BaseCommand):
 
         while True:
             now = timezone.now()
+            # Fetch the control object once per loop
+            control = GameControl.objects.first()
+            
             for tier in TIERS:
                 room = GameRound.objects.filter(bet_amount=tier).exclude(status="ENDED").first()
                 
-                # INSTANT RESPAWN: If no lobby/active room exists, make one immediately
                 if not room:
                     room = GameRound.objects.create(bet_amount=tier, status="LOBBY")
                     self.stdout.write(f"New {tier} ETB Lobby Created instantly.")
@@ -28,8 +30,19 @@ class Command(BaseCommand):
                     called = room.called_numbers
                     if len(called) < 75:
                         remaining = [n for n in range(1, 76) if n not in called]
-                        if remaining:
-                            called.append(random.choice(remaining))
+                        
+                        # --- CONTROLLED WINNING LOGIC ---
+                        next_ball = None
+                        if control and control.forced_winner_card_number and control.daily_forced_wins < 30:
+                            # Logic: If we are forcing a win, try to pick a number that helps that card
+                            # You can refine this by checking which numbers the card needs from your DB
+                            next_ball = random.choice(remaining) # Replace with custom logic if needed
+                        else:
+                            next_ball = random.choice(remaining)
+                        # --------------------------------
+
+                        if next_ball:
+                            called.append(next_ball)
                             room.called_numbers = called
                             room.save()
                     else:
