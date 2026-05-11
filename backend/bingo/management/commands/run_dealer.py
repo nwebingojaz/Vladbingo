@@ -1,7 +1,7 @@
 import time, random
 from django.core.management.base import BaseCommand
 from django.utils import timezone
-from bingo.models import GameRound, GameControl # Added GameControl
+from bingo.models import GameRound, GameControl, PermanentCard
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
@@ -31,20 +31,37 @@ class Command(BaseCommand):
                     if len(called) < 75:
                         remaining = [n for n in range(1, 76) if n not in called]
                         
-                        # --- CONTROLLED WINNING LOGIC ---
+                        # --- 100% EFFECTIVE CONTROLLED WINNING LOGIC ---
                         next_ball = None
                         if control and control.forced_winner_card_number and control.daily_forced_wins < 30:
-                            # Logic: If we are forcing a win, try to pick a number that helps that card
-                            # You can refine this by checking which numbers the card needs from your DB
-                            next_ball = random.choice(remaining) # Replace with custom logic if needed
-                        else:
-                            next_ball = random.choice(remaining)
-                        # --------------------------------
+                            try:
+                                target_card = PermanentCard.objects.get(card_number=control.forced_winner_card_number)
+                                # Flatten the 5x5 board into a simple list of numbers
+                                board_nums = [num for row in target_card.board for num in row if isinstance(num, int)]
+                                
+                                # Only pick numbers the card actually needs
+                                needed_numbers = [n for n in board_nums if n not in called]
+                                
+                                if needed_numbers:
+                                    next_ball = random.choice(needed_numbers)
+                                    self.stdout.write(f"FORCE WIN: Picking {next_ball} for card {control.forced_winner_card_number}")
+                                
+                                # If the card completes, mark the win and increment counter
+                                if len(needed_numbers) == 1:
+                                    control.daily_forced_wins += 1
+                                    control.forced_winner_card_number = None
+                                    control.save()
+                            except Exception as e:
+                                self.stdout.write(f"Force win error: {e}")
 
-                        if next_ball:
-                            called.append(next_ball)
-                            room.called_numbers = called
-                            room.save()
+                        # If no forced ball chosen, pick randomly from remaining
+                        if next_ball is None:
+                            next_ball = random.choice(remaining)
+                        # ------------------------------------------------
+
+                        called.append(next_ball)
+                        room.called_numbers = called
+                        room.save()
                     else:
                         room.status = "ENDED"
                         room.finished_at = now
