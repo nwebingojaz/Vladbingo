@@ -7,8 +7,9 @@ class Command(BaseCommand):
         # Always wipe and rebuild cards to ensure authentic layout
         PermanentCard.objects.all().delete()
         
-        self.stdout.write("Generating 200 Authentic B-I-N-G-O Cards...")
-        for i in range(1, 201):
+        # Updated the message and the range to 500
+        self.stdout.write("Generating 500 Authentic B-I-N-G-O Cards...")
+        for i in range(1, 501):  # Changed from 201 to 501
             # Strict Column Rules
             b = random.sample(range(1, 16), 5)
             i_col = random.sample(range(16, 31), 5)
@@ -29,4 +30,4 @@ class Command(BaseCommand):
         for t in [10, 20, 30, 40, 50, 100]:
             GameRound.objects.get_or_create(bet_amount=t, status="LOBBY")
             
-        self.stdout.write("✅ Authentic Cards Generated!")
+        self.stdout.write("✅ 500 Authentic Cards Generated!")
