@@ -8,6 +8,10 @@ class User(AbstractUser):
     bot_state = models.CharField(max_length=30, default="REG_NAME")
     real_name = models.CharField(max_length=100, blank=True)
     phone_number = models.CharField(max_length=20, blank=True)
+    # Added for Telegram Verification
+    telegram_id = models.BigIntegerField(null=True, blank=True)
+    otp_code = models.CharField(max_length=6, null=True, blank=True)
+    otp_expiry = models.DateTimeField(null=True, blank=True)
 
 class PermanentCard(models.Model):
     card_number = models.PositiveSmallIntegerField(unique=True)
@@ -29,3 +33,15 @@ class Transaction(models.Model):
     amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     type = models.CharField(max_length=20, default="DEPOSIT")
     note = models.TextField(default="")
+    status = models.CharField(max_length=20, default="pending") # pending, approved, rejected
+
+class GameControl(models.Model):
+    forced_winner_card_number = models.IntegerField(null=True, blank=True)
+    daily_forced_wins = models.IntegerField(default=0)
+    last_reset = models.DateField(default=timezone.now)
+
+    def save(self, *args, **kwargs):
+        if self.last_reset != timezone.now().date():
+            self.daily_forced_wins = 0
+            self.last_reset = timezone.now().date()
+        super().save(*args, **kwargs)
