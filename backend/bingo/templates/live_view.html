@@ -65,7 +65,8 @@
     <div id="v-selector" class="hidden p-4">
         <button onclick="showLobby()" class="text-blue-400 text-[10px] font-bold mb-3 flex items-center gap-1">← BACK TO ROOMS</button>
         <div id="active-call-banner" class="active-banner hidden">Active Game Call <span id="call-count">0</span>/75</div>
-        <div id="grid-200" class="grid grid-cols-10 gap-1 h-64 overflow-y-auto mb-6 p-2 bg-black/30 rounded-xl"></div>
+        <!-- CHANGED ID TO grid-500 -->
+        <div id="grid-500" class="grid grid-cols-10 gap-1 h-64 overflow-y-auto mb-6 p-2 bg-black/30 rounded-xl"></div>
         <div id="spectator-tracker" class="hidden mb-6 p-2 bg-slate-900/80 rounded-xl border border-blue-900/50"></div>
         <div class="flex gap-4 items-end bg-slate-800/50 p-3 rounded-2xl border border-white/5">
             <div class="preview-container"><div id="mini-grid" class="grid grid-cols-5 gap-0.5"></div><div class="text-[9px] text-center mt-2 text-blue-400 font-bold uppercase">Card <span id="prev-num">#---</span></div></div>
@@ -122,7 +123,7 @@
         let activeBet = 10; let myCard = null; let historyData = {winners: [], my_bets: []};
         let currentRoomTime = 0; let currentRoomStatus = 'LOBBY'; let myActiveGameId = null;
 
-        function handleDeposit() { tg.showAlert("Redirecting to secure Chapa Payment Gateway..."); }
+        function handleDeposit() { tg.showAlert("Redirecting to secure Payment Gateway..."); }
         function appLoop() { if (myActiveGameId) { updatePlayHall(); } else { refreshLobby(); } }
 
         function buildTracker(containerId) {
@@ -240,24 +241,26 @@
 
         function updateBanner(status, count, called_numbers) {
             const b = document.getElementById('active-call-banner'); const btn = document.getElementById('join-btn');
-            const g200 = document.getElementById('grid-200'); const sTrack = document.getElementById('spectator-tracker');
+            const gGrid = document.getElementById('grid-500'); const sTrack = document.getElementById('spectator-tracker');
             if(status === 'ACTIVE') { 
                 b.classList.remove('hidden'); document.getElementById('call-count').innerText=count; btn.disabled=true; btn.style.opacity="0.3"; btn.innerText="WAITING...";
-                g200.classList.add('hidden'); sTrack.classList.remove('hidden'); buildTracker('spectator-tracker');
+                gGrid.classList.add('hidden'); sTrack.classList.remove('hidden'); buildTracker('spectator-tracker');
                 document.querySelectorAll('#spectator-tracker .tracker-dot').forEach(el=>el.classList.remove('called'));
                 if(called_numbers) called_numbers.forEach(n => { let dot = document.getElementById('spectator-tracker-dot-'+n); if(dot) dot.classList.add('called'); });
             } else { 
                 b.classList.add('hidden'); btn.disabled=false; btn.style.opacity="1"; btn.innerText="▶ START!";
-                g200.classList.remove('hidden'); sTrack.classList.add('hidden');
+                gGrid.classList.remove('hidden'); sTrack.classList.add('hidden');
             }
         }
         
         setInterval(() => { if(!myActiveGameId) { const tEl = document.getElementById('timer'); if(currentRoomStatus === 'ACTIVE') { tEl.innerText = "PLAYING..."; tEl.classList.add('text-red-400'); } else { tEl.classList.remove('text-red-400'); if(currentRoomTime > 0) currentRoomTime--; let m = Math.floor(currentRoomTime / 60), s = currentRoomTime % 60; tEl.innerText = m + ":" + (s < 10 ? "0" + s : s); } } }, 1000);
         function showLobby() { document.getElementById('v-selector').classList.add('hidden'); document.getElementById('v-lobby').classList.remove('hidden'); }
         function selectRoom(t) { activeBet=t; document.getElementById('nav-room').innerText=t; document.getElementById('v-lobby').classList.add('hidden'); document.getElementById('v-selector').classList.remove('hidden'); initGrid(); appLoop(); }
-        function initGrid() { const g = document.getElementById('grid-200'); g.innerHTML = ''; for(let i=1; i<=200; i++) { let b = document.createElement('button'); b.className="card-num"; b.id="c-"+i; b.innerText=i; b.onclick=()=>selectCard(i); g.appendChild(b); } }
+        // CHANGED LOOP LIMIT TO 500
+        function initGrid() { const g = document.getElementById('grid-500'); g.innerHTML = ''; for(let i=1; i<=500; i++) { let b = document.createElement('button'); b.className="card-num"; b.id="c-"+i; b.innerText=i; b.onclick=()=>selectCard(i); g.appendChild(b); } }
         function selectCard(n) { myCard=n; document.querySelectorAll('.card-num').forEach(el=>el.classList.remove('active')); document.getElementById('c-'+n).classList.add('active'); document.getElementById('prev-num').innerText="#"+n; fetch('/api/card-data/'+n+'/').then(r=>r.json()).then(d=>{ const mini = document.getElementById('mini-grid'); mini.innerHTML = ''; d.board.forEach(row=>row.forEach(v=>{ let c=document.createElement('div'); c.className='mini-cell'; c.innerText=v==='FREE'?'X':v; mini.appendChild(c); })); }); document.getElementById('c-'+n).scrollIntoView({behavior:'smooth', block:'center'}); }
-        function pickRandom() { const r=Math.floor(Math.random()*200)+1; selectCard(r); }
+        // CHANGED MATH.RANDOM LIMIT TO 500
+        function pickRandom() { const r=Math.floor(Math.random()*500)+1; selectCard(r); }
         function joinGame() { fetch(`/api/join-room/${uid}/${activeBet}/${myCard}/`).then(r=>r.json()).then(d=>{ if(d.status==='ok') location.reload(); else tg.showAlert(d.error); }); }
         function openHistory() { document.getElementById('m-history').style.display = 'flex'; fetch('/api/history/'+uid+'/').then(r=>r.json()).then(d => { historyData = d; switchTab('bets'); }); }
         function closeHistory() { document.getElementById('m-history').style.display = 'none'; }
