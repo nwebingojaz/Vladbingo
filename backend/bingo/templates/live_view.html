@@ -65,8 +65,8 @@
     <div id="v-selector" class="hidden p-4">
         <button onclick="showLobby()" class="text-blue-400 text-[10px] font-bold mb-3 flex items-center gap-1">← BACK TO ROOMS</button>
         <div id="active-call-banner" class="active-banner hidden">Active Game Call <span id="call-count">0</span>/75</div>
-        <!-- CHANGED ID TO grid-500 -->
-        <div id="grid-500" class="grid grid-cols-10 gap-1 h-64 overflow-y-auto mb-6 p-2 bg-black/30 rounded-xl"></div>
+        <!-- Smart Grid Container -->
+        <div id="grid-container" class="grid grid-cols-10 gap-1 h-64 overflow-y-auto mb-6 p-2 bg-black/30 rounded-xl"></div>
         <div id="spectator-tracker" class="hidden mb-6 p-2 bg-slate-900/80 rounded-xl border border-blue-900/50"></div>
         <div class="flex gap-4 items-end bg-slate-800/50 p-3 rounded-2xl border border-white/5">
             <div class="preview-container"><div id="mini-grid" class="grid grid-cols-5 gap-0.5"></div><div class="text-[9px] text-center mt-2 text-blue-400 font-bold uppercase">Card <span id="prev-num">#---</span></div></div>
@@ -77,7 +77,7 @@
         </div>
     </div>
 
-    <!-- LIVE PLAY HALL (INTERACTIVE) -->
+    <!-- LIVE PLAY HALL -->
     <div id="v-play" class="hidden p-4 h-screen overflow-y-auto pb-32">
         <div class="flex justify-between items-center mb-3">
             <h2 class="text-blue-400 font-bold text-xs uppercase tracking-widest">My Board</h2>
@@ -88,11 +88,54 @@
         <div class="flex justify-center mb-6">
             <div class="bg-slate-800 p-2 rounded-2xl border-2 border-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.3)]">
                 <div class="grid grid-cols-5 gap-1 mb-1 text-center"><div class="font-black text-xl text-blue-400">B</div><div class="font-black text-xl text-blue-400">I</div><div class="font-black text-xl text-blue-400">N</div><div class="font-black text-xl text-blue-400">G</div><div class="font-black text-xl text-blue-400">O</div></div>
-                <!-- THE INTERACTIVE GRID -->
                 <div id="play-card" class="grid grid-cols-5 gap-1"></div>
             </div>
         </div>
         <button onclick="hitBingo()" class="w-full py-5 bg-gradient-to-r from-red-500 to-red-700 rounded-2xl font-black text-2xl shadow-[0_0_20px_rgba(239,68,68,0.4)] text-white active:scale-95 transition-all tracking-widest">📢 BINGO!</button>
+    </div>
+
+    <!-- DEPOSIT MODAL (WITH OTP & MANUAL TRANSFER) -->
+    <div id="m-deposit" class="modal" style="background: rgba(15, 23, 42, 0.98);">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-blue-400 font-black text-xl uppercase">Manual Deposit</h2>
+            <button onclick="document.getElementById('m-deposit').style.display='none'" class="text-2xl text-gray-400">✕</button>
+        </div>
+
+        <div id="dep-step-1">
+            <button onclick="showDepositForm('Telebirr')" class="w-full bg-white text-blue-600 font-bold py-4 rounded-xl mb-3 flex items-center justify-center gap-2">
+                <span class="text-2xl">📱</span> Telebirr Deposit
+            </button>
+            <button onclick="showDepositForm('CBE')" class="w-full bg-white text-purple-700 font-bold py-4 rounded-xl flex items-center justify-center gap-2">
+                <span class="text-2xl">🏦</span> CBE Birr Deposit
+            </button>
+        </div>
+
+        <div id="dep-step-2" class="hidden bg-slate-800 p-4 rounded-xl border border-blue-900/50 mt-4">
+            <h3 id="dep-title" class="text-center font-bold text-yellow-400 mb-2">Transfer to Account</h3>
+            
+            <div class="bg-red-900/40 border border-red-500 rounded p-2 mb-4 text-center">
+                <p class="text-red-400 text-[10px] font-bold uppercase">⚠️ IMPORTANT WARNING ⚠️</p>
+                <p class="text-white text-[9px]">Only use the Mobile App or USSD code (*847# / *127#).<br>DO NOT deposit at a physical bank branch.</p>
+            </div>
+
+            <div class="text-sm text-gray-300 mb-4 bg-black/30 p-3 rounded">
+                1. Transfer the amount to:<br>
+                <strong id="dep-account-info" class="text-white text-xl tracking-wider text-blue-300"></strong><br>
+                <br>
+                2. Copy the Transaction ID from your Bank/Telebirr SMS.<br>
+                3. Paste it below and verify with OTP.
+            </div>
+            
+            <input type="number" id="dep-amount" placeholder="Amount (ETB)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
+            <input type="text" id="dep-txid" placeholder="Transaction Number (e.g. CA999DASAD)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
+            
+            <div class="flex gap-2 mb-4">
+                <input type="text" id="dep-otp" placeholder="OTP Code" class="flex-1 bg-slate-900 border border-slate-700 rounded p-3 text-white">
+                <button onclick="requestOTP()" class="bg-red-500 text-white font-bold px-4 rounded hover:bg-red-600 transition-colors">Get OTP</button>
+            </div>
+            
+            <button onclick="submitDeposit()" class="w-full bg-blue-600 font-black text-white py-3 rounded-xl hover:bg-blue-700 transition-colors">Submit Deposit</button>
+        </div>
     </div>
 
     <!-- WIN CELEBRATION MODAL -->
@@ -102,9 +145,7 @@
             <div class="text-3xl mb-2">🎉 <span class="font-black text-white tracking-widest">BINGO!</span> 🎉</div>
             <p class="text-blue-100 mb-4 text-xs font-bold">You got a Bingo with card <span id="win-card-num" class="text-white text-lg"></span>!</p>
             <div class="bg-white rounded-xl p-2 mb-6 shadow-inner">
-                <div class="grid grid-cols-5 gap-1 text-center mb-1">
-                    <div class="font-black text-blue-600 text-sm">B</div><div class="font-black text-blue-600 text-sm">I</div><div class="font-black text-blue-600 text-sm">N</div><div class="font-black text-blue-600 text-sm">G</div><div class="font-black text-blue-600 text-sm">O</div>
-                </div>
+                <div class="grid grid-cols-5 gap-1 text-center mb-1"><div class="font-black text-blue-600 text-sm">B</div><div class="font-black text-blue-600 text-sm">I</div><div class="font-black text-blue-600 text-sm">N</div><div class="font-black text-blue-600 text-sm">G</div><div class="font-black text-blue-600 text-sm">O</div></div>
                 <div id="win-card-grid" class="grid grid-cols-5 gap-1"></div>
             </div>
             <button onclick="location.reload()" class="w-full bg-yellow-400 text-black font-black text-xl py-3 rounded-xl shadow-lg active:scale-95 transition-all">Keep Playing!</button>
@@ -122,8 +163,67 @@
         const tg = window.Telegram.WebApp; const uid = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : 0;
         let activeBet = 10; let myCard = null; let historyData = {winners: [], my_bets: []};
         let currentRoomTime = 0; let currentRoomStatus = 'LOBBY'; let myActiveGameId = null;
+        let currentMethod = "";
 
-        function handleDeposit() { tg.showAlert("Redirecting to secure Payment Gateway..."); }
+        // --- DEPOSIT & OTP LOGIC ---
+        function handleDeposit() {
+            document.getElementById('m-deposit').style.display = 'flex';
+            document.getElementById('dep-step-1').classList.remove('hidden');
+            document.getElementById('dep-step-2').classList.add('hidden');
+        }
+
+        function showDepositForm(method) {
+            currentMethod = method;
+            document.getElementById('dep-step-1').classList.add('hidden');
+            document.getElementById('dep-step-2').classList.remove('hidden');
+            document.getElementById('dep-title').innerText = method + " Deposit";
+
+            const accInfo = document.getElementById('dep-account-info');
+            if (method === 'Telebirr') {
+                accInfo.innerHTML = "0928911665<br><span class='text-sm text-gray-400'>Name: Kassahun</span>";
+            } else if (method === 'CBE') {
+                accInfo.innerHTML = "1000379893698<br><span class='text-sm text-gray-400'>Name: Yeabkal</span>";
+            }
+        }
+
+        function requestOTP() {
+            fetch('/api/send-otp/', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ tg_id: uid })
+            }).then(r=>r.json()).then(d => {
+                tg.showAlert(d.message);
+            });
+        }
+
+        function submitDeposit() {
+            const amount = document.getElementById('dep-amount').value;
+            const txid = document.getElementById('dep-txid').value;
+            const otp = document.getElementById('dep-otp').value;
+            
+            if(!amount || !txid || !otp) return tg.showAlert("Please fill all fields!");
+
+            fetch('/api/verify-otp/', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ tg_id: uid, otp: otp })
+            }).then(r=>r.json()).then(d => {
+                if(d.status === 'success') {
+                    fetch('/api/submit-deposit/', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ tg_id: uid, amount: amount, tx_id: txid, method: currentMethod })
+                    }).then(r2=>r2.json()).then(d2 => {
+                        tg.showAlert(d2.message);
+                        document.getElementById('m-deposit').style.display = 'none';
+                    });
+                } else {
+                    tg.showAlert(d.message);
+                }
+            });
+        }
+        // -------------------------------
+
         function appLoop() { if (myActiveGameId) { updatePlayHall(); } else { refreshLobby(); } }
 
         function buildTracker(containerId) {
@@ -241,7 +341,7 @@
 
         function updateBanner(status, count, called_numbers) {
             const b = document.getElementById('active-call-banner'); const btn = document.getElementById('join-btn');
-            const gGrid = document.getElementById('grid-500'); const sTrack = document.getElementById('spectator-tracker');
+            const gGrid = document.getElementById('grid-container'); const sTrack = document.getElementById('spectator-tracker');
             if(status === 'ACTIVE') { 
                 b.classList.remove('hidden'); document.getElementById('call-count').innerText=count; btn.disabled=true; btn.style.opacity="0.3"; btn.innerText="WAITING...";
                 gGrid.classList.add('hidden'); sTrack.classList.remove('hidden'); buildTracker('spectator-tracker');
@@ -256,11 +356,27 @@
         setInterval(() => { if(!myActiveGameId) { const tEl = document.getElementById('timer'); if(currentRoomStatus === 'ACTIVE') { tEl.innerText = "PLAYING..."; tEl.classList.add('text-red-400'); } else { tEl.classList.remove('text-red-400'); if(currentRoomTime > 0) currentRoomTime--; let m = Math.floor(currentRoomTime / 60), s = currentRoomTime % 60; tEl.innerText = m + ":" + (s < 10 ? "0" + s : s); } } }, 1000);
         function showLobby() { document.getElementById('v-selector').classList.add('hidden'); document.getElementById('v-lobby').classList.remove('hidden'); }
         function selectRoom(t) { activeBet=t; document.getElementById('nav-room').innerText=t; document.getElementById('v-lobby').classList.add('hidden'); document.getElementById('v-selector').classList.remove('hidden'); initGrid(); appLoop(); }
-        // CHANGED LOOP LIMIT TO 500
-        function initGrid() { const g = document.getElementById('grid-500'); g.innerHTML = ''; for(let i=1; i<=500; i++) { let b = document.createElement('button'); b.className="card-num"; b.id="c-"+i; b.innerText=i; b.onclick=()=>selectCard(i); g.appendChild(b); } }
+        
+        // --- SMART CARD LIMIT LOGIC ---
+        function getMaxCards() { return (activeBet == 10) ? 1000 : 500; }
+
+        function initGrid() { 
+            const g = document.getElementById('grid-container'); 
+            g.innerHTML = ''; 
+            let maxCards = getMaxCards(); 
+            for(let i=1; i<=maxCards; i++) { 
+                let b = document.createElement('button'); b.className="card-num"; b.id="c-"+i; b.innerText=i; b.onclick=()=>selectCard(i); g.appendChild(b); 
+            } 
+        }
+
+        function pickRandom() { 
+            let maxCards = getMaxCards(); 
+            const r=Math.floor(Math.random()*maxCards)+1; 
+            selectCard(r); 
+        }
+        // ------------------------------
+        
         function selectCard(n) { myCard=n; document.querySelectorAll('.card-num').forEach(el=>el.classList.remove('active')); document.getElementById('c-'+n).classList.add('active'); document.getElementById('prev-num').innerText="#"+n; fetch('/api/card-data/'+n+'/').then(r=>r.json()).then(d=>{ const mini = document.getElementById('mini-grid'); mini.innerHTML = ''; d.board.forEach(row=>row.forEach(v=>{ let c=document.createElement('div'); c.className='mini-cell'; c.innerText=v==='FREE'?'X':v; mini.appendChild(c); })); }); document.getElementById('c-'+n).scrollIntoView({behavior:'smooth', block:'center'}); }
-        // CHANGED MATH.RANDOM LIMIT TO 500
-        function pickRandom() { const r=Math.floor(Math.random()*500)+1; selectCard(r); }
         function joinGame() { fetch(`/api/join-room/${uid}/${activeBet}/${myCard}/`).then(r=>r.json()).then(d=>{ if(d.status==='ok') location.reload(); else tg.showAlert(d.error); }); }
         function openHistory() { document.getElementById('m-history').style.display = 'flex'; fetch('/api/history/'+uid+'/').then(r=>r.json()).then(d => { historyData = d; switchTab('bets'); }); }
         function closeHistory() { document.getElementById('m-history').style.display = 'none'; }
