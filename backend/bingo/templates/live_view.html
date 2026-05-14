@@ -24,43 +24,71 @@
         .btn-start { background: linear-gradient(135deg, #ef4444, #dc2626); border-radius: 12px; padding: 15px; font-weight: 900; font-size: 1.1rem; width: 100%; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4); color: white; transition: 0.2s;}
         .btn-start:active { transform: scale(0.95); }
         .btn-random { background: #1e293b; border: 1px solid #3b82f6; border-radius: 12px; width: 100%; padding: 10px; font-size: 0.8rem; font-weight: bold; color: #3b82f6; margin-bottom: 8px; }
-        .btn-deposit { background: #3b82f6; color: white; padding: 4px 12px; border-radius: 20px; font-weight: 900; font-size: 10px; }
         
-        .modal { background: rgba(0,0,0,0.95); position: fixed; inset: 0; z-index: 100; padding: 20px; display: none; flex-direction: column;}
+        .modal { background: rgba(11, 15, 25, 1); position: fixed; inset: 0; z-index: 50; padding: 20px; display: none; flex-direction: column; overflow-y:auto; }
         .history-row { background: #1e293b; margin-bottom: 4px; padding: 10px; border-radius: 6px; font-size: 10px; display: flex; justify-content: space-between; }
-        .tab-btn { flex: 1; text-align: center; padding: 10px; font-weight: bold; border-bottom: 2px solid transparent; color: gray; }
-        .tab-btn.active { border-bottom-color: #3b82f6; color: #3b82f6; }
         
+        /* Sidebar Menu */
+        #sidebar { position: fixed; top: 0; left: -100%; width: 75%; max-width: 300px; height: 100%; background: #0f172a; z-index: 100; transition: 0.3s; box-shadow: 5px 0 15px rgba(0,0,0,0.5); }
+        #sidebar.open { left: 0; }
+        #sidebar-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 90; display: none; }
+        .menu-item { display: flex; align-items: center; gap: 15px; padding: 15px 20px; font-size: 1.1rem; font-weight: bold; border-bottom: 1px solid #1e293b; color: #e2e8f0; }
+        .menu-item:active { background: #1e293b; }
+
+        /* Wallet Tabs */
+        .wallet-tab { flex: 1; text-align: center; padding: 12px 0; font-size: 11px; font-weight: 900; color: #64748b; border-bottom: 3px solid transparent; }
+        .wallet-tab.active { color: #3b82f6; border-bottom-color: #3b82f6; }
+
         .switch { position: relative; display: inline-block; width: 120px; height: 34px; background-color: #1e293b; border-radius: 34px; border: 1px solid #3b82f6; cursor: pointer; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider { position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: 34px; transition: .4s; }
         .slider:before { position: absolute; content: "MANUAL"; height: 26px; width: 54px; left: 4px; bottom: 3px; background-color: #3b82f6; color: white; font-size: 10px; font-weight: bold; display: flex; align-items: center; justify-content: center; border-radius: 34px; transition: .4s; }
         input:checked + .slider { background-color: #0b0f19; }
         input:checked + .slider:before { transform: translateX(56px); background-color: #10b981; content: "AUTO"; }
-
-        .celebration { background: #3b82f6; border-radius: 24px; padding: 24px; text-align: center; max-width: 320px; width: 100%; border: 4px solid #93c5fd; box-shadow: 0 0 50px rgba(59, 130, 246, 0.8); }
-        .win-grid-cell { aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 900; border-radius: 4px; border: 1px solid #e2e8f0; }
-        
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
     </style>
 </head>
 <body class="antialiased select-none">
 
-    <!-- THE TOAST POPUP (Hidden by default) -->
+    <!-- TOAST POPUP -->
     <div id="toast-msg" class="fixed top-16 left-1/2 transform -translate-x-1/2 bg-blue-600 border-2 border-blue-400 text-white font-black px-6 py-3 rounded-full shadow-[0_0_20px_rgba(59,130,246,0.6)] transition-all duration-300 opacity-0 pointer-events-none z-50 text-sm tracking-wider">
         Card #--- Selected!
+    </div>
+
+    <!-- SIDEBAR OVERLAY -->
+    <div id="sidebar-overlay" onclick="toggleMenu()"></div>
+
+    <!-- SIDEBAR MENU -->
+    <div id="sidebar" class="flex flex-col">
+        <div class="p-6 bg-blue-600 flex items-center gap-4">
+            <div class="bg-white p-3 rounded-full text-2xl">👤</div>
+            <div>
+                <div class="font-black text-white text-lg">VLAD PLAYER</div>
+                <div class="text-blue-200 text-xs font-bold" id="menu-id">ID: Loading...</div>
+            </div>
+        </div>
+        <div class="flex-1 overflow-y-auto py-2">
+            <div class="menu-item" onclick="toggleMenu(); showScreen('v-lobby')">🏠 Home</div>
+            <div class="menu-item" onclick="toggleMenu(); openWallet('deposit')">👛 Wallet & Banking</div>
+            <div class="menu-item" onclick="toggleMenu(); openHistory()">📜 Game History</div>
+            <div class="menu-item" onclick="toggleMenu(); openSettings()">⚙️ Settings & Security</div>
+        </div>
+        <div class="menu-item text-red-400 border-t-2 border-slate-800" onclick="tg.close()">🚪 Exit Game</div>
     </div>
     
     <!-- HEADER -->
     <div class="header-bg p-3 flex justify-between items-center shadow-lg relative z-40">
-        <div class="flex items-center gap-2"><div class="bg-blue-600 p-1 rounded font-black text-[10px] text-white italic">VLAD</div><div class="font-black text-xs uppercase text-white">BINGO PRO</div></div>
-        <div class="flex items-center gap-2"><div class="bg-slate-800 px-3 py-1 rounded-full flex items-center gap-2"><span class="text-yellow-400">👛</span><span id="bal-header" class="font-bold text-xs">0.00</span></div><button onclick="handleDeposit()" class="btn-deposit">+ DEPOSIT</button></div>
+        <div class="flex items-center gap-3">
+            <button onclick="toggleMenu()" class="text-white text-2xl px-2">☰</button>
+            <div class="flex items-center gap-1"><div class="bg-blue-600 p-1 rounded font-black text-[10px] text-white italic">VLAD</div><div class="font-black text-xs uppercase text-white">BINGO</div></div>
+        </div>
+        <div class="bg-slate-800 px-3 py-1.5 rounded-full flex items-center gap-2 border border-blue-900" onclick="openWallet('deposit')">
+            <span class="text-yellow-400 text-sm">👛</span><span id="bal-header" class="font-bold text-sm">0.00</span>
+        </div>
     </div>
     
-    <div class="bg-slate-900/80 p-2 flex justify-around items-center text-[9px] font-bold text-blue-400 uppercase border-b border-blue-900/50">
+    <div class="bg-slate-900/80 p-2 flex justify-around items-center text-[10px] font-bold text-blue-400 uppercase border-b border-blue-900/50">
         <div>🎲 Room: <span id="nav-room" class="text-white">10</span></div>
-        <div>🎁 Win: <span id="nav-prize" class="text-white text-[11px]">0</span></div>
-        <div onclick="openHistory()">📜 History</div>
+        <div>🎁 Win: <span id="nav-prize" class="text-white">0</span></div>
         <div onclick="location.reload()">🔄 Refresh</div>
     </div>
     
@@ -74,7 +102,7 @@
 
     <!-- SELECTOR -->
     <div id="v-selector" class="hidden p-4 h-screen overflow-y-auto pb-32 relative">
-        <button onclick="showLobby()" class="text-blue-400 text-[10px] font-bold mb-3 flex items-center gap-1">← BACK TO LOBBY</button>
+        <button onclick="showScreen('v-lobby')" class="text-blue-400 text-[10px] font-bold mb-3 flex items-center gap-1">← BACK TO LOBBY</button>
         <div id="active-call-banner" class="active-banner hidden">Active Game Call <span id="call-count">0</span>/75</div>
         <div id="grid-container" class="grid grid-cols-10 gap-1 h-64 overflow-y-auto mb-6 p-2 bg-black/30 rounded-xl"></div>
         <div id="spectator-tracker" class="hidden mb-6 p-2 bg-slate-900/80 rounded-xl border border-blue-900/50"></div>
@@ -87,275 +115,204 @@
         </div>
     </div>
 
-    <!-- LIVE PLAY HALL (4-SLOT LAYOUT) -->
+    <!-- LIVE PLAY HALL (4-SLOTS) -->
     <div id="v-play" class="hidden p-4 h-screen overflow-y-auto pb-32">
         <div class="flex justify-between items-center mb-4 bg-slate-800 p-2 rounded-xl border border-slate-700">
             <div id="play-status-badge" class="text-[10px] bg-blue-500/20 border border-blue-500 text-blue-500 px-3 py-1 rounded-full font-black">WAITING...</div>
-            <label class="switch">
-              <input type="checkbox" id="auto-toggle" onchange="toggleAutoMode(this)">
-              <span class="slider"></span>
-            </label>
+            <label class="switch"><input type="checkbox" id="auto-toggle" onchange="toggleAutoMode(this)"><span class="slider"></span></label>
         </div>
-
         <div id="play-tracker" class="mb-4 p-2 bg-slate-900/80 rounded-xl border border-blue-900/50 hidden"></div>
-
-        <!-- Dynamic 4-Slot Container -->
         <div id="multi-card-container" class="grid grid-cols-2 gap-2 mb-6">
             <div class="bg-slate-900/50 p-1 rounded-xl border-2 border-slate-700 border-dashed flex items-center justify-center min-h-[120px]" id="slot-1"><div id="play-card-1" class="w-full"></div></div>
             <div class="bg-slate-900/50 p-1 rounded-xl border-2 border-slate-700 border-dashed flex items-center justify-center min-h-[120px]" id="slot-2"><div id="play-card-2" class="w-full"></div></div>
             <div class="bg-slate-900/50 p-1 rounded-xl border-2 border-slate-700 border-dashed flex items-center justify-center min-h-[120px]" id="slot-3"><div id="play-card-3" class="w-full"></div></div>
             <div class="bg-slate-900/50 p-1 rounded-xl border-2 border-slate-700 border-dashed flex items-center justify-center min-h-[120px]" id="slot-4"><div id="play-card-4" class="w-full"></div></div>
         </div>
-
         <button onclick="hitBingo()" id="bingo-btn" class="w-full py-4 bg-slate-700 text-slate-400 rounded-2xl font-black text-xl border-2 border-slate-600 transition-all tracking-widest">BINGO!</button>
     </div>
 
-    <!-- DEPOSIT MODAL -->
-    <div id="m-deposit" class="modal" style="background: rgba(15, 23, 42, 0.98);">
-        <div class="flex justify-between items-center mb-6">
-            <h2 class="text-blue-400 font-black text-xl uppercase">Manual Deposit</h2>
-            <button onclick="document.getElementById('m-deposit').style.display='none'" class="text-2xl text-gray-400">✕</button>
+    <!-- UNIFIED WALLET MODAL -->
+    <div id="m-wallet" class="modal">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-white font-black text-2xl">Wallet</h2>
+            <button onclick="document.getElementById('m-wallet').style.display='none'" class="text-2xl text-gray-400">✕</button>
         </div>
-        <div id="dep-step-1">
-            <button onclick="showDepositForm('Telebirr')" class="w-full bg-white text-blue-600 font-bold py-4 rounded-xl mb-3 flex items-center justify-center gap-2"><span class="text-2xl">📱</span> Telebirr</button>
-            <button onclick="showDepositForm('CBE')" class="w-full bg-white text-purple-700 font-bold py-4 rounded-xl flex items-center justify-center gap-2"><span class="text-2xl">🏦</span> CBE Birr</button>
+        
+        <!-- Wallet Navigation Tabs -->
+        <div class="flex bg-slate-800 rounded-xl mb-6 border border-slate-700">
+            <div id="w-tab-deposit" onclick="openWalletTab('deposit')" class="wallet-tab active flex flex-col items-center"><span class="text-lg">📥</span>Deposit</div>
+            <div id="w-tab-withdraw" onclick="openWalletTab('withdraw')" class="wallet-tab flex flex-col items-center"><span class="text-lg">📤</span>Withdraw</div>
+            <div id="w-tab-transfer" onclick="openWalletTab('transfer')" class="wallet-tab flex flex-col items-center"><span class="text-lg">💸</span>Transfer</div>
         </div>
-        <div id="dep-step-2" class="hidden bg-slate-800 p-4 rounded-xl border border-blue-900/50 mt-4">
-            <h3 id="dep-title" class="text-center font-bold text-yellow-400 mb-2">Transfer to Account</h3>
-            <div class="bg-red-900/40 border border-red-500 rounded p-2 mb-4 text-center"><p class="text-red-400 text-[10px] font-bold uppercase">⚠️ IMPORTANT WARNING ⚠️</p><p class="text-white text-[9px]">Only use Mobile App or USSD (*847# / *127#).<br>DO NOT deposit at a physical bank branch.</p></div>
-            <div class="text-sm text-gray-300 mb-4 bg-black/30 p-3 rounded">1. Transfer amount to:<br><strong id="dep-account-info" class="text-white text-xl tracking-wider text-blue-300"></strong><br><br>2. Copy Transaction ID from SMS.<br>3. Paste below & verify with OTP.</div>
-            <input type="number" id="dep-amount" placeholder="Amount (ETB)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
-            <input type="text" id="dep-txid" placeholder="Transaction ID" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
-            <div class="flex gap-2 mb-4"><input type="text" id="dep-otp" placeholder="OTP Code" class="flex-1 bg-slate-900 border border-slate-700 rounded p-3 text-white"><button onclick="requestOTP()" class="bg-red-500 text-white font-bold px-4 rounded hover:bg-red-600 transition-colors">Get OTP</button></div>
-            <button onclick="submitDeposit()" class="w-full bg-blue-600 font-black text-white py-3 rounded-xl hover:bg-blue-700 transition-colors">Submit Deposit</button>
+
+        <div class="bg-blue-900/30 p-4 rounded-xl border border-blue-500/30 mb-6 flex justify-between items-center">
+            <div class="text-gray-400 text-xs font-bold uppercase">Balance</div>
+            <div class="text-white font-black text-2xl"><span id="wallet-bal">0.00</span> <span class="text-sm text-blue-400">ETB</span></div>
+        </div>
+
+        <!-- DEPOSIT SECTION (AMHARIC) -->
+        <div id="w-sec-deposit" class="w-section">
+            <div id="dep-step-1">
+                <button onclick="showDepositForm('Telebirr')" class="w-full bg-white text-blue-600 font-bold py-4 rounded-xl mb-3 flex items-center justify-center gap-2"><span class="text-2xl">📱</span> Telebirr Deposit</button>
+                <button onclick="showDepositForm('CBE')" class="w-full bg-white text-purple-700 font-bold py-4 rounded-xl flex items-center justify-center gap-2"><span class="text-2xl">🏦</span> CBE Birr Deposit</button>
+            </div>
+            <div id="dep-step-2" class="hidden bg-slate-800 p-4 rounded-xl border border-blue-900/50 mt-4">
+                <h3 id="dep-title" class="text-center font-bold text-yellow-400 mb-2">Transfer to Account</h3>
+                <div class="bg-red-900/40 border border-red-500 rounded p-2 mb-4 text-center"><p class="text-red-400 text-[10px] font-bold uppercase">⚠️ ማሳሰቢያ ⚠️</p><p class="text-white text-[9px]">በሞባይል አፕሊኬሽን ወይም በአጭር ቁጥር (*847# / *127#) ብቻ ይጠቀሙ።<br>በአካል ባንክ ውስጥ ሄደው አያስገቡ።</p></div>
+                <div class="text-sm text-gray-300 mb-4 bg-black/30 p-3 rounded">1. ገንዘቡን ወደዚህ ያስገቡ:<br><strong id="dep-account-info" class="text-white text-xl tracking-wider text-blue-300"></strong><br><br>2. ከአጭር የፅሁፍ መልዕክት (SMS) ላይ የትራንዛክሽን ቁጥሩን (Transaction ID) ኮፒ ያድርጉ።<br>3. ከታች ባለው ቦታ ላይ ያስገቡ እና በኦቲፒ (OTP) ያረጋግጡ።</div>
+                <input type="number" id="dep-amount" placeholder="Amount (ETB)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
+                <input type="text" id="dep-txid" placeholder="Transaction Number (e.g. CA999DASAD)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
+                <div class="flex gap-2 mb-4"><input type="text" id="dep-otp" placeholder="OTP Code" class="flex-1 bg-slate-900 border border-slate-700 rounded p-3 text-white"><button onclick="requestOTP()" class="bg-red-500 text-white font-bold px-4 rounded">Get OTP</button></div>
+                <button onclick="submitDeposit()" class="w-full bg-blue-600 font-black text-white py-3 rounded-xl">Submit Deposit</button>
+            </div>
+        </div>
+
+        <!-- WITHDRAW SECTION -->
+        <div id="w-sec-withdraw" class="w-section hidden bg-slate-800 p-4 rounded-xl border border-slate-700">
+            <h3 class="text-red-400 font-black mb-4">Secure Withdrawal</h3>
+            <input type="number" id="with-amount" placeholder="Amount (Min 50 ETB)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
+            <input type="text" id="with-account" placeholder="Your Bank/Telebirr Account Number" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-4 text-white">
+            <div class="flex gap-2 mb-4"><input type="text" id="with-otp" placeholder="OTP Code" class="flex-1 bg-slate-900 border border-slate-700 rounded p-3 text-white"><button onclick="requestOTP()" class="bg-red-500 text-white font-bold px-4 rounded">Get OTP</button></div>
+            <button onclick="submitAction('/api/submit-withdrawal/', {amount: document.getElementById('with-amount').value, account: document.getElementById('with-account').value, otp: document.getElementById('with-otp').value})" class="w-full bg-red-600 font-black text-white py-3 rounded-xl">Confirm Withdrawal</button>
+        </div>
+
+        <!-- TRANSFER SECTION -->
+        <div id="w-sec-transfer" class="w-section hidden bg-slate-800 p-4 rounded-xl border border-slate-700">
+            <h3 class="text-green-400 font-black mb-4">Transfer to Friend</h3>
+            <input type="number" id="tr-amount" placeholder="Amount to Transfer (ETB)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
+            <input type="text" id="tr-account" placeholder="Friend's User ID or Phone" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-4 text-white">
+            <div class="flex gap-2 mb-4"><input type="text" id="tr-otp" placeholder="OTP Code" class="flex-1 bg-slate-900 border border-slate-700 rounded p-3 text-white"><button onclick="requestOTP()" class="bg-red-500 text-white font-bold px-4 rounded">Get OTP</button></div>
+            <button onclick="submitAction('/api/submit-transfer/', {amount: document.getElementById('tr-amount').value, account: document.getElementById('tr-account').value, otp: document.getElementById('tr-otp').value})" class="w-full bg-green-600 font-black text-white py-3 rounded-xl">Send Money</button>
         </div>
     </div>
 
-    <!-- WIN MODAL & HISTORY MODAL -->
-    <div id="m-win" class="modal" style="justify-content:center; align-items:center;">
-        <div class="celebration">
-            <div class="text-6xl mb-2">🏆</div><div class="text-3xl mb-2">🎉 <span class="font-black text-white tracking-widest">BINGO!</span> 🎉</div>
-            <p class="text-blue-100 mb-4 text-xs font-bold">You got a Bingo with card <span id="win-card-num" class="text-white text-lg"></span>!</p>
-            <button onclick="location.reload()" class="w-full bg-yellow-400 text-black font-black text-xl py-3 rounded-xl shadow-lg">Keep Playing!</button>
+    <!-- SETTINGS / SECURITY MODAL -->
+    <div id="m-settings" class="modal" style="background: rgba(15, 23, 42, 0.98);">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-white font-black text-xl">Settings & Security</h2>
+            <button onclick="document.getElementById('m-settings').style.display='none'" class="text-2xl text-gray-400">✕</button>
+        </div>
+        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+            <h3 class="text-blue-400 font-bold mb-2">Change Security PIN/Password</h3>
+            <p class="text-xs text-gray-400 mb-4">Verify your identity via Telegram OTP to update your withdrawal PIN.</p>
+            <input type="password" id="set-pass" placeholder="New PIN/Password" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
+            <div class="flex gap-2 mb-4"><input type="text" id="set-otp" placeholder="OTP Code" class="flex-1 bg-slate-900 border border-slate-700 rounded p-3 text-white"><button onclick="requestOTP()" class="bg-red-500 text-white font-bold px-4 rounded">Get OTP</button></div>
+            <button onclick="submitAction('/api/change-password/', {password: document.getElementById('set-pass').value, otp: document.getElementById('set-otp').value})" class="w-full bg-blue-600 font-black text-white py-3 rounded-xl">Update Password</button>
         </div>
     </div>
+
+    <!-- HISTORY & WIN MODALS (Same) -->
     <div id="m-history" class="modal">
-        <div class="flex justify-between items-center mb-2"><h2 class="text-blue-400 font-black italic uppercase text-lg">History</h2><button onclick="closeHistory()" class="text-2xl text-gray-400">✕</button></div>
+        <div class="flex justify-between items-center mb-2"><h2 class="text-blue-400 font-black italic uppercase text-lg">History</h2><button onclick="document.getElementById('m-history').style.display='none'" class="text-2xl text-gray-400">✕</button></div>
         <div class="flex mb-4"><div id="tab-bets" onclick="switchTab('bets')" class="tab-btn active">My Bets</div><div id="tab-win" onclick="switchTab('win')" class="tab-btn">All Winners</div></div>
         <div id="history-content" class="h-full overflow-y-auto pb-20"></div>
+    </div>
+    <div id="m-win" class="modal" style="justify-content:center; align-items:center;">
+        <div class="celebration"><div class="text-6xl mb-2">🏆</div><div class="text-3xl mb-2">🎉 <span class="font-black text-white tracking-widest">BINGO!</span> 🎉</div><p class="text-blue-100 mb-4 text-xs font-bold">You got a Bingo with card <span id="win-card-num" class="text-white text-lg"></span>!</p><button onclick="location.reload()" class="w-full bg-yellow-400 text-black font-black text-xl py-3 rounded-xl shadow-lg">Keep Playing!</button></div>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp; const uid = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : 0;
-        let activeBet = 10; 
-        let myCards = []; // Multi-card array
-        let historyData = {winners: [], my_bets: []};
-        let currentRoomTime = 0; let currentRoomStatus = 'LOBBY'; let myActiveGameId = null;
+        document.getElementById('menu-id').innerText = "ID: " + uid;
+        let activeBet = 10; let myCards = []; let historyData = {winners: [], my_bets: []}; let currentRoomTime = 0; let currentRoomStatus = 'LOBBY'; let myActiveGameId = null;
         let currentMethod = ""; let autoMode = false; let autoBingoFired = false;
 
-        // --- UI HELPERS ---
-        function updateBuyButton() {
-            const btn = document.getElementById('join-btn');
-            if (myCards.length === 0) {
-                btn.innerText = "▶ BUY CARD";
-                btn.style.opacity = "0.5";
-            } else {
-                const totalCost = myCards.length * activeBet;
-                btn.innerText = `▶ BUY ${myCards.length} ${myCards.length > 1 ? 'CARDS' : 'CARD'} (${totalCost} ETB)`;
-                btn.style.opacity = "1";
-            }
+        // --- SIDEBAR & NAVIGATION ---
+        function toggleMenu() { 
+            const sb = document.getElementById('sidebar'); const ov = document.getElementById('sidebar-overlay');
+            if(sb.classList.contains('open')) { sb.classList.remove('open'); ov.style.display='none'; } 
+            else { sb.classList.add('open'); ov.style.display='block'; }
         }
-
-        function showToast(msg) {
-            const t = document.getElementById('toast-msg');
-            t.innerText = msg; t.classList.remove('opacity-0');
-            setTimeout(() => { t.classList.add('opacity-0'); }, 1500); 
-        }
-
-        function toggleAutoMode(el) { autoMode = el.checked; if(autoMode) updatePlayHall(); }
+        function showScreen(id) { document.getElementById('v-lobby').classList.add('hidden'); document.getElementById('v-selector').classList.add('hidden'); document.getElementById('v-play').classList.add('hidden'); document.getElementById(id).classList.remove('hidden'); if(id==='v-selector'){ myCards=[]; updateBuyButton(); } }
         
-        // --- DEPOSIT & OTP ---
-        function handleDeposit() { document.getElementById('m-deposit').style.display = 'flex'; document.getElementById('dep-step-1').classList.remove('hidden'); document.getElementById('dep-step-2').classList.add('hidden'); }
-        function showDepositForm(method) { currentMethod = method; document.getElementById('dep-step-1').classList.add('hidden'); document.getElementById('dep-step-2').classList.remove('hidden'); document.getElementById('dep-title').innerText = method + " Deposit"; const accInfo = document.getElementById('dep-account-info'); if (method === 'Telebirr') accInfo.innerHTML = "0928911665<br><span class='text-sm text-gray-400'>Name: Kassahun</span>"; else if (method === 'CBE') accInfo.innerHTML = "1000379893698<br><span class='text-sm text-gray-400'>Name: Yeabkal</span>"; }
-        function requestOTP() { fetch('/api/send-otp/', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ tg_id: uid }) }).then(r=>r.json()).then(d => tg.showAlert(d.message)); }
-        function submitDeposit() { const amount = document.getElementById('dep-amount').value, txid = document.getElementById('dep-txid').value, otp = document.getElementById('dep-otp').value; if(!amount || !txid || !otp) return tg.showAlert("Please fill all fields!"); fetch('/api/verify-otp/', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ tg_id: uid, otp: otp }) }).then(r=>r.json()).then(d => { if(d.status === 'success') { fetch('/api/submit-deposit/', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ tg_id: uid, amount: amount, tx_id: txid, method: currentMethod }) }).then(r2=>r2.json()).then(d2 => { tg.showAlert(d2.message); document.getElementById('m-deposit').style.display = 'none'; }); } else tg.showAlert(d.message); }); }
-
-        // --- APP ENGINE ---
-        function appLoop() { if (myActiveGameId) { updatePlayHall(); } else { refreshLobby(); } }
-
-        function buildTracker(containerId) {
-            const container = document.getElementById(containerId); if (container.children.length > 0) return;
-            const rows = { 'B': [1,15], 'I': [16,30], 'N': [31,45], 'G': [46,60], 'O': [61,75] };
-            for(const [letter, bounds] of Object.entries(rows)) {
-                let rowDiv = document.createElement('div'); rowDiv.className = "tracker-row"; let lDiv = document.createElement('div'); lDiv.className = "tracker-letter"; lDiv.innerText = letter; rowDiv.appendChild(lDiv);
-                for(let i=bounds[0]; i<=bounds[1]; i++) { let dot = document.createElement('div'); dot.id = containerId + '-dot-' + i; dot.className = "tracker-dot"; dot.innerText = i; rowDiv.appendChild(dot); }
-                container.appendChild(rowDiv);
-            }
+        // --- WALLET TABS ---
+        function openWallet(tab) { document.getElementById('m-wallet').style.display = 'flex'; document.getElementById('wallet-bal').innerText = document.getElementById('bal-header').innerText; openWalletTab(tab); }
+        function openWalletTab(tab) {
+            ['deposit', 'withdraw', 'transfer'].forEach(t => {
+                document.getElementById('w-tab-'+t).classList.remove('active'); document.getElementById('w-sec-'+t).classList.add('hidden');
+            });
+            document.getElementById('w-tab-'+tab).classList.add('active'); document.getElementById('w-sec-'+tab).classList.remove('hidden');
         }
+        function openSettings() { document.getElementById('m-settings').style.display = 'flex'; }
+
+        // --- DEPOSIT & OTP ---
+        function showDepositForm(method) { currentMethod = method; document.getElementById('dep-step-1').classList.add('hidden'); document.getElementById('dep-step-2').classList.remove('hidden'); document.getElementById('dep-title').innerText = method + " Deposit"; const accInfo = document.getElementById('dep-account-info'); if (method === 'Telebirr') accInfo.innerHTML = "0928911665<br><span class='text-sm text-gray-400'>ስም (Name): Kassahun</span>"; else if (method === 'CBE') accInfo.innerHTML = "1000379893698<br><span class='text-sm text-gray-400'>ስም (Name): Yeabkal</span>"; }
+        function requestOTP() { fetch('/api/send-otp/', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ tg_id: uid }) }).then(r=>r.json()).then(d => tg.showAlert(d.message)); }
+        
+        function submitDeposit() { 
+            const amount = document.getElementById('dep-amount').value, txid = document.getElementById('dep-txid').value, otp = document.getElementById('dep-otp').value; 
+            if(!amount || !txid || !otp) return tg.showAlert("Please fill all fields!"); 
+            submitAction('/api/submit-deposit/', {amount: amount, tx_id: txid, method: currentMethod, otp: otp});
+        }
+        
+        function submitAction(url, payload) {
+            if(!payload.otp) return tg.showAlert("OTP is required!");
+            payload.tg_id = uid;
+            fetch('/api/verify-otp/', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ tg_id: uid, otp: payload.otp }) }).then(r=>r.json()).then(d => { 
+                if(d.status === 'success') { 
+                    fetch(url, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) }).then(r2=>r2.json()).then(d2 => { tg.showAlert(d2.message); if(d2.status==='success') location.reload(); }); 
+                } else tg.showAlert(d.message); 
+            });
+        }
+
+        // --- ENGINE ---
+        function showToast(msg) { const t = document.getElementById('toast-msg'); t.innerText = msg; t.classList.remove('opacity-0'); setTimeout(() => { t.classList.add('opacity-0'); }, 1500); }
+        function appLoop() { if (myActiveGameId) { updatePlayHall(); } else { refreshLobby(); } }
+        function buildTracker(containerId) { const container = document.getElementById(containerId); if (container.children.length > 0) return; const rows = { 'B': [1,15], 'I': [16,30], 'N': [31,45], 'G': [46,60], 'O': [61,75] }; for(const [letter, bounds] of Object.entries(rows)) { let rowDiv = document.createElement('div'); rowDiv.className = "tracker-row"; let lDiv = document.createElement('div'); lDiv.className = "tracker-letter"; lDiv.innerText = letter; rowDiv.appendChild(lDiv); for(let i=bounds[0]; i<=bounds[1]; i++) { let dot = document.createElement('div'); dot.id = containerId + '-dot-' + i; dot.className = "tracker-dot"; dot.innerText = i; rowDiv.appendChild(dot); } container.appendChild(rowDiv); } }
 
         function refreshLobby() {
             fetch('/api/lobby-info/'+uid+'/').then(r=>r.json()).then(d => {
                 document.getElementById('bal-header').innerText = d.balance.toFixed(2);
-                if(d.active_game_id) { myActiveGameId = d.active_game_id; document.getElementById('v-lobby').classList.add('hidden'); document.getElementById('v-selector').classList.add('hidden'); document.getElementById('timer-bar').classList.add('hidden'); document.getElementById('v-play').classList.remove('hidden'); updatePlayHall(); return; }
+                if(d.active_game_id) { myActiveGameId = d.active_game_id; showScreen('v-play'); updatePlayHall(); return; }
                 const list = document.getElementById('room-list'); list.innerHTML = ''; d.rooms.sort((a,b) => a.bet - b.bet);
                 d.rooms.forEach(room => {
                     const isLive = room.status === 'ACTIVE';
-                    list.innerHTML += `<div onclick="selectRoom(${room.bet})" class="room-card ${isLive ? 'live' : ''} cursor-pointer"><div class="flex justify-between w-full"><div><div class="text-white font-black text-xl">Bingo ${room.bet}</div><div class="text-[11px] font-bold ${isLive ? 'text-red-400' : 'text-blue-400'} mt-1">${isLive ? 'LIVE: CALLING ' + room.called_count + '/75' : 'STARTING IN: ' + room.time_left + 's'}</div><div class="text-[10px] text-gray-400 mt-1">Win Pool: <span class="text-white font-bold">${room.win.toFixed(0)} ETB</span></div></div><div class="flex flex-col items-end justify-center"><div class="${isLive ? 'text-red-500' : 'text-blue-500'} font-bold text-2xl">${isLive ? '⏳' : '▶'}</div><div class="text-[9px] text-gray-500 mt-2">${room.players} Users Joined</div></div></div></div>`;
+                    list.innerHTML += `<div onclick="selectRoom(${room.bet})" class="room-card ${isLive ? 'live' : ''} cursor-pointer"><div class="flex justify-between w-full"><div><div class="text-white font-black text-xl">Bingo ${room.bet}</div><div class="text-[11px] font-bold ${isLive ? 'text-red-400' : 'text-blue-400'} mt-1">${isLive ? 'LIVE: CALLING ' + room.called_count + '/75' : 'STARTING IN: ' + room.time_left + 's'}</div><div class="text-[10px] text-gray-400 mt-1">Win Pool: <span class="text-white font-bold">${room.win.toFixed(0)} ETB</span></div></div><div class="flex flex-col items-end justify-center"><div class="${isLive ? 'text-red-500' : 'text-blue-500'} font-bold text-2xl">${isLive ? '⏳' : '▶'}</div><div class="text-[9px] text-gray-500 mt-2">${room.players} Cards in play</div></div></div></div>`;
                     if(activeBet == room.bet) { currentRoomTime = room.time_left; currentRoomStatus = room.status; document.getElementById('nav-prize').innerText = room.win.toFixed(0); updateBanner(room.status, room.called_count, room.called_numbers); }
                 });
             });
         }
 
-        // --- MULTI-CARD CHECK WIN LOGIC ---
-        function checkLocal1LineWin() {
-            for (let s=1; s<=4; s++) {
-                const pc = document.getElementById('play-card-' + s);
-                if (!pc || pc.children.length === 0) continue;
-                
-                const cells = Array.from(pc.querySelectorAll('div'));
-                if(cells.length < 25) continue;
-                
-                let grid = []; for(let i=0; i<5; i++) { grid.push(cells.slice(i*5, i*5+5).map(c => c.classList.contains('is-marked') || c.innerText === '⭐')); }
-                for(let i=0; i<5; i++) { if(grid[i].every(v=>v)) return true; if(grid.every(row=>row[i])) return true; }
-                if([0,1,2,3,4].every(i => grid[i][i])) return true; if([0,1,2,3,4].every(i => grid[i][4-i])) return true;
-                if([grid[0][0], grid[0][4], grid[4][0], grid[4][4]].every(v=>v)) return true;
-            }
-            return false;
-        }
-
-        // --- MULTI-CARD PLAY HALL RENDERER ---
+        function checkLocal1LineWin() { for (let s=1; s<=4; s++) { const pc = document.getElementById('play-card-' + s); if (!pc || pc.children.length === 0) continue; const cells = Array.from(pc.querySelectorAll('div')); if(cells.length < 25) continue; let grid = []; for(let i=0; i<5; i++) { grid.push(cells.slice(i*5, i*5+5).map(c => c.classList.contains('is-marked') || c.innerText === '⭐')); } for(let i=0; i<5; i++) { if(grid[i].every(v=>v)) return true; if(grid.every(row=>row[i])) return true; } if([0,1,2,3,4].every(i => grid[i][i])) return true; if([0,1,2,3,4].every(i => grid[i][4-i])) return true; if([grid[0][0], grid[0][4], grid[4][0], grid[4][4]].every(v=>v)) return true; } return false; }
+        
         function updatePlayHall() {
             if(!myActiveGameId) return;
             fetch(`/api/game-info/${myActiveGameId}/${uid}/`).then(r=>r.json()).then(d => {
                 if(d.status === 'ENDED') { tg.showAlert("Game Over! Check History."); location.reload(); return; }
-                const badge = document.getElementById('play-status-badge');
-                if(d.status === 'ACTIVE') { badge.innerText = "LIVE: " + d.called.length + "/75"; badge.className = "text-[10px] bg-red-500/20 border border-red-500 text-red-500 px-3 py-1 rounded-full font-black animate-pulse"; }
-
-                // Draw up to 4 boards based on what the user bought
+                const badge = document.getElementById('play-status-badge'); if(d.status === 'ACTIVE') { badge.innerText = "LIVE: " + d.called.length + "/75"; badge.className = "text-[10px] bg-red-500/20 border border-red-500 text-red-500 px-3 py-1 rounded-full font-black animate-pulse"; }
                 if(d.boards_data && d.boards_data.length > 0) {
                     for(let i=0; i<d.boards_data.length; i++) {
-                        let slotNum = i + 1;
-                        let pc = document.getElementById('play-card-' + slotNum);
-                        
+                        let slotNum = i + 1; let pc = document.getElementById('play-card-' + slotNum);
                         if(pc && pc.children.length === 0) {
-                            let parentDiv = pc.parentElement;
-                            parentDiv.className = "bg-slate-800 p-1 rounded-xl border-2 border-yellow-500 relative shadow-[0_0_15px_rgba(234,179,8,0.2)]";
-                            parentDiv.innerHTML = `<div class="absolute -top-3 left-2 bg-yellow-500 text-black text-[9px] font-black px-2 py-0.5 rounded">#${d.boards_data[i].card_number}</div><div class="grid grid-cols-5 gap-0.5 mb-0.5 text-center mt-2"><div class="font-black text-[10px] text-blue-400">B</div><div class="font-black text-[10px] text-blue-400">I</div><div class="font-black text-[10px] text-blue-400">N</div><div class="font-black text-[10px] text-blue-400">G</div><div class="font-black text-[10px] text-blue-400">O</div></div><div id="play-card-${slotNum}" class="grid grid-cols-5 gap-0.5"></div>`;
-                            
+                            let parentDiv = pc.parentElement; parentDiv.className = "bg-slate-800 p-1 rounded-xl border-2 border-yellow-500 relative shadow-[0_0_15px_rgba(234,179,8,0.2)]"; parentDiv.innerHTML = `<div class="absolute -top-3 left-2 bg-yellow-500 text-black text-[9px] font-black px-2 py-0.5 rounded">#${d.boards_data[i].card_number}</div><div class="grid grid-cols-5 gap-0.5 mb-0.5 text-center mt-2"><div class="font-black text-[10px] text-blue-400">B</div><div class="font-black text-[10px] text-blue-400">I</div><div class="font-black text-[10px] text-blue-400">N</div><div class="font-black text-[10px] text-blue-400">G</div><div class="font-black text-[10px] text-blue-400">O</div></div><div id="play-card-${slotNum}" class="grid grid-cols-5 gap-0.5"></div>`;
                             pc = document.getElementById('play-card-' + slotNum); 
-                            
-                            d.boards_data[i].board.forEach(row => row.forEach(val => {
-                                let cell = document.createElement('div'); cell.className = 'w-[8vw] h-[8vw] max-w-[40px] max-h-[40px] flex items-center justify-center text-[10px] font-black rounded border border-blue-900/50 bg-slate-900 shadow-inner cursor-pointer transition-colors';
-                                if (val === 'FREE') { cell.innerText = '⭐'; cell.classList.add('bg-blue-600', 'text-yellow-400', 'is-marked'); } 
-                                else {
-                                    cell.innerText = val; cell.classList.add('text-blue-200');
-                                    cell.onclick = function() {
-                                        if(autoMode) return;
-                                        this.classList.toggle('bg-red-500'); this.classList.toggle('text-white'); this.classList.toggle('border-red-400'); this.classList.toggle('text-blue-200'); this.classList.toggle('is-marked');
-                                        activateBingoButton();
-                                    };
-                                }
-                                pc.appendChild(cell);
-                            }));
+                            d.boards_data[i].board.forEach(row => row.forEach(val => { let cell = document.createElement('div'); cell.className = 'w-[8vw] h-[8vw] max-w-[40px] max-h-[40px] flex items-center justify-center text-[10px] font-black rounded border border-blue-900/50 bg-slate-900 shadow-inner cursor-pointer transition-colors'; if (val === 'FREE') { cell.innerText = '⭐'; cell.classList.add('bg-blue-600', 'text-yellow-400', 'is-marked'); } else { cell.innerText = val; cell.classList.add('text-blue-200'); cell.onclick = function() { if(autoMode) return; this.classList.toggle('bg-red-500'); this.classList.toggle('text-white'); this.classList.toggle('border-red-400'); this.classList.toggle('text-blue-200'); this.classList.toggle('is-marked'); activateBingoButton(); }; } pc.appendChild(cell); }));
                         }
-
-                        // Auto-Mark numbers for this specific board
-                        if (autoMode && d.called && d.called.length > 0) {
-                            document.querySelectorAll(`#play-card-${slotNum} div`).forEach(cell => {
-                                let val = cell.innerText;
-                                if(val !== '⭐' && d.called.includes(parseInt(val))) {
-                                    if(!cell.classList.contains('is-marked')) { cell.classList.add('bg-red-500', 'text-white', 'border-red-400', 'is-marked'); cell.classList.remove('text-blue-200'); }
-                                }
-                            });
-                        }
+                        if (autoMode && d.called && d.called.length > 0) { document.querySelectorAll(`#play-card-${slotNum} div`).forEach(cell => { let val = cell.innerText; if(val !== '⭐' && d.called.includes(parseInt(val))) { if(!cell.classList.contains('is-marked')) { cell.classList.add('bg-red-500', 'text-white', 'border-red-400', 'is-marked'); cell.classList.remove('text-blue-200'); } } }); }
                     }
                     if(autoMode && checkLocal1LineWin() && !autoBingoFired) { autoBingoFired = true; hitBingo(); }
                 }
                 activateBingoButton();
             });
         }
-
         function activateBingoButton() { const btn = document.getElementById('bingo-btn'); if(checkLocal1LineWin()) { btn.className = "w-full py-4 bg-gradient-to-r from-red-500 to-red-700 rounded-2xl font-black text-xl shadow-[0_0_20px_rgba(239,68,68,0.4)] text-white active:scale-95 transition-all tracking-widest"; } else { btn.className = "w-full py-4 bg-slate-700 text-slate-400 rounded-2xl font-black text-xl border-2 border-slate-600 transition-all tracking-widest"; } }
-        
-        function hitBingo() { 
-            if(!checkLocal1LineWin()) return tg.showAlert("⚠️ HOLD ON!\n\nYou haven't made a full line yet!"); 
-            fetch(`/api/check-win/${myActiveGameId}/${uid}/?marked=0`).then(r=>r.json()).then(d => { 
-                if (d.status === 'WINNER') { 
-                    document.getElementById('m-win').style.display = 'flex'; 
-                    document.getElementById('win-card-num').innerText = d.winning_card; 
-                } else if (d.status === 'NOT_YET') { 
-                    tg.showAlert("❌ NOT BINGO YET!\n\nWait for the dealer to call your numbers!"); autoBingoFired = false; 
-                } 
-            }); 
-        }
+        function hitBingo() { if(!checkLocal1LineWin()) return tg.showAlert("⚠️ HOLD ON!\n\nYou haven't made a full line yet!"); fetch(`/api/check-win/${myActiveGameId}/${uid}/?marked=0`).then(r=>r.json()).then(d => { if (d.status === 'WINNER') { document.getElementById('m-win').style.display = 'flex'; document.getElementById('win-card-num').innerText = d.winning_card; } else if (d.status === 'NOT_YET') { tg.showAlert("❌ NOT BINGO YET!\n\nWait for the dealer to call your numbers!"); autoBingoFired = false; } }); }
 
-        function updateBanner(status, count, called_numbers) {
-            const b = document.getElementById('active-call-banner'); const btn = document.getElementById('join-btn');
-            const gGrid = document.getElementById('grid-container'); const sTrack = document.getElementById('spectator-tracker');
-            if(status === 'ACTIVE') { 
-                b.classList.remove('hidden'); document.getElementById('call-count').innerText=count; btn.disabled=true; btn.style.opacity="0.3"; btn.innerText="WAITING...";
-                gGrid.classList.add('hidden'); sTrack.classList.remove('hidden'); buildTracker('spectator-tracker');
-                document.querySelectorAll('#spectator-tracker .tracker-dot').forEach(el=>el.classList.remove('called'));
-                if(called_numbers) called_numbers.forEach(n => { let dot = document.getElementById('spectator-tracker-dot-'+n); if(dot) dot.classList.add('called'); });
-            } else { 
-                b.classList.add('hidden'); btn.disabled=false; updateBuyButton();
-                gGrid.classList.remove('hidden'); sTrack.classList.add('hidden');
-            }
-        }
-
+        function updateBanner(status, count, called_numbers) { const b = document.getElementById('active-call-banner'); const btn = document.getElementById('join-btn'); const gGrid = document.getElementById('grid-container'); const sTrack = document.getElementById('spectator-tracker'); if(status === 'ACTIVE') { b.classList.remove('hidden'); document.getElementById('call-count').innerText=count; btn.disabled=true; btn.style.opacity="0.3"; btn.innerText="WAITING..."; gGrid.classList.add('hidden'); sTrack.classList.remove('hidden'); buildTracker('spectator-tracker'); document.querySelectorAll('#spectator-tracker .tracker-dot').forEach(el=>el.classList.remove('called')); if(called_numbers) called_numbers.forEach(n => { let dot = document.getElementById('spectator-tracker-dot-'+n); if(dot) dot.classList.add('called'); }); } else { b.classList.add('hidden'); btn.disabled=false; updateBuyButton(); gGrid.classList.remove('hidden'); sTrack.classList.add('hidden'); } }
+        function updateBuyButton() { const btn = document.getElementById('join-btn'); if (myCards.length === 0) { btn.innerText = "▶ BUY CARD"; btn.style.opacity = "0.5"; } else { const totalCost = myCards.length * activeBet; btn.innerText = `▶ BUY ${myCards.length} ${myCards.length > 1 ? 'CARDS' : 'CARD'} (${totalCost} ETB)`; btn.style.opacity = "1"; } }
         function getMaxCards() { return (activeBet == 10) ? 1000 : 500; }
-        function showLobby() { document.getElementById('v-selector').classList.add('hidden'); document.getElementById('v-lobby').classList.remove('hidden'); myCards = []; updateBuyButton(); }
-        function selectRoom(t) { activeBet=t; document.getElementById('nav-room').innerText=t; document.getElementById('v-lobby').classList.add('hidden'); document.getElementById('v-selector').classList.remove('hidden'); myCards = []; initGrid(); appLoop(); updateBuyButton(); }
-        
+        function selectRoom(t) { activeBet=t; document.getElementById('nav-room').innerText=t; showScreen('v-selector'); initGrid(); appLoop(); }
         function initGrid() { const g = document.getElementById('grid-container'); g.innerHTML = ''; let maxCards = getMaxCards(); for(let i=1; i<=maxCards; i++) { let b = document.createElement('button'); b.className="card-num"; b.id="c-"+i; b.innerText=i; b.onclick=()=>selectCard(i); g.appendChild(b); } }
-        
-        // --- MULTI-CARD SELECTION ---
-        function selectCard(n) { 
-            const btn = document.getElementById('c-'+n);
-            if (myCards.includes(n)) {
-                myCards = myCards.filter(id => id !== n);
-                btn.classList.remove('active');
-                if(myCards.length > 0) previewCard(myCards[myCards.length-1]); else document.getElementById('mini-grid').innerHTML = '';
-            } else {
-                if(myCards.length >= 4) return tg.showAlert("Maximum 4 cards allowed per game!");
-                myCards.push(n);
-                btn.classList.add('active');
-                showToast("Card #" + n + " Added! (" + myCards.length + "/4)");
-                previewCard(n);
-            }
-            updateBuyButton();
-        }
-
+        function selectCard(n) { const btn = document.getElementById('c-'+n); if (myCards.includes(n)) { myCards = myCards.filter(id => id !== n); btn.classList.remove('active'); if(myCards.length > 0) previewCard(myCards[myCards.length-1]); else document.getElementById('mini-grid').innerHTML = ''; } else { if(myCards.length >= 4) return tg.showAlert("Maximum 4 cards allowed per game!"); myCards.push(n); btn.classList.add('active'); showToast("Card #" + n + " Added! (" + myCards.length + "/4)"); previewCard(n); } updateBuyButton(); }
         function previewCard(n) { document.getElementById('prev-num').innerText="#"+n; fetch('/api/card-data/'+n+'/').then(r=>r.json()).then(d=>{ const mini = document.getElementById('mini-grid'); mini.innerHTML = ''; d.board.forEach(row=>row.forEach(v=>{ let c=document.createElement('div'); c.className='mini-cell'; c.innerText=v==='FREE'?'X':v; mini.appendChild(c); })); }); }
-        
-        function pickRandom() { 
-            if(myCards.length >= 4) return tg.showAlert("Maximum 4 cards allowed!");
-            let maxCards = getMaxCards(); let r = Math.floor(Math.random()*maxCards)+1; 
-            while(myCards.includes(r)) { r = Math.floor(Math.random()*maxCards)+1; } 
-            selectCard(r); 
-        }
-        
-        function joinGame() { 
-            if(myCards.length === 0) return tg.showAlert("Select at least 1 card!");
-            const cardsString = myCards.join(',');
-            fetch(`/api/join-room/${uid}/${activeBet}/${cardsString}/`).then(r=>r.json()).then(d=>{ if(d.status==='ok') location.reload(); else tg.showAlert(d.error); }); 
-        }
+        function pickRandom() { if(myCards.length >= 4) return tg.showAlert("Maximum 4 cards allowed!"); let maxCards = getMaxCards(); let r = Math.floor(Math.random()*maxCards)+1; while(myCards.includes(r)) { r = Math.floor(Math.random()*maxCards)+1; } selectCard(r); }
+        function joinGame() { if(myCards.length === 0) return tg.showAlert("Select at least 1 card!"); const cardsString = myCards.join(','); fetch(`/api/join-room/${uid}/${activeBet}/${cardsString}/`).then(r=>r.json()).then(d=>{ if(d.status==='ok') location.reload(); else tg.showAlert(d.error); }); }
         
         function openHistory() { document.getElementById('m-history').style.display = 'flex'; fetch('/api/history/'+uid+'/').then(r=>r.json()).then(d => { historyData = d; switchTab('bets'); }); }
-        function closeHistory() { document.getElementById('m-history').style.display = 'none'; }
-        
-        function switchTab(tab) { 
-            document.getElementById('tab-bets').className = "tab-btn " + (tab==='bets' ? 'active' : ''); document.getElementById('tab-win').className = "tab-btn " + (tab==='win' ? 'active' : ''); 
-            const content = document.getElementById('history-content'); content.innerHTML = ''; 
-            if(tab === 'bets') { 
-                if(historyData.my_bets.length===0) content.innerHTML="<div class='text-center text-gray-500 mt-10'>No bets yet.</div>"; 
-                historyData.my_bets.forEach(h => { content.innerHTML += `<div class="history-row border-l-2 ${h.status==='WON' ? 'border-green-500' : 'border-red-500'}"><div><div class="text-gray-400">Game</div><div class="font-bold">#${h.game_id}</div></div><div><div class="text-gray-400">Bet/Card</div><div class="text-blue-400">${h.bet}/[${h.card}]</div></div><div class="text-right"><div class="text-gray-400">Result</div><div class="font-black ${h.status==='WON' ? 'text-green-500' : 'text-red-500'}">${h.status==='WON' ? '+'+h.prize : '-'+(h.bet * (h.card ? h.card.toString().split(',').length : 1))}</div></div></div>`; }); 
-            } else { 
-                historyData.winners.forEach(h => { content.innerHTML += `<div class="history-row"><div><div class="text-gray-400">Game</div><div class="font-bold">#${h.game_id}</div></div><div><div class="text-gray-400">Winner</div><div class="text-blue-400">@${h.winner}</div></div><div class="text-right"><div class="text-gray-400">Prize</div><div class="text-green-400 font-black">${h.prize} ETB</div></div></div>`; }); 
-            } 
-        }
+        function switchTab(tab) { document.getElementById('tab-bets').className = "tab-btn " + (tab==='bets' ? 'active' : ''); document.getElementById('tab-win').className = "tab-btn " + (tab==='win' ? 'active' : ''); const content = document.getElementById('history-content'); content.innerHTML = ''; if(tab === 'bets') { if(historyData.my_bets.length===0) content.innerHTML="<div class='text-center text-gray-500 mt-10'>No bets yet.</div>"; historyData.my_bets.forEach(h => { content.innerHTML += `<div class="history-row border-l-2 ${h.status==='WON' ? 'border-green-500' : 'border-red-500'}"><div><div class="text-gray-400">Game</div><div class="font-bold">#${h.game_id}</div></div><div><div class="text-gray-400">Bet/Card</div><div class="text-blue-400">${h.bet}/[${h.card}]</div></div><div class="text-right"><div class="text-gray-400">Result</div><div class="font-black ${h.status==='WON' ? 'text-green-500' : 'text-red-500'}">${h.status==='WON' ? '+'+h.prize : '-'+(h.bet * (h.card ? h.card.toString().split(',').length : 1))}</div></div></div>`; }); } else { historyData.winners.forEach(h => { content.innerHTML += `<div class="history-row"><div><div class="text-gray-400">Game</div><div class="font-bold">#${h.game_id}</div></div><div><div class="text-gray-400">Winner</div><div class="text-blue-400">@${h.winner}</div></div><div class="text-right"><div class="text-gray-400">Prize</div><div class="text-green-400 font-black">${h.prize} ETB</div></div></div>`; }); } }
         
         appLoop(); setInterval(appLoop, 2000);
+        setInterval(() => { if(!myActiveGameId) { const tEl = document.getElementById('timer'); if(currentRoomStatus === 'ACTIVE') { tEl.innerText = "PLAYING..."; tEl.classList.add('text-red-400'); } else { tEl.classList.remove('text-red-400'); if(currentRoomTime > 0) currentRoomTime--; let m = Math.floor(currentRoomTime / 60), s = currentRoomTime % 60; tEl.innerText = m + ":" + (s < 10 ? "0" + s : s); } } }, 1000);
     </script>
 </body>
 </html>
