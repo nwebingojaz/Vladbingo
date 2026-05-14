@@ -5,11 +5,12 @@ from bingo.models import PermanentCard, GameRound
 class Command(BaseCommand):
     def handle(self, *args, **options):
         # Always wipe and rebuild cards to ensure authentic layout
+        # THIS WILL AUTOMATICALLY DELETE YOUR 5000 CARDS AND RESET TO 1000
         PermanentCard.objects.all().delete()
         
-        # Updated the message and the range to 500
-        self.stdout.write("Generating 500 Authentic B-I-N-G-O Cards...")
-        for i in range(1, 501):  # Changed from 201 to 501
+        # Updated the message and the range to 1000
+        self.stdout.write("Generating 1000 Authentic B-I-N-G-O Cards...")
+        for i in range(1, 1001):  # Changed to 1001 to generate exactly 1000 cards
             # Strict Column Rules
             b = random.sample(range(1, 16), 5)
             i_col = random.sample(range(16, 31), 5)
@@ -30,4 +31,4 @@ class Command(BaseCommand):
         for t in [10, 20, 30, 40, 50, 100]:
             GameRound.objects.get_or_create(bet_amount=t, status="LOBBY")
             
-        self.stdout.write("✅ 500 Authentic Cards Generated!")
+        self.stdout.write("✅ 1000 Authentic Cards Generated!")
