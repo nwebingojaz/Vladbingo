@@ -31,7 +31,6 @@
         .tab-btn { flex: 1; text-align: center; padding: 10px; font-weight: bold; border-bottom: 2px solid transparent; color: gray; }
         .tab-btn.active { border-bottom-color: #3b82f6; color: #3b82f6; }
         
-        /* Auto/Manual Toggle Switch CSS */
         .switch { position: relative; display: inline-block; width: 120px; height: 34px; background-color: #1e293b; border-radius: 34px; border: 1px solid #3b82f6; cursor: pointer; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider { position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: 34px; transition: .4s; }
@@ -46,9 +45,14 @@
     </style>
 </head>
 <body class="antialiased select-none">
+
+    <!-- THE TOAST POPUP (Hidden by default) -->
+    <div id="toast-msg" class="fixed top-16 left-1/2 transform -translate-x-1/2 bg-blue-600 border-2 border-blue-400 text-white font-black px-6 py-3 rounded-full shadow-[0_0_20px_rgba(59,130,246,0.6)] transition-all duration-300 opacity-0 pointer-events-none z-50 text-sm tracking-wider">
+        Card #--- Selected!
+    </div>
     
     <!-- HEADER -->
-    <div class="header-bg p-3 flex justify-between items-center shadow-lg">
+    <div class="header-bg p-3 flex justify-between items-center shadow-lg relative z-40">
         <div class="flex items-center gap-2"><div class="bg-blue-600 p-1 rounded font-black text-[10px] text-white italic">VLAD</div><div class="font-black text-xs uppercase text-white">BINGO PRO</div></div>
         <div class="flex items-center gap-2"><div class="bg-slate-800 px-3 py-1 rounded-full flex items-center gap-2"><span class="text-yellow-400">👛</span><span id="bal-header" class="font-bold text-xs">0.00</span></div><button onclick="handleDeposit()" class="btn-deposit">+ DEPOSIT</button></div>
     </div>
@@ -69,7 +73,7 @@
     <div id="v-lobby" class="p-4 h-screen overflow-y-auto pb-32"><div id="room-list"></div></div>
 
     <!-- SELECTOR -->
-    <div id="v-selector" class="hidden p-4 h-screen overflow-y-auto pb-32">
+    <div id="v-selector" class="hidden p-4 h-screen overflow-y-auto pb-32 relative">
         <button onclick="showLobby()" class="text-blue-400 text-[10px] font-bold mb-3 flex items-center gap-1">← BACK TO LOBBY</button>
         <div id="active-call-banner" class="active-banner hidden">Active Game Call <span id="call-count">0</span>/75</div>
         <div id="grid-container" class="grid grid-cols-10 gap-1 h-64 overflow-y-auto mb-6 p-2 bg-black/30 rounded-xl"></div>
@@ -85,8 +89,6 @@
 
     <!-- LIVE PLAY HALL (4-SLOT LAYOUT) -->
     <div id="v-play" class="hidden p-4 h-screen overflow-y-auto pb-32">
-        
-        <!-- AUTO / MANUAL SWITCH -->
         <div class="flex justify-between items-center mb-4 bg-slate-800 p-2 rounded-xl border border-slate-700">
             <div id="play-status-badge" class="text-[10px] bg-blue-500/20 border border-blue-500 text-blue-500 px-3 py-1 rounded-full font-black">WAITING...</div>
             <label class="switch">
@@ -97,26 +99,18 @@
 
         <div id="play-tracker" class="mb-4 p-2 bg-slate-900/80 rounded-xl border border-blue-900/50 hidden"></div>
 
-        <!-- 4 SLOTS GRID -->
         <div class="grid grid-cols-2 gap-2 mb-6">
-            <!-- SLOT 1 (Active) -->
             <div class="bg-slate-800 p-1 rounded-xl border-2 border-yellow-500 relative shadow-[0_0_15px_rgba(234,179,8,0.2)]">
                 <div class="absolute -top-3 left-2 bg-yellow-500 text-black text-[9px] font-black px-2 py-0.5 rounded">SLOT 1</div>
                 <div class="grid grid-cols-5 gap-0.5 mb-0.5 text-center mt-2"><div class="font-black text-[10px] text-blue-400">B</div><div class="font-black text-[10px] text-blue-400">I</div><div class="font-black text-[10px] text-blue-400">N</div><div class="font-black text-[10px] text-blue-400">G</div><div class="font-black text-[10px] text-blue-400">O</div></div>
                 <div id="play-card" class="grid grid-cols-5 gap-0.5"></div>
             </div>
-
-            <!-- SLOT 2 (Empty for Phase 2) -->
             <div onclick="tg.showAlert('Multi-card coming in Phase 2!')" class="bg-slate-900/50 p-1 rounded-xl border-2 border-slate-700 border-dashed flex items-center justify-center cursor-pointer">
                 <span class="text-slate-600 font-black text-xs uppercase tracking-widest opacity-50">+ SLOT 2</span>
             </div>
-            
-            <!-- SLOT 3 (Empty) -->
             <div onclick="tg.showAlert('Multi-card coming in Phase 2!')" class="bg-slate-900/50 p-1 rounded-xl border-2 border-slate-700 border-dashed flex items-center justify-center cursor-pointer min-h-[120px]">
                 <span class="text-slate-600 font-black text-xs uppercase tracking-widest opacity-50">+ SLOT 3</span>
             </div>
-
-            <!-- SLOT 4 (Empty) -->
             <div onclick="tg.showAlert('Multi-card coming in Phase 2!')" class="bg-slate-900/50 p-1 rounded-xl border-2 border-slate-700 border-dashed flex items-center justify-center cursor-pointer">
                 <span class="text-slate-600 font-black text-xs uppercase tracking-widest opacity-50">+ SLOT 4</span>
             </div>
@@ -137,19 +131,11 @@
         </div>
         <div id="dep-step-2" class="hidden bg-slate-800 p-4 rounded-xl border border-blue-900/50 mt-4">
             <h3 id="dep-title" class="text-center font-bold text-yellow-400 mb-2">Transfer to Account</h3>
-            <div class="bg-red-900/40 border border-red-500 rounded p-2 mb-4 text-center">
-                <p class="text-red-400 text-[10px] font-bold uppercase">⚠️ IMPORTANT WARNING ⚠️</p>
-                <p class="text-white text-[9px]">Only use Mobile App or USSD (*847# / *127#).<br>DO NOT deposit at a physical bank branch.</p>
-            </div>
-            <div class="text-sm text-gray-300 mb-4 bg-black/30 p-3 rounded">
-                1. Transfer amount to:<br><strong id="dep-account-info" class="text-white text-xl tracking-wider text-blue-300"></strong><br><br>2. Copy Transaction ID from SMS.<br>3. Paste below & verify with OTP.
-            </div>
+            <div class="bg-red-900/40 border border-red-500 rounded p-2 mb-4 text-center"><p class="text-red-400 text-[10px] font-bold uppercase">⚠️ IMPORTANT WARNING ⚠️</p><p class="text-white text-[9px]">Only use Mobile App or USSD (*847# / *127#).<br>DO NOT deposit at a physical bank branch.</p></div>
+            <div class="text-sm text-gray-300 mb-4 bg-black/30 p-3 rounded">1. Transfer amount to:<br><strong id="dep-account-info" class="text-white text-xl tracking-wider text-blue-300"></strong><br><br>2. Copy Transaction ID from SMS.<br>3. Paste below & verify with OTP.</div>
             <input type="number" id="dep-amount" placeholder="Amount (ETB)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
             <input type="text" id="dep-txid" placeholder="Transaction ID" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
-            <div class="flex gap-2 mb-4">
-                <input type="text" id="dep-otp" placeholder="OTP Code" class="flex-1 bg-slate-900 border border-slate-700 rounded p-3 text-white">
-                <button onclick="requestOTP()" class="bg-red-500 text-white font-bold px-4 rounded">Get OTP</button>
-            </div>
+            <div class="flex gap-2 mb-4"><input type="text" id="dep-otp" placeholder="OTP Code" class="flex-1 bg-slate-900 border border-slate-700 rounded p-3 text-white"><button onclick="requestOTP()" class="bg-red-500 text-white font-bold px-4 rounded">Get OTP</button></div>
             <button onclick="submitDeposit()" class="w-full bg-blue-600 font-black text-white py-3 rounded-xl">Submit Deposit</button>
         </div>
     </div>
@@ -172,77 +158,52 @@
         const tg = window.Telegram.WebApp; const uid = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : 0;
         let activeBet = 10; let myCard = null; let historyData = {winners: [], my_bets: []};
         let currentRoomTime = 0; let currentRoomStatus = 'LOBBY'; let myActiveGameId = null;
-        let currentMethod = "";
-        let autoMode = false; // The Auto Switch State
-        let autoBingoFired = false; // Prevent spamming backend
+        let currentMethod = ""; let autoMode = false; let autoBingoFired = false;
 
-        // --- TOGGLE AUTO MODE ---
-        function toggleAutoMode(el) {
-            autoMode = el.checked;
-            if(autoMode) updatePlayHall(); // Force check immediately
+        // --- TOAST NOTIFICATION FUNCTION ---
+        function showToast(msg) {
+            const t = document.getElementById('toast-msg');
+            t.innerText = msg;
+            t.classList.remove('opacity-0');
+            setTimeout(() => { t.classList.add('opacity-0'); }, 1500); // Fades out after 1.5s
         }
 
-        // --- DEPOSIT LOGIC ---
+        function toggleAutoMode(el) { autoMode = el.checked; if(autoMode) updatePlayHall(); }
         function handleDeposit() { document.getElementById('m-deposit').style.display = 'flex'; document.getElementById('dep-step-1').classList.remove('hidden'); document.getElementById('dep-step-2').classList.add('hidden'); }
-        function showDepositForm(method) {
-            currentMethod = method; document.getElementById('dep-step-1').classList.add('hidden'); document.getElementById('dep-step-2').classList.remove('hidden'); document.getElementById('dep-title').innerText = method + " Deposit";
-            const accInfo = document.getElementById('dep-account-info');
-            if (method === 'Telebirr') accInfo.innerHTML = "0928911665<br><span class='text-sm text-gray-400'>Name: Kassahun</span>";
-            else if (method === 'CBE') accInfo.innerHTML = "1000379893698<br><span class='text-sm text-gray-400'>Name: Yeabkal</span>";
-        }
+        function showDepositForm(method) { currentMethod = method; document.getElementById('dep-step-1').classList.add('hidden'); document.getElementById('dep-step-2').classList.remove('hidden'); document.getElementById('dep-title').innerText = method + " Deposit"; const accInfo = document.getElementById('dep-account-info'); if (method === 'Telebirr') accInfo.innerHTML = "0928911665<br><span class='text-sm text-gray-400'>Name: Kassahun</span>"; else if (method === 'CBE') accInfo.innerHTML = "1000379893698<br><span class='text-sm text-gray-400'>Name: Yeabkal</span>"; }
         function requestOTP() { fetch('/api/send-otp/', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ tg_id: uid }) }).then(r=>r.json()).then(d => tg.showAlert(d.message)); }
-        function submitDeposit() {
-            const amount = document.getElementById('dep-amount').value, txid = document.getElementById('dep-txid').value, otp = document.getElementById('dep-otp').value;
-            if(!amount || !txid || !otp) return tg.showAlert("Please fill all fields!");
-            fetch('/api/verify-otp/', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ tg_id: uid, otp: otp }) }).then(r=>r.json()).then(d => {
-                if(d.status === 'success') {
-                    fetch('/api/submit-deposit/', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ tg_id: uid, amount: amount, tx_id: txid, method: currentMethod }) }).then(r2=>r2.json()).then(d2 => { tg.showAlert(d2.message); document.getElementById('m-deposit').style.display = 'none'; });
-                } else tg.showAlert(d.message);
-            });
-        }
+        function submitDeposit() { const amount = document.getElementById('dep-amount').value, txid = document.getElementById('dep-txid').value, otp = document.getElementById('dep-otp').value; if(!amount || !txid || !otp) return tg.showAlert("Please fill all fields!"); fetch('/api/verify-otp/', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ tg_id: uid, otp: otp }) }).then(r=>r.json()).then(d => { if(d.status === 'success') { fetch('/api/submit-deposit/', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ tg_id: uid, amount: amount, tx_id: txid, method: currentMethod }) }).then(r2=>r2.json()).then(d2 => { tg.showAlert(d2.message); document.getElementById('m-deposit').style.display = 'none'; }); } else tg.showAlert(d.message); }); }
 
         function appLoop() { if (myActiveGameId) { updatePlayHall(); } else { refreshLobby(); } }
+
+        function buildTracker(containerId) {
+            const container = document.getElementById(containerId); if (container.children.length > 0) return;
+            const rows = { 'B': [1,15], 'I': [16,30], 'N': [31,45], 'G': [46,60], 'O': [61,75] };
+            for(const [letter, bounds] of Object.entries(rows)) {
+                let rowDiv = document.createElement('div'); rowDiv.className = "tracker-row"; let lDiv = document.createElement('div'); lDiv.className = "tracker-letter"; lDiv.innerText = letter; rowDiv.appendChild(lDiv);
+                for(let i=bounds[0]; i<=bounds[1]; i++) { let dot = document.createElement('div'); dot.id = containerId + '-dot-' + i; dot.className = "tracker-dot"; dot.innerText = i; rowDiv.appendChild(dot); }
+                container.appendChild(rowDiv);
+            }
+        }
 
         function refreshLobby() {
             fetch('/api/lobby-info/'+uid+'/').then(r=>r.json()).then(d => {
                 document.getElementById('bal-header').innerText = d.balance.toFixed(2);
-                if(d.active_game_id) {
-                    myActiveGameId = d.active_game_id;
-                    document.getElementById('v-lobby').classList.add('hidden'); document.getElementById('v-selector').classList.add('hidden'); document.getElementById('timer-bar').classList.add('hidden'); document.getElementById('v-play').classList.remove('hidden');
-                    updatePlayHall(); return;
-                }
-                const list = document.getElementById('room-list'); list.innerHTML = '';
-                d.rooms.sort((a,b) => a.bet - b.bet);
+                if(d.active_game_id) { myActiveGameId = d.active_game_id; document.getElementById('v-lobby').classList.add('hidden'); document.getElementById('v-selector').classList.add('hidden'); document.getElementById('timer-bar').classList.add('hidden'); document.getElementById('v-play').classList.remove('hidden'); updatePlayHall(); return; }
+                const list = document.getElementById('room-list'); list.innerHTML = ''; d.rooms.sort((a,b) => a.bet - b.bet);
                 d.rooms.forEach(room => {
                     const isLive = room.status === 'ACTIVE';
-                    list.innerHTML += `
-                        <div onclick="selectRoom(${room.bet})" class="room-card ${isLive ? 'live' : ''} cursor-pointer">
-                            <div class="flex justify-between w-full">
-                                <div><div class="text-white font-black text-xl">Bingo ${room.bet}</div><div class="text-[11px] font-bold ${isLive ? 'text-red-400' : 'text-blue-400'} mt-1">${isLive ? 'LIVE: CALLING ' + room.called_count + '/75' : 'STARTING IN: ' + room.time_left + 's'}</div><div class="text-[10px] text-gray-400 mt-1">Win: <span class="text-white font-bold">${room.win.toFixed(0)} ETB</span></div></div>
-                                <div class="flex flex-col items-end justify-center"><div class="${isLive ? 'text-red-500' : 'text-blue-500'} font-bold text-2xl">${isLive ? '⏳' : '▶'}</div><div class="text-[9px] text-gray-500 mt-2">${room.players} Players</div></div>
-                            </div>
-                        </div>`;
+                    list.innerHTML += `<div onclick="selectRoom(${room.bet})" class="room-card ${isLive ? 'live' : ''} cursor-pointer"><div class="flex justify-between w-full"><div><div class="text-white font-black text-xl">Bingo ${room.bet}</div><div class="text-[11px] font-bold ${isLive ? 'text-red-400' : 'text-blue-400'} mt-1">${isLive ? 'LIVE: CALLING ' + room.called_count + '/75' : 'STARTING IN: ' + room.time_left + 's'}</div><div class="text-[10px] text-gray-400 mt-1">Win: <span class="text-white font-bold">${room.win.toFixed(0)} ETB</span></div></div><div class="flex flex-col items-end justify-center"><div class="${isLive ? 'text-red-500' : 'text-blue-500'} font-bold text-2xl">${isLive ? '⏳' : '▶'}</div><div class="text-[9px] text-gray-500 mt-2">${room.players} Players</div></div></div></div>`;
+                    if(activeBet == room.bet) { currentRoomTime = room.time_left; currentRoomStatus = room.status; document.getElementById('nav-prize').innerText = room.win.toFixed(0); updateBanner(room.status, room.called_count, room.called_numbers); }
                 });
             });
         }
 
-        // --- LOCAL WIN CHECK (Strict 1 Line) ---
         function checkLocal1LineWin() {
-            const cells = Array.from(document.querySelectorAll('#play-card div'));
-            if(cells.length < 25) return false;
-            
-            let grid = [];
-            for(let i=0; i<5; i++) { grid.push(cells.slice(i*5, i*5+5).map(c => c.classList.contains('is-marked') || c.innerText === '⭐')); }
-            
-            // Check rows & cols
-            for(let i=0; i<5; i++) {
-                if(grid[i].every(v=>v)) return true; // Row
-                if(grid.every(row=>row[i])) return true; // Col
-            }
-            // Check diagonals
-            if([0,1,2,3,4].every(i => grid[i][i])) return true;
-            if([0,1,2,3,4].every(i => grid[i][4-i])) return true;
-            
+            const cells = Array.from(document.querySelectorAll('#play-card div')); if(cells.length < 25) return false;
+            let grid = []; for(let i=0; i<5; i++) { grid.push(cells.slice(i*5, i*5+5).map(c => c.classList.contains('is-marked') || c.innerText === '⭐')); }
+            for(let i=0; i<5; i++) { if(grid[i].every(v=>v)) return true; if(grid.every(row=>row[i])) return true; }
+            if([0,1,2,3,4].every(i => grid[i][i])) return true; if([0,1,2,3,4].every(i => grid[i][4-i])) return true;
             return false;
         }
 
@@ -256,13 +217,12 @@
                 const pc = document.getElementById('play-card');
                 if(pc.children.length === 0) {
                     d.board.forEach(row => row.forEach(val => {
-                        let cell = document.createElement('div'); 
-                        cell.className = 'w-[8vw] h-[8vw] max-w-[40px] max-h-[40px] flex items-center justify-center text-[10px] font-black rounded border border-blue-900/50 bg-slate-900 shadow-inner cursor-pointer transition-colors';
+                        let cell = document.createElement('div'); cell.className = 'w-[8vw] h-[8vw] max-w-[40px] max-h-[40px] flex items-center justify-center text-[10px] font-black rounded border border-blue-900/50 bg-slate-900 shadow-inner cursor-pointer transition-colors';
                         if (val === 'FREE') { cell.innerText = '⭐'; cell.classList.add('bg-blue-600', 'text-yellow-400', 'is-marked'); } 
                         else {
                             cell.innerText = val; cell.classList.add('text-blue-200');
                             cell.onclick = function() {
-                                if(autoMode) return; // Prevent manual click if Auto is ON
+                                if(autoMode) return;
                                 this.classList.toggle('bg-red-500'); this.classList.toggle('text-white'); this.classList.toggle('border-red-400'); this.classList.toggle('text-blue-200'); this.classList.toggle('is-marked');
                                 activateBingoButton();
                             };
@@ -271,54 +231,37 @@
                     }));
                 }
 
-                // --- AUTO MODE LOGIC ---
                 if (autoMode && d.called && d.called.length > 0) {
                     document.querySelectorAll('#play-card div').forEach(cell => {
                         let val = cell.innerText;
                         if(val !== '⭐' && d.called.includes(parseInt(val))) {
-                            if(!cell.classList.contains('is-marked')) {
-                                cell.classList.add('bg-red-500', 'text-white', 'border-red-400', 'is-marked');
-                                cell.classList.remove('text-blue-200');
-                            }
+                            if(!cell.classList.contains('is-marked')) { cell.classList.add('bg-red-500', 'text-white', 'border-red-400', 'is-marked'); cell.classList.remove('text-blue-200'); }
                         }
                     });
-                    
-                    // Auto Shout BINGO if 1 line is complete
-                    if(checkLocal1LineWin() && !autoBingoFired) {
-                        autoBingoFired = true;
-                        hitBingo();
-                    }
+                    if(checkLocal1LineWin() && !autoBingoFired) { autoBingoFired = true; hitBingo(); }
                 }
-                activateBingoButton(); // Highlight button if win condition met
+                activateBingoButton();
             });
         }
 
-        // Highlights the Bingo button red when a line is complete
-        function activateBingoButton() {
-            const btn = document.getElementById('bingo-btn');
-            if(checkLocal1LineWin()) {
-                btn.className = "w-full py-4 bg-gradient-to-r from-red-500 to-red-700 rounded-2xl font-black text-xl shadow-[0_0_20px_rgba(239,68,68,0.4)] text-white active:scale-95 transition-all tracking-widest";
-            } else {
-                btn.className = "w-full py-4 bg-slate-700 text-slate-400 rounded-2xl font-black text-xl border-2 border-slate-600 transition-all tracking-widest";
-            }
-        }
-
-        function hitBingo() {
-            if(!checkLocal1LineWin()) return tg.showAlert("⚠️ HOLD ON!\n\nYou haven't made a full line yet!");
-            fetch(`/api/check-win/${myActiveGameId}/${uid}/?marked=0`).then(r=>r.json()).then(d => {
-                if (d.status === 'WINNER') {
-                    document.getElementById('m-win').style.display = 'flex'; document.getElementById('win-card-num').innerText = myCard;
-                } else if (d.status === 'NOT_YET') { 
-                    tg.showAlert("❌ NOT BINGO YET!\n\nWait for the dealer to call your numbers!"); autoBingoFired = false; 
-                }
-            });
-        }
+        function activateBingoButton() { const btn = document.getElementById('bingo-btn'); if(checkLocal1LineWin()) { btn.className = "w-full py-4 bg-gradient-to-r from-red-500 to-red-700 rounded-2xl font-black text-xl shadow-[0_0_20px_rgba(239,68,68,0.4)] text-white active:scale-95 transition-all tracking-widest"; } else { btn.className = "w-full py-4 bg-slate-700 text-slate-400 rounded-2xl font-black text-xl border-2 border-slate-600 transition-all tracking-widest"; } }
+        function hitBingo() { if(!checkLocal1LineWin()) return tg.showAlert("⚠️ HOLD ON!\n\nYou haven't made a full line yet!"); fetch(`/api/check-win/${myActiveGameId}/${uid}/?marked=0`).then(r=>r.json()).then(d => { if (d.status === 'WINNER') { document.getElementById('m-win').style.display = 'flex'; document.getElementById('win-card-num').innerText = myCard; } else if (d.status === 'NOT_YET') { tg.showAlert("❌ NOT BINGO YET!\n\nWait for the dealer to call your numbers!"); autoBingoFired = false; } }); }
 
         function getMaxCards() { return (activeBet == 10) ? 1000 : 500; }
         function showLobby() { document.getElementById('v-selector').classList.add('hidden'); document.getElementById('v-lobby').classList.remove('hidden'); }
         function selectRoom(t) { activeBet=t; document.getElementById('nav-room').innerText=t; document.getElementById('v-lobby').classList.add('hidden'); document.getElementById('v-selector').classList.remove('hidden'); initGrid(); appLoop(); }
         function initGrid() { const g = document.getElementById('grid-container'); g.innerHTML = ''; let maxCards = getMaxCards(); for(let i=1; i<=maxCards; i++) { let b = document.createElement('button'); b.className="card-num"; b.id="c-"+i; b.innerText=i; b.onclick=()=>selectCard(i); g.appendChild(b); } }
-        function selectCard(n) { myCard=n; document.querySelectorAll('.card-num').forEach(el=>el.classList.remove('active')); document.getElementById('c-'+n).classList.add('active'); document.getElementById('prev-num').innerText="#"+n; fetch('/api/card-data/'+n+'/').then(r=>r.json()).then(d=>{ const mini = document.getElementById('mini-grid'); mini.innerHTML = ''; d.board.forEach(row=>row.forEach(v=>{ let c=document.createElement('div'); c.className='mini-cell'; c.innerText=v==='FREE'?'X':v; mini.appendChild(c); })); }); document.getElementById('c-'+n).scrollIntoView({behavior:'smooth', block:'center'}); }
+        function selectCard(n) { 
+            myCard=n; 
+            document.querySelectorAll('.card-num').forEach(el=>el.classList.remove('active')); 
+            document.getElementById('c-'+n).classList.add('active'); 
+            document.getElementById('prev-num').innerText="#"+n; 
+            
+            // Trigger the new Toast Popup!
+            showToast("Card #" + n + " Selected!");
+
+            fetch('/api/card-data/'+n+'/').then(r=>r.json()).then(d=>{ const mini = document.getElementById('mini-grid'); mini.innerHTML = ''; d.board.forEach(row=>row.forEach(v=>{ let c=document.createElement('div'); c.className='mini-cell'; c.innerText=v==='FREE'?'X':v; mini.appendChild(c); })); }); document.getElementById('c-'+n).scrollIntoView({behavior:'smooth', block:'center'}); 
+        }
         function pickRandom() { let maxCards = getMaxCards(); const r=Math.floor(Math.random()*maxCards)+1; selectCard(r); }
         function joinGame() { fetch(`/api/join-room/${uid}/${activeBet}/${myCard}/`).then(r=>r.json()).then(d=>{ if(d.status==='ok') location.reload(); else tg.showAlert(d.error); }); }
         
