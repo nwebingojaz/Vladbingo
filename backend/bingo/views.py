@@ -26,7 +26,6 @@ def lobby_info(request, tg_id):
     now = timezone.now()
     for r in rooms:
         p_count = len(r['players'])
-        
         # Calculate total cards bought by all players for accurate prize pool
         total_cards = sum(len(c) if isinstance(c, list) else 1 for c in r['players'].values())
         win_amount = float(r['bet_amount'] * total_cards) * 0.8
@@ -34,8 +33,7 @@ def lobby_info(request, tg_id):
         elapsed = (now - r['created_at']).total_seconds()
         room_data.append({
             'id': r['id'], 'bet': float(r['bet_amount']), 'players': p_count,
-            'win': win_amount,
-            'status': r['status'],
+            'win': win_amount, 'status': r['status'],
             'called_count': len(r['called_numbers']),
             'time_left': max(0, 60 - int(elapsed))
         })
@@ -50,10 +48,8 @@ def get_history(request, tg_id):
     my_bets_data = []
     for g in my_games:
         my_cards = g.players.get(str(tg_id))
-        if isinstance(my_cards, list):
-            card_str = ", ".join(str(x) for x in my_cards)
-        else:
-            card_str = str(my_cards)
+        if isinstance(my_cards, list): card_str = ", ".join(str(x) for x in my_cards)
+        else: card_str = str(my_cards)
             
         is_winner = g.winner_username == f"tg_{tg_id}"
         my_bets_data.append({
@@ -66,8 +62,6 @@ def get_history(request, tg_id):
 # --- MULTI-CARD JOIN ROOM LOGIC ---
 def join_room(request, tg_id, bet, card_num):
     user = User.objects.get(username=f"tg_{tg_id}")
-    
-    # Convert comma-separated string into a list of integers
     selected_cards = [int(x) for x in str(card_num).split(',') if x.isdigit()]
     
     if len(selected_cards) == 0: return JsonResponse({'status': 'error', 'error': 'No cards selected'})
@@ -80,10 +74,8 @@ def join_room(request, tg_id, bet, card_num):
     game = GameRound.objects.filter(status="LOBBY", bet_amount=bet).first()
     if not game: return JsonResponse({'status': 'error', 'error': 'No Lobby'})
     
-    # Save the list of cards to the user
     game.players[str(tg_id)] = selected_cards
     game.save()
-    
     user.operational_credit -= total_cost
     user.save()
     return JsonResponse({'status': 'ok'})
@@ -92,27 +84,17 @@ def get_game_info(request, game_id, tg_id):
     try:
         game = GameRound.objects.get(id=game_id)
         user_cards = game.players.get(str(tg_id), [])
-        
-        # Backward compatibility for old single int format
         if isinstance(user_cards, int): user_cards = [user_cards]
         
         boards_data = []
         for c_num in user_cards:
             card_obj = PermanentCard.objects.get(card_number=c_num)
-            boards_data.append({
-                "card_number": c_num,
-                "board": card_obj.board
-            })
+            boards_data.append({"card_number": c_num, "board": card_obj.board})
             
         total_cards_in_game = sum(len(cards) if isinstance(cards, list) else 1 for cards in game.players.values())
         prize = (Decimal(total_cards_in_game) * game.bet_amount) * Decimal("0.80")
         
-        return JsonResponse({
-            'boards_data': boards_data, 
-            'called': game.called_numbers, 
-            'prize': float(prize), 
-            'status': game.status
-        })
+        return JsonResponse({'boards_data': boards_data, 'called': game.called_numbers, 'prize': float(prize), 'status': game.status})
     except Exception as e: return JsonResponse({'error': str(e)}, status=404)
 
 def check_win(request, game_id, tg_id):
@@ -127,17 +109,12 @@ def check_win(request, game_id, tg_id):
         marked_str = request.GET.get('marked', '')
         marked_nums = [int(x) for x in marked_str.split(',') if x.isdigit()]
         
-        # If marked is [0] (Auto Mode), assume all called numbers are marked
-        if marked_nums == [0]:
-            valid_marks = set(game.called_numbers)
-        else:
-            valid_marks = set(game.called_numbers).intersection(set(marked_nums))
+        if marked_nums == [0]: valid_marks = set(game.called_numbers)
+        else: valid_marks = set(game.called_numbers).intersection(set(marked_nums))
             
-        valid_marks.add("FREE") # Center is free
-        
+        valid_marks.add("FREE")
         winning_card = None
         
-        # Loop through all up to 4 cards the user owns
         for c_num in user_cards:
             card = PermanentCard.objects.get(card_number=c_num)
             board = card.board
@@ -172,7 +149,7 @@ def check_win(request, game_id, tg_id):
 
 
 # ==========================================
-# OTP & MANUAL DEPOSIT LOGIC
+# OTP & WALLET LOGIC (WITH AMHARIC)
 # ==========================================
 
 def send_telegram_message(chat_id, text):
@@ -192,7 +169,8 @@ def send_otp(request):
             user.otp_expiry = timezone.now() + timedelta(minutes=5)
             user.save()
             
-            msg = f"🔐 <b>Vlad Bingo Security</b>\n\nYour Deposit Verification Code is: <code>{otp}</code>\n\n<i>This code expires in 5 minutes.</i>"
+            # AMHARIC TRANSLATION HERE
+            msg = f"🔐 <b>የቭላድ ቢንጎ (Vlad Bingo Security)</b>\n\nየማረጋገጫ ኮድዎ (OTP Code): <code>{otp}</code> ነው\n\n<i>ይህ ኮድ በ5 ደቂቃ ውስጥ ጊዜው ያልፋል። ለማንም አያጋሩ! (Do not share this code)</i>"
             send_telegram_message(tg_id, msg)
             return JsonResponse({"status": "success", "message": "OTP sent to your Telegram chat!"})
         except User.DoesNotExist:
@@ -225,10 +203,82 @@ def submit_deposit(request):
         method = data.get('method')
         try:
             user = User.objects.get(username=f"tg_{tg_id}")
-            Transaction.objects.create(
-                agent=user, amount=amount, note=f"TXID: {tx_id}",
-                type=f"DEPOSIT_{method.upper()}", status="pending"
-            )
+            Transaction.objects.create(agent=user, amount=amount, note=f"TXID: {tx_id}", type=f"DEPOSIT_{method.upper()}", status="pending")
+            # Notify Admin Channel
+            send_telegram_message(settings.CHANNEL_ID, f"🟢 <b>NEW DEPOSIT</b>\nUser: {tg_id}\nAmount: {amount} ETB\nMethod: {method}\nTXID: {tx_id}")
             return JsonResponse({"status": "success", "message": "Deposit submitted! Waiting for Admin approval."})
+        except User.DoesNotExist:
+            return JsonResponse({"status": "error", "message": "User not found."})
+
+@csrf_exempt
+def submit_withdrawal(request):
+    if request.method == "POST":
+        data = json.loads(request.body)
+        tg_id = data.get('tg_id')
+        amount = Decimal(str(data.get('amount', 0)))
+        account = data.get('account')
+        try:
+            user = User.objects.get(username=f"tg_{tg_id}")
+            if user.operational_credit < amount: return JsonResponse({"status": "error", "message": "Insufficient balance!"})
+            if amount < 50: return JsonResponse({"status": "error", "message": "Minimum withdrawal is 50 ETB."})
+            
+            user.operational_credit -= amount
+            user.save()
+            Transaction.objects.create(agent=user, amount=amount, note=f"To: {account}", type="WITHDRAWAL", status="pending")
+            
+            # Notify Admin Channel
+            send_telegram_message(settings.CHANNEL_ID, f"🔴 <b>NEW WITHDRAWAL</b>\nUser: {tg_id}\nAmount: {amount} ETB\nAccount: {account}")
+            return JsonResponse({"status": "success", "message": "Withdrawal requested successfully!"})
+        except User.DoesNotExist:
+            return JsonResponse({"status": "error", "message": "User not found."})
+
+@csrf_exempt
+def submit_transfer(request):
+    if request.method == "POST":
+        data = json.loads(request.body)
+        tg_id = data.get('tg_id')
+        amount = Decimal(str(data.get('amount', 0)))
+        target_account = data.get('account')
+        try:
+            sender = User.objects.get(username=f"tg_{tg_id}")
+            if sender.operational_credit < amount: return JsonResponse({"status": "error", "message": "Insufficient balance!"})
+            if amount < 10: return JsonResponse({"status": "error", "message": "Minimum transfer is 10 ETB."})
+            
+            # Try to find receiver by Phone Number OR Telegram ID
+            receiver = User.objects.filter(phone_number=target_account).first()
+            if not receiver:
+                receiver = User.objects.filter(username=f"tg_{target_account}").first()
+            
+            if not receiver: return JsonResponse({"status": "error", "message": "Receiver account not found!"})
+            if sender == receiver: return JsonResponse({"status": "error", "message": "You cannot transfer to yourself!"})
+            
+            # Perform Transfer
+            sender.operational_credit -= amount
+            sender.save()
+            receiver.operational_credit += amount
+            receiver.save()
+            
+            Transaction.objects.create(agent=sender, amount=amount, note=f"Transfer to {target_account}", type="TRANSFER_OUT", status="approved")
+            Transaction.objects.create(agent=receiver, amount=amount, note=f"Transfer from {tg_id}", type="TRANSFER_IN", status="approved")
+            
+            # Notify Receiver
+            if receiver.telegram_id:
+                send_telegram_message(receiver.telegram_id, f"💸 <b>Transfer Received!</b>\nYou received {amount} ETB from user {tg_id}.")
+                
+            return JsonResponse({"status": "success", "message": f"Successfully transferred {amount} ETB!"})
+        except User.DoesNotExist:
+            return JsonResponse({"status": "error", "message": "User not found."})
+
+@csrf_exempt
+def change_password(request):
+    if request.method == "POST":
+        data = json.loads(request.body)
+        tg_id = data.get('tg_id')
+        new_pass = data.get('password')
+        try:
+            user = User.objects.get(username=f"tg_{tg_id}")
+            user.set_password(new_pass) # Django's built in secure password hashing
+            user.save()
+            return JsonResponse({"status": "success", "message": "Security PIN updated successfully!"})
         except User.DoesNotExist:
             return JsonResponse({"status": "error", "message": "User not found."})
