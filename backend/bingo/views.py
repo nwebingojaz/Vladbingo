@@ -166,8 +166,15 @@ def send_otp(request):
     if request.method == "POST":
         data = json.loads(request.body)
         tg_id = data.get('tg_id')
+        phone = data.get('phone', '') # Capture the phone number from the frontend
+        
         try:
             user = User.objects.get(username=f"tg_{tg_id}")
+            
+            # Save the phone number to their profile if they provided one
+            if phone:
+                user.phone_number = phone
+                
             otp = str(random.randint(100000, 999999))
             user.otp_code = otp
             user.otp_expiry = timezone.now() + timedelta(minutes=5)
@@ -231,7 +238,7 @@ def submit_withdrawal(request):
             Transaction.objects.create(agent=user, amount=amount, note=f"To: {account}", type="WITHDRAWAL", status="pending")
             
             # Notify Admin Channel
-            send_telegram_message(settings.CHANNEL_ID, f"🔴 <b>NEW WITHDRAWAL</b>\nUser: {tg_id}\nAmount: {amount} ETB\nAccount: {account}")
+            send_telegram_message(settings.CHANNEL_ID, f"🔴 <b>NEW WITHDRAWAL</b>\nUser: {tg_id}\nAmount: {amount} ETB\nAccount: {account}\nPhone: {user.phone_number}")
             return JsonResponse({"status": "success", "message": "Withdrawal requested successfully!"})
         except User.DoesNotExist:
             return JsonResponse({"status": "error", "message": "User not found."})
