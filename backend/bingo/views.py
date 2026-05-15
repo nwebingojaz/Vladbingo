@@ -1,3 +1,4 @@
+import os
 import json
 import requests
 import random
@@ -149,41 +150,71 @@ def check_win(request, game_id, tg_id):
 
 
 # ==========================================
-# OTP & WALLET LOGIC (AMHARIC + ERROR CATCH)
+# TELEGRAM GATEWAY OTP & WALLET LOGIC
 # ==========================================
 
 def send_telegram_message(chat_id, text):
+    # Standard Bot API (Used for sending alerts to your Admin Channel)
     token = settings.TELEGRAM_BOT_TOKEN
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     try:
-        response = requests.post(url, json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"}, timeout=5)
-        response.raise_for_status() # Throws error if Token or ID is invalid
+        requests.post(url, json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"}, timeout=5)
     except Exception as e:
         print(f"TELEGRAM API ERROR: {e}")
+
+def send_gateway_otp(phone_number, otp_code):
+    # Official Telegram Gateway API (Used for the Blue Shield OTPs)
+    gateway_token = os.environ.get("GATEWAY_TOKEN") 
+    url = "https://gatewayapi.telegram.org/sendVerificationMessage"
+    
+    # Format phone number for Telegram (+251...)
+    if phone_number.startswith("0"):
+        phone_number = "+251" + phone_number[1:]
+    elif not phone_number.startswith("+"):
+        phone_number = "+" + phone_number
+        
+    headers = {
+        "Authorization": f"Bearer {gateway_token}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "phone_number": phone_number,
+        "code": otp_code
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=5)
+        response.raise_for_status()
+    except Exception as e:
+        print(f"GATEWAY API ERROR: {e}")
 
 @csrf_exempt
 def send_otp(request):
     if request.method == "POST":
         data = json.loads(request.body)
         tg_id = data.get('tg_id')
-        phone = data.get('phone', '') # Capture the phone number from the frontend
+        phone = data.get('phone', '') 
         
         try:
             user = User.objects.get(username=f"tg_{tg_id}")
             
-            # Save the phone number to their profile if they provided one
+            # Save the phone number to their profile
             if phone:
                 user.phone_number = phone
+                
+            if not user.phone_number:
+                return JsonResponse({"status": "error", "message": "Phone number is required."})
                 
             otp = str(random.randint(100000, 999999))
             user.otp_code = otp
             user.otp_expiry = timezone.now() + timedelta(minutes=5)
             user.save()
             
-            # AMHARIC TRANSLATION & CORRECT BRANDING
-            msg = f"🔐 <b>Bigest Bingo Bot Security</b>\n\nየማረጋገጫ ኮድዎ (OTP Code): <code>{otp}</code> ነው\n\n<i>ይህ ኮድ በ5 ደቂቃ ውስጥ ጊዜው ያልፋል። ለማንም አያጋሩ! (Do not share this code)</i>"
-            send_telegram_message(tg_id, msg)
-            return JsonResponse({"status": "success", "message": "OTP sent to your Telegram chat!"})
+            # Send using the Official Gateway!
+            send_gateway_otp(user.phone_number, otp)
+            
+            return JsonResponse({"status": "success", "message": "OTP sent! Check your Telegram Verification Codes."})
         except User.DoesNotExist:
             return JsonResponse({"status": "error", "message": "User not found."})
 
