@@ -10,7 +10,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from .models import User, PermanentCard, GameRound, Transaction
 
-def home(request): return HttpResponse("<h1>BIGEST BINGOBT ENGINE ACTIVE</h1>")
+def home(request): return HttpResponse("<h1>BIGEST BINGO BOT ENGINE ACTIVE</h1>")
 def live_view(request): return render(request, 'live_view.html')
 
 def get_card_data(request, num):
@@ -173,8 +173,8 @@ def send_otp(request):
             user.otp_expiry = timezone.now() + timedelta(minutes=5)
             user.save()
             
-            # AMHARIC TRANSLATION & BRANDING
-            msg = f"🔐 <b>Bigestbingobt Security</b>\n\nየማረጋገጫ ኮድዎ (OTP Code): <code>{otp}</code> ነው\n\n<i>ይህ ኮድ በ5 ደቂቃ ውስጥ ጊዜው ያልፋል። ለማንም አያጋሩ! (Do not share this code)</i>"
+            # AMHARIC TRANSLATION & CORRECT BRANDING
+            msg = f"🔐 <b>Bigest Bingo Bot Security</b>\n\nየማረጋገጫ ኮድዎ (OTP Code): <code>{otp}</code> ነው\n\n<i>ይህ ኮድ በ5 ደቂቃ ውስጥ ጊዜው ያልፋል። ለማንም አያጋሩ! (Do not share this code)</i>"
             send_telegram_message(tg_id, msg)
             return JsonResponse({"status": "success", "message": "OTP sent to your Telegram chat!"})
         except User.DoesNotExist:
