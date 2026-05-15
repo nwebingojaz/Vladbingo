@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>BIGEST BINGOBT</title>
+    <title>BIGEST BINGO BOT</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -78,7 +78,7 @@
     <div class="header-bg p-3 flex justify-between items-center shadow-lg relative z-40">
         <div class="flex items-center gap-3">
             <button onclick="toggleMenu()" class="text-white text-2xl px-2">☰</button>
-            <div class="flex items-center gap-1"><div class="bg-blue-600 p-1 rounded font-black text-[10px] text-white italic">BIGEST</div><div class="font-black text-xs uppercase text-white">BINGOBT</div></div>
+            <div class="flex items-center gap-1"><div class="bg-blue-600 p-1 rounded font-black text-[10px] text-white italic">BIGEST</div><div class="font-black text-xs uppercase text-white">BINGO BOT</div></div>
         </div>
         <div class="bg-slate-800 px-3 py-1.5 rounded-full flex items-center gap-2 border border-blue-900" onclick="openWallet('deposit')">
             <span class="text-yellow-400 text-sm">👛</span><span id="bal-header" class="font-bold text-sm">0.00</span>
@@ -194,6 +194,16 @@
         </div>
     </div>
 
+    <!-- HISTORY & WIN MODALS -->
+    <div id="m-history" class="modal">
+        <div class="flex justify-between items-center mb-2"><h2 class="text-blue-400 font-black italic uppercase text-lg">History</h2><button onclick="document.getElementById('m-history').style.display='none'" class="text-2xl text-gray-400">✕</button></div>
+        <div class="flex mb-4"><div id="tab-bets" onclick="switchTab('bets')" class="tab-btn active">My Bets</div><div id="tab-win" onclick="switchTab('win')" class="tab-btn">All Winners</div></div>
+        <div id="history-content" class="h-full overflow-y-auto pb-20"></div>
+    </div>
+    <div id="m-win" class="modal" style="justify-content:center; align-items:center;">
+        <div class="celebration"><div class="text-6xl mb-2">🏆</div><div class="text-3xl mb-2">🎉 <span class="font-black text-white tracking-widest">BINGO!</span> 🎉</div><p class="text-blue-100 mb-4 text-xs font-bold">You got a Bingo with card <span id="win-card-num" class="text-white text-lg"></span>!</p><button onclick="location.reload()" class="w-full bg-yellow-400 text-black font-black text-xl py-3 rounded-xl shadow-lg">Keep Playing!</button></div>
+    </div>
+
     <script>
         const tg = window.Telegram.WebApp; const uid = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : 0;
         document.getElementById('menu-id').innerText = "ID: " + uid;
@@ -240,7 +250,26 @@
 
         function checkLocal1LineWin() { for (let s=1; s<=4; s++) { const pc = document.getElementById('play-card-' + s); if (!pc || pc.children.length === 0) continue; const cells = Array.from(pc.querySelectorAll('div')); if(cells.length < 25) continue; let grid = []; for(let i=0; i<5; i++) { grid.push(cells.slice(i*5, i*5+5).map(c => c.classList.contains('is-marked') || c.innerText === '⭐')); } for(let i=0; i<5; i++) { if(grid[i].every(v=>v)) return true; if(grid.every(row=>row[i])) return true; } if([0,1,2,3,4].every(i => grid[i][i])) return true; if([0,1,2,3,4].every(i => grid[i][4-i])) return true; if([grid[0][0], grid[0][4], grid[4][0], grid[4][4]].every(v=>v)) return true; } return false; }
         
-        function updatePlayHall() { if(!myActiveGameId) return; fetch(`/api/game-info/${myActiveGameId}/${uid}/`).then(r=>r.json()).then(d => { if(d.status === 'ENDED') { tg.showAlert("Game Over! Check History."); location.reload(); return; } const badge = document.getElementById('play-status-badge'); if(d.status === 'ACTIVE') { badge.innerText = "LIVE: " + d.called.length + "/75"; badge.className = "text-[10px] bg-red-500/20 border border-red-500 text-red-500 px-3 py-1 rounded-full font-black animate-pulse"; } if(d.boards_data && d.boards_data.length > 0) { for(let i=0; i<d.boards_data.length; i++) { let slotNum = i + 1; let pc = document.getElementById('play-card-' + slotNum); if(pc && pc.children.length === 0) { let parentDiv = pc.parentElement; parentDiv.className = "bg-slate-800 p-1 rounded-xl border-2 border-yellow-500 relative shadow-[0_0_15px_rgba(234,179,8,0.2)]"; parentDiv.innerHTML = `<div class="absolute -top-3 left-2 bg-yellow-500 text-black text-[9px] font-black px-2 py-0.5 rounded">#${d.boards_data[i].card_number}</div><div class="grid grid-cols-5 gap-0.5 mb-0.5 text-center mt-2"><div class="font-black text-[10px] text-blue-400">B</div><div class="font-black text-[10px] text-blue-400">I</div><div class="font-black text-[10px] text-blue-400">N</div><div class="font-black text-[10px] text-blue-400">G</div><div class="font-black text-[10px] text-blue-400">O</div></div><div id="play-card-${slotNum}" class="grid grid-cols-5 gap-0.5"></div>`; pc = document.getElementById('play-card-' + slotNum); d.boards_data[i].board.forEach(row => row.forEach(val => { let cell = document.createElement('div'); cell.className = 'w-[8vw] h-[8vw] max-w-[40px] max-h-[40px] flex items-center justify-center text-[10px] font-black rounded border border-blue-900/50 bg-slate-900 shadow-inner cursor-pointer transition-colors'; if (val === 'FREE') { cell.innerText = '⭐'; cell.classList.add('bg-blue-600', 'text-yellow-400', 'is-marked'); } else { cell.innerText = val; cell.classList.add('text-blue-200'); cell.onclick = function() { if(autoMode) return; this.classList.toggle('bg-red-500'); this.classList.toggle('text-white'); this.classList.toggle('border-red-400'); this.classList.toggle('text-blue-200'); this.classList.toggle('is-marked'); activateBingoButton(); }; } pc.appendChild(cell); })); } if (autoMode && d.called && d.called.length > 0) { document.querySelectorAll(`#play-card-${slotNum} div`).forEach(cell => { let val = cell.innerText; if(val !== '⭐' && d.called.includes(parseInt(val))) { if(!cell.classList.contains('is-marked')) { cell.classList.add('bg-red-500', 'text-white', 'border-red-400', 'is-marked'); cell.classList.remove('text-blue-200'); } } }); } } if(autoMode && checkLocal1LineWin() && !autoBingoFired) { autoBingoFired = true; hitBingo(); } } activateBingoButton(); }); }
+        function updatePlayHall() {
+            if(!myActiveGameId) return;
+            fetch(`/api/game-info/${myActiveGameId}/${uid}/`).then(r=>r.json()).then(d => {
+                if(d.status === 'ENDED') { tg.showAlert("Game Over! Check History."); location.reload(); return; }
+                const badge = document.getElementById('play-status-badge'); if(d.status === 'ACTIVE') { badge.innerText = "LIVE: " + d.called.length + "/75"; badge.className = "text-[10px] bg-red-500/20 border border-red-500 text-red-500 px-3 py-1 rounded-full font-black animate-pulse"; }
+                if(d.boards_data && d.boards_data.length > 0) {
+                    for(let i=0; i<d.boards_data.length; i++) {
+                        let slotNum = i + 1; let pc = document.getElementById('play-card-' + slotNum);
+                        if(pc && pc.children.length === 0) {
+                            let parentDiv = pc.parentElement; parentDiv.className = "bg-slate-800 p-1 rounded-xl border-2 border-yellow-500 relative shadow-[0_0_15px_rgba(234,179,8,0.2)]"; parentDiv.innerHTML = `<div class="absolute -top-3 left-2 bg-yellow-500 text-black text-[9px] font-black px-2 py-0.5 rounded">#${d.boards_data[i].card_number}</div><div class="grid grid-cols-5 gap-0.5 mb-0.5 text-center mt-2"><div class="font-black text-[10px] text-blue-400">B</div><div class="font-black text-[10px] text-blue-400">I</div><div class="font-black text-[10px] text-blue-400">N</div><div class="font-black text-[10px] text-blue-400">G</div><div class="font-black text-[10px] text-blue-400">O</div></div><div id="play-card-${slotNum}" class="grid grid-cols-5 gap-0.5"></div>`;
+                            pc = document.getElementById('play-card-' + slotNum); 
+                            d.boards_data[i].board.forEach(row => row.forEach(val => { let cell = document.createElement('div'); cell.className = 'w-[8vw] h-[8vw] max-w-[40px] max-h-[40px] flex items-center justify-center text-[10px] font-black rounded border border-blue-900/50 bg-slate-900 shadow-inner cursor-pointer transition-colors'; if (val === 'FREE') { cell.innerText = '⭐'; cell.classList.add('bg-blue-600', 'text-yellow-400', 'is-marked'); } else { cell.innerText = val; cell.classList.add('text-blue-200'); cell.onclick = function() { if(autoMode) return; this.classList.toggle('bg-red-500'); this.classList.toggle('text-white'); this.classList.toggle('border-red-400'); this.classList.toggle('text-blue-200'); this.classList.toggle('is-marked'); activateBingoButton(); }; } pc.appendChild(cell); }));
+                        }
+                        if (autoMode && d.called && d.called.length > 0) { document.querySelectorAll(`#play-card-${slotNum} div`).forEach(cell => { let val = cell.innerText; if(val !== '⭐' && d.called.includes(parseInt(val))) { if(!cell.classList.contains('is-marked')) { cell.classList.add('bg-red-500', 'text-white', 'border-red-400', 'is-marked'); cell.classList.remove('text-blue-200'); } } }); }
+                    }
+                    if(autoMode && checkLocal1LineWin() && !autoBingoFired) { autoBingoFired = true; hitBingo(); }
+                }
+                activateBingoButton();
+            });
+        }
         function activateBingoButton() { const btn = document.getElementById('bingo-btn'); if(checkLocal1LineWin()) { btn.className = "w-full py-4 bg-gradient-to-r from-red-500 to-red-700 rounded-2xl font-black text-xl shadow-[0_0_20px_rgba(239,68,68,0.4)] text-white active:scale-95 transition-all tracking-widest"; } else { btn.className = "w-full py-4 bg-slate-700 text-slate-400 rounded-2xl font-black text-xl border-2 border-slate-600 transition-all tracking-widest"; } }
         function hitBingo() { if(!checkLocal1LineWin()) return tg.showAlert("⚠️ HOLD ON!\n\nYou haven't made a full line yet!"); fetch(`/api/check-win/${myActiveGameId}/${uid}/?marked=0`).then(r=>r.json()).then(d => { if (d.status === 'WINNER') { document.getElementById('m-win').style.display = 'flex'; document.getElementById('win-card-num').innerText = d.winning_card; } else if (d.status === 'NOT_YET') { tg.showAlert("❌ NOT BINGO YET!\n\nWait for the dealer to call your numbers!"); autoBingoFired = false; } }); }
 
@@ -255,6 +284,7 @@
         function joinGame() { if(myCards.length === 0) return tg.showAlert("Select at least 1 card!"); const cardsString = myCards.join(','); fetch(`/api/join-room/${uid}/${activeBet}/${cardsString}/`).then(r=>r.json()).then(d=>{ if(d.status==='ok') location.reload(); else tg.showAlert(d.error); }); }
         function openHistory() { document.getElementById('m-history').style.display = 'flex'; fetch('/api/history/'+uid+'/').then(r=>r.json()).then(d => { historyData = d; switchTab('bets'); }); }
         function closeHistory() { document.getElementById('m-history').style.display = 'none'; }
+        function switchTab(tab) { document.getElementById('tab-bets').className = "tab-btn " + (tab==='bets' ? 'active' : ''); document.getElementById('tab-win').className = "tab-btn " + (tab==='win' ? 'active' : ''); const content = document.getElementById('history-content'); content.innerHTML = ''; if(tab === 'bets') { if(historyData.my_bets.length===0) content.innerHTML="<div class='text-center text-gray-500 mt-10'>No bets yet.</div>"; historyData.my_bets.forEach(h => { content.innerHTML += `<div class="history-row border-l-2 ${h.status==='WON' ? 'border-green-500' : 'border-red-500'}"><div><div class="text-gray-400">Game</div><div class="font-bold">#${h.game_id}</div></div><div><div class="text-gray-400">Bet/Card</div><div class="text-blue-400">${h.bet}/[${h.card}]</div></div><div class="text-right"><div class="text-gray-400">Result</div><div class="font-black ${h.status==='WON' ? 'text-green-500' : 'text-red-500'}">${h.status==='WON' ? '+'+h.prize : '-'+(h.bet * (h.card ? h.card.toString().split(',').length : 1))}</div></div></div>`; }); } else { historyData.winners.forEach(h => { content.innerHTML += `<div class="history-row"><div><div class="text-gray-400">Game</div><div class="font-bold">#${h.game_id}</div></div><div><div class="text-gray-400">Winner</div><div class="text-blue-400">@${h.winner}</div></div><div class="text-right"><div class="text-gray-400">Prize</div><div class="text-green-400 font-black">${h.prize} ETB</div></div></div>`; }); } }
         
         appLoop(); setInterval(appLoop, 2000);
         setInterval(() => { if(!myActiveGameId) { const tEl = document.getElementById('timer'); if(currentRoomStatus === 'ACTIVE') { tEl.innerText = "PLAYING..."; tEl.classList.add('text-red-400'); } else { tEl.classList.remove('text-red-400'); if(currentRoomTime > 0) currentRoomTime--; let m = Math.floor(currentRoomTime / 60), s = currentRoomTime % 60; tEl.innerText = m + ":" + (s < 10 ? "0" + s : s); } } }, 1000);
