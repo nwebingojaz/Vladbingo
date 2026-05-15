@@ -10,7 +10,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from .models import User, PermanentCard, GameRound, Transaction
 
-def home(request): return HttpResponse("<h1>VLAD BINGO ENGINE ACTIVE</h1>")
+def home(request): return HttpResponse("<h1>BIGEST BINGOBT ENGINE ACTIVE</h1>")
 def live_view(request): return render(request, 'live_view.html')
 
 def get_card_data(request, num):
@@ -149,13 +149,17 @@ def check_win(request, game_id, tg_id):
 
 
 # ==========================================
-# OTP & WALLET LOGIC (WITH AMHARIC)
+# OTP & WALLET LOGIC (AMHARIC + ERROR CATCH)
 # ==========================================
 
 def send_telegram_message(chat_id, text):
     token = settings.TELEGRAM_BOT_TOKEN
     url = f"https://api.telegram.org/bot{token}/sendMessage"
-    requests.post(url, json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"})
+    try:
+        response = requests.post(url, json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"}, timeout=5)
+        response.raise_for_status() # Throws error if Token or ID is invalid
+    except Exception as e:
+        print(f"TELEGRAM API ERROR: {e}")
 
 @csrf_exempt
 def send_otp(request):
@@ -169,8 +173,8 @@ def send_otp(request):
             user.otp_expiry = timezone.now() + timedelta(minutes=5)
             user.save()
             
-            # AMHARIC TRANSLATION HERE
-            msg = f"🔐 <b>የቭላድ ቢንጎ (Vlad Bingo Security)</b>\n\nየማረጋገጫ ኮድዎ (OTP Code): <code>{otp}</code> ነው\n\n<i>ይህ ኮድ በ5 ደቂቃ ውስጥ ጊዜው ያልፋል። ለማንም አያጋሩ! (Do not share this code)</i>"
+            # AMHARIC TRANSLATION & BRANDING
+            msg = f"🔐 <b>Bigestbingobt Security</b>\n\nየማረጋገጫ ኮድዎ (OTP Code): <code>{otp}</code> ነው\n\n<i>ይህ ኮድ በ5 ደቂቃ ውስጥ ጊዜው ያልፋል። ለማንም አያጋሩ! (Do not share this code)</i>"
             send_telegram_message(tg_id, msg)
             return JsonResponse({"status": "success", "message": "OTP sent to your Telegram chat!"})
         except User.DoesNotExist:
@@ -244,7 +248,6 @@ def submit_transfer(request):
             if sender.operational_credit < amount: return JsonResponse({"status": "error", "message": "Insufficient balance!"})
             if amount < 10: return JsonResponse({"status": "error", "message": "Minimum transfer is 10 ETB."})
             
-            # Try to find receiver by Phone Number OR Telegram ID
             receiver = User.objects.filter(phone_number=target_account).first()
             if not receiver:
                 receiver = User.objects.filter(username=f"tg_{target_account}").first()
@@ -252,7 +255,6 @@ def submit_transfer(request):
             if not receiver: return JsonResponse({"status": "error", "message": "Receiver account not found!"})
             if sender == receiver: return JsonResponse({"status": "error", "message": "You cannot transfer to yourself!"})
             
-            # Perform Transfer
             sender.operational_credit -= amount
             sender.save()
             receiver.operational_credit += amount
@@ -261,7 +263,6 @@ def submit_transfer(request):
             Transaction.objects.create(agent=sender, amount=amount, note=f"Transfer to {target_account}", type="TRANSFER_OUT", status="approved")
             Transaction.objects.create(agent=receiver, amount=amount, note=f"Transfer from {tg_id}", type="TRANSFER_IN", status="approved")
             
-            # Notify Receiver
             if receiver.telegram_id:
                 send_telegram_message(receiver.telegram_id, f"💸 <b>Transfer Received!</b>\nYou received {amount} ETB from user {tg_id}.")
                 
@@ -277,7 +278,7 @@ def change_password(request):
         new_pass = data.get('password')
         try:
             user = User.objects.get(username=f"tg_{tg_id}")
-            user.set_password(new_pass) # Django's built in secure password hashing
+            user.set_password(new_pass)
             user.save()
             return JsonResponse({"status": "success", "message": "Security PIN updated successfully!"})
         except User.DoesNotExist:
