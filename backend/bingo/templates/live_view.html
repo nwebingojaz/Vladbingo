@@ -146,6 +146,7 @@
             <div class="text-white font-black text-2xl"><span id="wallet-bal">0.00</span> <span class="text-sm text-blue-400">ETB</span></div>
         </div>
 
+        <!-- DEPOSIT (NO OTP) -->
         <div id="w-sec-deposit" class="w-section">
             <div id="dep-step-1">
                 <button onclick="showDepositForm('Telebirr')" class="w-full bg-white text-blue-600 font-bold py-4 rounded-xl mb-3 flex items-center justify-center gap-2"><span class="text-2xl">📱</span> Telebirr Deposit</button>
@@ -154,28 +155,42 @@
             <div id="dep-step-2" class="hidden bg-slate-800 p-4 rounded-xl border border-blue-900/50 mt-4">
                 <h3 id="dep-title" class="text-center font-bold text-yellow-400 mb-2">Transfer to Account</h3>
                 <div class="bg-red-900/40 border border-red-500 rounded p-2 mb-4 text-center"><p class="text-red-400 text-[10px] font-bold uppercase">⚠️ ማሳሰቢያ ⚠️</p><p class="text-white text-[9px]">በሞባይል አፕሊኬሽን ወይም በአጭር ቁጥር (*847# / *127#) ብቻ ይጠቀሙ።<br>በአካል ባንክ ውስጥ ሄደው አያስገቡ።</p></div>
-                <div class="text-sm text-gray-300 mb-4 bg-black/30 p-3 rounded">1. ገንዘቡን ወደዚህ ያስገቡ:<br><strong id="dep-account-info" class="text-white text-xl tracking-wider text-blue-300"></strong><br><br>2. ከአጭር የፅሁፍ መልዕክት (SMS) ላይ የትራንዛክሽን ቁጥሩን ኮፒ ያድርጉ።<br>3. ከታች ባለው ቦታ ላይ ያስገቡ እና በኦቲፒ ያረጋግጡ።</div>
-                <input type="number" id="dep-amount" placeholder="Amount (ETB)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
-                <input type="text" id="dep-txid" placeholder="Transaction Number (e.g. CA999DASAD)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
-                <div class="flex gap-2 mb-4"><input type="text" id="dep-otp" placeholder="OTP Code" class="flex-1 bg-slate-900 border border-slate-700 rounded p-3 text-white"><button onclick="requestOTP()" class="bg-red-500 text-white font-bold px-4 rounded">Get OTP</button></div>
+                <div class="text-sm text-gray-300 mb-4 bg-black/30 p-3 rounded">1. ገንዘቡን ወደዚህ ያስገቡ:<br><strong id="dep-account-info" class="text-white text-xl tracking-wider text-blue-300"></strong><br><br>2. ከአጭር የፅሁፍ መልዕክት (SMS) ላይ የትራንዛክሽን ቁጥሩን (Transaction ID) ኮፒ ያድርጉ።<br>3. ከታች ባለው ቦታ ላይ ያስገቡ።</div>
+                
+                <input type="number" id="dep-amount" placeholder="Deposit Amount (ETB)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
+                <input type="text" id="dep-txid" placeholder="Transaction Number (e.g. CA999DASAD)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-6 text-white">
+                
                 <button onclick="submitDeposit()" class="w-full bg-blue-600 font-black text-white py-3 rounded-xl">Submit Deposit</button>
             </div>
         </div>
 
+        <!-- WITHDRAW (WITH PHONE & OTP) -->
         <div id="w-sec-withdraw" class="w-section hidden bg-slate-800 p-4 rounded-xl border border-slate-700">
             <h3 class="text-red-400 font-black mb-4">Secure Withdrawal</h3>
+            <input type="tel" id="with-phone" placeholder="Your Phone Number" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
             <input type="number" id="with-amount" placeholder="Amount (Min 50 ETB)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
-            <input type="text" id="with-account" placeholder="Your Bank/Telebirr Account Number" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-4 text-white">
-            <div class="flex gap-2 mb-4"><input type="text" id="with-otp" placeholder="OTP Code" class="flex-1 bg-slate-900 border border-slate-700 rounded p-3 text-white"><button onclick="requestOTP()" class="bg-red-500 text-white font-bold px-4 rounded">Get OTP</button></div>
-            <button onclick="submitAction('/api/submit-withdrawal/', {amount: document.getElementById('with-amount').value, account: document.getElementById('with-account').value, otp: document.getElementById('with-otp').value})" class="w-full bg-red-600 font-black text-white py-3 rounded-xl">Confirm Withdrawal</button>
+            
+            <select id="with-bank" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
+                <option value="Telebirr">Telebirr</option>
+                <option value="CBE">Commercial Bank of Ethiopia (CBE)</option>
+                <option value="Awash">Awash Bank</option>
+                <option value="Dashen">Dashen Bank</option>
+                <option value="Abyssinia">Bank of Abyssinia</option>
+            </select>
+            
+            <input type="text" id="with-account" placeholder="Your Account Number" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-4 text-white">
+            
+            <div class="flex gap-2 mb-4"><input type="text" id="with-otp" placeholder="OTP Code" class="flex-1 bg-slate-900 border border-slate-700 rounded p-3 text-white"><button onclick="requestOTP('withdraw')" class="bg-red-500 text-white font-bold px-4 rounded">Get OTP</button></div>
+            <button onclick="submitAction('/api/submit-withdrawal/', {amount: document.getElementById('with-amount').value, account: document.getElementById('with-account').value, bank: document.getElementById('with-bank').value, otp: document.getElementById('with-otp').value})" class="w-full bg-red-600 font-black text-white py-3 rounded-xl">Confirm Withdrawal</button>
         </div>
 
+        <!-- TRANSFER -->
         <div id="w-sec-transfer" class="w-section hidden bg-slate-800 p-4 rounded-xl border border-slate-700">
             <h3 class="text-green-400 font-black mb-4">Transfer to Friend</h3>
             <input type="number" id="tr-amount" placeholder="Amount to Transfer (ETB)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
-            <input type="text" id="tr-account" placeholder="Friend's User ID or Phone" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-4 text-white">
-            <div class="flex gap-2 mb-4"><input type="text" id="tr-otp" placeholder="OTP Code" class="flex-1 bg-slate-900 border border-slate-700 rounded p-3 text-white"><button onclick="requestOTP()" class="bg-red-500 text-white font-bold px-4 rounded">Get OTP</button></div>
-            <button onclick="submitAction('/api/submit-transfer/', {amount: document.getElementById('tr-amount').value, account: document.getElementById('tr-account').value, otp: document.getElementById('tr-otp').value})" class="w-full bg-green-600 font-black text-white py-3 rounded-xl">Send Money</button>
+            <input type="text" id="tr-phone" placeholder="Friend's Phone Number or ID" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-4 text-white">
+            
+            <button onclick="submitTransferAction('/api/submit-transfer/', {amount: document.getElementById('tr-amount').value, account: document.getElementById('tr-phone').value})" class="w-full bg-green-600 font-black text-white py-3 rounded-xl">Send Money</button>
         </div>
     </div>
 
@@ -186,22 +201,23 @@
             <button onclick="document.getElementById('m-settings').style.display='none'" class="text-2xl text-gray-400">✕</button>
         </div>
         <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
-            <h3 class="text-blue-400 font-bold mb-2">Change Security PIN/Password</h3>
-            <p class="text-xs text-gray-400 mb-4">Verify your identity via Telegram OTP to update your withdrawal PIN.</p>
-            <input type="password" id="set-pass" placeholder="New PIN/Password" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
-            <div class="flex gap-2 mb-4"><input type="text" id="set-otp" placeholder="OTP Code" class="flex-1 bg-slate-900 border border-slate-700 rounded p-3 text-white"><button onclick="requestOTP()" class="bg-red-500 text-white font-bold px-4 rounded">Get OTP</button></div>
+            <h3 class="text-blue-400 font-bold mb-2">Change Password</h3>
+            <p class="text-xs text-gray-400 mb-4">Enter your phone number to receive an OTP and update your password.</p>
+            <input type="tel" id="set-phone" placeholder="Your Phone Number" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
+            <input type="password" id="set-pass" placeholder="New Password" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
+            <div class="flex gap-2 mb-4"><input type="text" id="set-otp" placeholder="OTP Code" class="flex-1 bg-slate-900 border border-slate-700 rounded p-3 text-white"><button onclick="requestOTP('password')" class="bg-red-500 text-white font-bold px-4 rounded">Get OTP</button></div>
             <button onclick="submitAction('/api/change-password/', {password: document.getElementById('set-pass').value, otp: document.getElementById('set-otp').value})" class="w-full bg-blue-600 font-black text-white py-3 rounded-xl">Update Password</button>
         </div>
     </div>
 
     <!-- HISTORY & WIN MODALS -->
+    <div id="m-win" class="modal" style="justify-content:center; align-items:center;">
+        <div class="celebration"><div class="text-6xl mb-2">🏆</div><div class="text-3xl mb-2">🎉 <span class="font-black text-white tracking-widest">BINGO!</span> 🎉</div><p class="text-blue-100 mb-4 text-xs font-bold">You got a Bingo with card <span id="win-card-num" class="text-white text-lg"></span>!</p><button onclick="location.reload()" class="w-full bg-yellow-400 text-black font-black text-xl py-3 rounded-xl shadow-lg">Keep Playing!</button></div>
+    </div>
     <div id="m-history" class="modal">
         <div class="flex justify-between items-center mb-2"><h2 class="text-blue-400 font-black italic uppercase text-lg">History</h2><button onclick="document.getElementById('m-history').style.display='none'" class="text-2xl text-gray-400">✕</button></div>
         <div class="flex mb-4"><div id="tab-bets" onclick="switchTab('bets')" class="tab-btn active">My Bets</div><div id="tab-win" onclick="switchTab('win')" class="tab-btn">All Winners</div></div>
         <div id="history-content" class="h-full overflow-y-auto pb-20"></div>
-    </div>
-    <div id="m-win" class="modal" style="justify-content:center; align-items:center;">
-        <div class="celebration"><div class="text-6xl mb-2">🏆</div><div class="text-3xl mb-2">🎉 <span class="font-black text-white tracking-widest">BINGO!</span> 🎉</div><p class="text-blue-100 mb-4 text-xs font-bold">You got a Bingo with card <span id="win-card-num" class="text-white text-lg"></span>!</p><button onclick="location.reload()" class="w-full bg-yellow-400 text-black font-black text-xl py-3 rounded-xl shadow-lg">Keep Playing!</button></div>
     </div>
 
     <script>
@@ -217,21 +233,39 @@
         function openWalletTab(tab) { ['deposit', 'withdraw', 'transfer'].forEach(t => { document.getElementById('w-tab-'+t).classList.remove('active'); document.getElementById('w-sec-'+t).classList.add('hidden'); }); document.getElementById('w-tab-'+tab).classList.add('active'); document.getElementById('w-sec-'+tab).classList.remove('hidden'); }
         function openSettings() { document.getElementById('m-settings').style.display = 'flex'; }
 
-        function showDepositForm(method) { currentMethod = method; document.getElementById('dep-step-1').classList.add('hidden'); document.getElementById('dep-step-2').classList.remove('hidden'); document.getElementById('dep-title').innerText = method + " Deposit"; const accInfo = document.getElementById('dep-account-info'); if (method === 'Telebirr') accInfo.innerHTML = "0928911665<br><span class='text-sm text-gray-400'>ስም (Name): Kassahun</span>"; else if (method === 'CBE') accInfo.innerHTML = "1000379893698<br><span class='text-sm text-gray-400'>ስም (Name): Yeabkal</span>"; }
+        // --- UPDATED ACCOUNT INFO (SOLOMON FOR TELEBIRR) ---
+        function showDepositForm(method) { currentMethod = method; document.getElementById('dep-step-1').classList.add('hidden'); document.getElementById('dep-step-2').classList.remove('hidden'); document.getElementById('dep-title').innerText = method + " Deposit"; const accInfo = document.getElementById('dep-account-info'); if (method === 'Telebirr') accInfo.innerHTML = "0977733630<br><span class='text-sm text-gray-400'>ስም (Name): Solomon</span>"; else if (method === 'CBE') accInfo.innerHTML = "1000379893698<br><span class='text-sm text-gray-400'>ስም (Name): Yeabkal</span>"; }
         
-        // --- SECURE OTP SENDER (WITH ERROR CATCHING) ---
-        function requestOTP() { 
+        // --- OTP REQUEST (PULLS PHONE NUMBER FROM ACTIVE TAB) ---
+        function requestOTP(formType) { 
+            let phoneNum = "";
+            if(formType === 'withdraw') phoneNum = document.getElementById('with-phone').value;
+            if(formType === 'password') phoneNum = document.getElementById('set-phone').value;
+            
+            if(!phoneNum) return tg.showAlert("Please enter your Phone Number first!");
+            
             tg.showAlert("Requesting OTP...");
-            fetch('/api/send-otp/', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ tg_id: uid }) })
-            .then(r => {
-                if(!r.ok) throw new Error("Server error " + r.status);
-                return r.json();
-            })
+            fetch('/api/send-otp/', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ tg_id: uid, phone: phoneNum }) })
+            .then(r => { if(!r.ok) throw new Error("Server error " + r.status); return r.json(); })
             .then(d => tg.showAlert(d.message))
-            .catch(err => tg.showAlert("⚠️ Server Error: Please make sure your Bot Token is correct and the server is running.")); 
+            .catch(err => tg.showAlert("⚠️ Server Error.")); 
         }
         
-        function submitDeposit() { const amount = document.getElementById('dep-amount').value, txid = document.getElementById('dep-txid').value, otp = document.getElementById('dep-otp').value; if(!amount || !txid || !otp) return tg.showAlert("Please fill all fields!"); submitAction('/api/submit-deposit/', {amount: amount, tx_id: txid, method: currentMethod, otp: otp}); }
+        // --- DEPOSIT SUBMIT (NO OTP) ---
+        function submitDeposit() { 
+            const amount = document.getElementById('dep-amount').value;
+            const txid = document.getElementById('dep-txid').value; 
+            if(!amount || !txid) return tg.showAlert("Please fill all fields!"); 
+            
+            fetch('/api/submit-deposit/', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({ tg_id: uid, amount: amount, tx_id: txid, method: currentMethod }) 
+            }).then(r=>r.json()).then(d => { 
+                tg.showAlert(d.message); 
+                if(d.status === 'success') { document.getElementById('m-deposit').style.display = 'none'; }
+            }).catch(e => tg.showAlert("⚠️ Error submitting deposit."));
+        }
         
         function submitAction(url, payload) {
             if(!payload.otp) return tg.showAlert("OTP is required!");
@@ -241,6 +275,13 @@
                 if(d.status === 'success') { fetch(url, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) }).then(r2=>r2.json()).then(d2 => { tg.showAlert(d2.message); if(d2.status==='success') location.reload(); }); } 
                 else tg.showAlert(d.message); 
             }).catch(e => tg.showAlert("⚠️ Action Failed: Please try again."));
+        }
+
+        // TRANSFER DOES NOT NEED OTP BY DEFAULT, JUST SUBMITS DIRECTLY
+        function submitTransferAction(url, payload) {
+            if(!payload.amount || !payload.account) return tg.showAlert("Please fill all fields!");
+            payload.tg_id = uid;
+            fetch(url, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) }).then(r=>r.json()).then(d => { tg.showAlert(d.message); if(d.status==='success') location.reload(); });
         }
 
         function showToast(msg) { const t = document.getElementById('toast-msg'); t.innerText = msg; t.classList.remove('opacity-0'); setTimeout(() => { t.classList.add('opacity-0'); }, 1500); }
