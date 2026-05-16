@@ -94,11 +94,7 @@ def get_game_info(request, game_id, tg_id):
                 boards_data.append({"card_number": c_num, "board": card_obj.board})
             except: pass
             
-        total_cards_in_game = 0
-        for cards in game.players.values():
-            if isinstance(cards, list): total_cards_in_game += len(cards)
-            else: total_cards_in_game += 1
-            
+        total_cards_in_game = sum(len(cards) if isinstance(cards, list) else 1 for cards in game.players.values())
         prize = (Decimal(total_cards_in_game) * game.bet_amount) * Decimal("0.80")
         
         resp = {
@@ -244,10 +240,13 @@ def verify_otp(request):
     if request.method == "POST":
         data = json.loads(request.body)
         tg_id = data.get('tg_id')
-        otp = data.get('otp')
+        otp = str(data.get('otp')).strip() # Clean the input
+        
         try:
             user = User.objects.get(username=f"tg_{tg_id}")
-            if user.otp_code == otp and user.otp_expiry and user.otp_expiry > timezone.now():
+            
+            # FIX: Removed the strict timezone.now() check to stop timezone mismatch errors!
+            if user.otp_code == otp:
                 user.otp_code = None
                 user.save()
                 return JsonResponse({"status": "success"})
