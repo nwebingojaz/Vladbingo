@@ -26,7 +26,7 @@ def db_op(uid, action, val=None):
 async def send_main_menu(update: Update, user):
     # FIXED: Google Drive blocks bots. Use a direct image link like Imgur or PostImages.
     # I put a temporary working image here. Replace it with your own Imgur link!
-    photo_url = "https://images.unsplash.com/photo-1518133910546-b6c2fb7d79e3?q=80&w=1000&auto=format&fit=crop"
+    photo_url = "https://drive.google.com/file/d/1wZMDGAurEoypxAl72-bguAw0mA7qBtRr/view?usp=drivesdk"
     
     caption = (
         f"🎰 **BIGEST BINGO BOT** 🎰\n\n"
