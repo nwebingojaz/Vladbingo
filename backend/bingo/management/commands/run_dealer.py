@@ -85,5 +85,5 @@ class Command(BaseCommand):
                 self.stdout.write(f"DEALER LOOP CRASHED: {e}")
                 self.stdout.write(traceback.format_exc())
             
-            # Rest for 4 seconds before the next loop
-            time.sleep(4)
+            # FAST PACED GAME: Calls a number every 3 seconds
+            time.sleep(3)
