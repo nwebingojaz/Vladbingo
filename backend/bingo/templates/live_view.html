@@ -37,7 +37,7 @@
         .wallet-tab { flex: 1; text-align: center; padding: 12px 0; font-size: 11px; font-weight: 900; color: #64748b; border-bottom: 3px solid transparent; }
         .wallet-tab.active { color: #3b82f6; border-bottom-color: #3b82f6; }
 
-        /* SWITCH IN ENGLISH */
+        /* SWITCH IS ENGLISH */
         .switch { position: relative; display: inline-block; width: 120px; height: 34px; background-color: #1e293b; border-radius: 34px; border: 1px solid #3b82f6; cursor: pointer; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider { position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: 34px; transition: .4s; }
@@ -67,7 +67,7 @@
             </div>
         </div>
         <div class="flex-1 overflow-y-auto py-2">
-            <div class="menu-item" onclick="toggleMenu(); showLobby()">🏠 ዋና ገፅ (Home)</div>
+            <div class="menu-item" onclick="toggleMenu(); showScreen('v-lobby')">🏠 ዋና ገፅ (Home)</div>
             <div class="menu-item" onclick="toggleMenu(); openWallet('deposit')">👛 ዋሌት (Wallet)</div>
             <div class="menu-item" onclick="toggleMenu(); openHistory()">📜 የጨዋታ ታሪክ (History)</div>
             <div class="menu-item" onclick="toggleMenu(); openReferral()">🎟️ ጋብዘው ይሸለሙ (Refer)</div>
@@ -95,11 +95,10 @@
         </div>
     </div>
     
-    <!-- ROOM NAV BAR -->
     <div class="bg-slate-900/80 p-2 flex justify-around items-center text-[10px] font-bold text-blue-400 uppercase border-b border-blue-900/50">
         <div>🎲 ክፍል (Room): <span id="nav-room" class="text-white">10</span></div>
-        <div>🎁 ሽልማት (WIN): <span id="nav-prize" class="text-white">0</span></div>
-        <div onclick="location.reload()">🔄 አድስ (REFRESH)</div>
+        <div>🎁 ሽልማት (Win): <span id="nav-prize" class="text-white">0</span></div>
+        <div onclick="location.reload()">🔄 አድስ (Refresh)</div>
     </div>
     
     <div id="timer-bar" class="bg-black/60 p-1 text-center border-b border-white/5">
@@ -127,7 +126,6 @@
 
     <!-- LIVE PLAY HALL -->
     <div id="v-play" class="hidden p-4 h-screen overflow-y-auto pb-32">
-        <!-- BIG BALL TRACKER & AUTO SWITCH -->
         <div class="flex justify-between items-center mb-4 bg-slate-900 p-3 rounded-2xl border border-slate-700 shadow-lg relative">
             <div class="flex items-center gap-3">
                 <div class="w-14 h-14 bg-gradient-to-br from-white to-slate-300 rounded-full flex items-center justify-center border-4 border-slate-400 shadow-[0_0_15px_rgba(255,255,255,0.3)]">
@@ -143,8 +141,6 @@
         </div>
 
         <div id="play-tracker" class="mb-4 p-2 bg-slate-900/80 rounded-xl border border-blue-900/50 hidden"></div>
-        
-        <!-- 4 SLOTS GRID -->
         <div id="multi-card-container" class="grid grid-cols-2 gap-2 mb-6">
             <div class="bg-slate-900/50 p-1 rounded-xl border-2 border-slate-700 border-dashed flex items-center justify-center min-h-[120px]" id="slot-1"><div id="play-card-1" class="w-full"></div></div>
             <div class="bg-slate-900/50 p-1 rounded-xl border-2 border-slate-700 border-dashed flex items-center justify-center min-h-[120px]" id="slot-2"><div id="play-card-2" class="w-full"></div></div>
@@ -279,7 +275,6 @@
         const tg = window.Telegram.WebApp; const uid = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : 0;
         document.getElementById('menu-id').innerText = "መለያ (ID): " + uid;
         
-        // --- STATE PRESERVATION ---
         let activeBet = parseInt(sessionStorage.getItem('activeBet')) || 10; 
         let myCards = JSON.parse(sessionStorage.getItem('myCards')) || []; 
         let isFirstLoad = true;
@@ -350,6 +345,7 @@
 
         function refreshLobby() { 
             fetch('/api/lobby-info/'+uid+'/').then(r=>r.json()).then(d => { 
+                // FIXED: Update prize properly using logic we discussed
                 document.getElementById('bal-header').innerText = d.balance.toFixed(2); 
                 
                 if(d.active_game_id) { 
@@ -359,7 +355,6 @@
                     return; 
                 } 
                 
-                // --- STATE RESTORE LOGIC (Only runs on fresh reload) ---
                 if(isFirstLoad) {
                     isFirstLoad = false;
                     const savedScreen = sessionStorage.getItem('currentScreen');
@@ -376,7 +371,6 @@
                         updateBuyButton();
                     }
                 }
-                // -----------------------------------------------------
 
                 const list = document.getElementById('room-list'); list.innerHTML = ''; d.rooms.sort((a,b) => a.bet - b.bet); 
                 d.rooms.forEach(room => { 
@@ -442,6 +436,9 @@
                 
                 const badge = document.getElementById('play-status-badge'); if(d.status === 'ACTIVE') { badge.innerText = "እየተጠራ ነው: " + d.called.length + "/75"; badge.className = "text-[10px] bg-red-500/20 border border-red-500 text-red-500 px-3 py-1 rounded-full font-black animate-pulse"; }
                 
+                // FIXED PRIZE IN LIVE HALL
+                document.getElementById('nav-prize').innerText = d.prize.toFixed(0);
+                
                 globalCalledNumbers = d.called || [];
                 if(d.called && d.called.length > 0) {
                     let latest = d.called[d.called.length - 1];
@@ -477,21 +474,7 @@
         function updateBanner(status, count, called_numbers) { const b = document.getElementById('active-call-banner'); const btn = document.getElementById('join-btn'); const gGrid = document.getElementById('grid-container'); const sTrack = document.getElementById('spectator-tracker'); if(status === 'ACTIVE') { b.classList.remove('hidden'); document.getElementById('call-count').innerText=count; btn.disabled=true; btn.style.opacity="0.3"; btn.innerText="WAITING..."; gGrid.classList.add('hidden'); sTrack.classList.remove('hidden'); buildTracker('spectator-tracker'); document.querySelectorAll('#spectator-tracker .tracker-dot').forEach(el=>el.classList.remove('called')); if(called_numbers) called_numbers.forEach(n => { let dot = document.getElementById('spectator-tracker-dot-'+n); if(dot) dot.classList.add('called'); }); } else { b.classList.add('hidden'); btn.disabled=false; updateBuyButton(); gGrid.classList.remove('hidden'); sTrack.classList.add('hidden'); } }
         function updateBuyButton() { const btn = document.getElementById('join-btn'); if (myCards.length === 0) { btn.innerText = "▶ ካርድ ይግዙ"; btn.style.opacity = "0.5"; } else { const totalCost = myCards.length * activeBet; btn.innerText = `▶ ${myCards.length} ካርድ ይግዙ (${totalCost} ETB)`; btn.style.opacity = "1"; } }
         function getMaxCards() { return (activeBet == 10) ? 1000 : 500; }
-        
-        function selectRoom(t) { 
-            activeBet = t; 
-            sessionStorage.setItem('activeBet', activeBet);
-            sessionStorage.setItem('currentScreen', 'v-selector');
-            myCards = []; 
-            sessionStorage.setItem('myCards', JSON.stringify(myCards));
-            
-            document.getElementById('nav-room').innerText = t; 
-            showScreen('v-selector'); 
-            initGrid(); 
-            appLoop(); 
-            updateBuyButton(); 
-        }
-        
+        function selectRoom(t) { activeBet=t; sessionStorage.setItem('activeBet', activeBet); sessionStorage.setItem('currentScreen', 'v-selector'); document.getElementById('nav-room').innerText=t; showScreen('v-selector'); myCards = []; sessionStorage.setItem('myCards', JSON.stringify(myCards)); initGrid(); appLoop(); updateBuyButton(); }
         function initGrid() { const g = document.getElementById('grid-container'); g.innerHTML = ''; let maxCards = getMaxCards(); for(let i=1; i<=maxCards; i++) { let b = document.createElement('button'); b.className="card-num"; b.id="c-"+i; b.innerText=i; b.onclick=()=>selectCard(i); g.appendChild(b); } }
         
         function selectCard(n) { 
@@ -503,7 +486,7 @@
                 if(myCards.length >= 4) return tg.showAlert("በአንድ ጊዜ ከ 4 ካርድ በላይ መግዛት አይቻልም!"); 
                 myCards.push(n); btn.classList.add('active'); showToast("ካርድ #" + n + " ተመርጧል! (" + myCards.length + "/4)"); previewCard(n); 
             } 
-            sessionStorage.setItem('myCards', JSON.stringify(myCards)); // Save state!
+            sessionStorage.setItem('myCards', JSON.stringify(myCards));
             updateBuyButton(); 
         }
         
@@ -514,7 +497,7 @@
             const cardsString = myCards.join(','); 
             fetch(`/api/join-room/${uid}/${activeBet}/${cardsString}/`).then(r=>r.json()).then(d=>{ 
                 if(d.status==='ok') {
-                    sessionStorage.removeItem('currentScreen'); // Clear state on success so it loads Live room next
+                    sessionStorage.removeItem('currentScreen'); 
                     sessionStorage.removeItem('myCards');
                     location.reload(); 
                 } else tg.showAlert(d.error); 
