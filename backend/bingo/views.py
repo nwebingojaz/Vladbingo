@@ -25,9 +25,8 @@ def lobby_info(request, tg_id):
     rooms = GameRound.objects.exclude(status="ENDED").values('id', 'bet_amount', 'players', 'created_at', 'status', 'called_numbers')
     room_data = []
     now = timezone.now()
-    
     for r in rooms:
-        players_dict = r['players'] or {}
+        players_dict = r['players'] if r['players'] else {}
         p_count = len(players_dict)
         total_cards = sum(len(c) if isinstance(c, list) else 1 for c in players_dict.values())
         win_amount = float(r['bet_amount'] * total_cards) * 0.73
@@ -39,7 +38,6 @@ def lobby_info(request, tg_id):
             'called_count': len(r['called_numbers']),
             'time_left': max(0, 60 - int(elapsed))
         })
-        
     active_game = GameRound.objects.filter(players__has_key=str(tg_id)).exclude(status="ENDED").last()
     return JsonResponse({'balance': float(user.operational_credit), 'rooms': room_data, 'active_game_id': active_game.id if active_game else None})
 
@@ -77,14 +75,14 @@ def join_room(request, tg_id, bet, card_num):
         game = GameRound.objects.filter(status="LOBBY", bet_amount=bet).first()
         if not game: return JsonResponse({'status': 'error', 'error': 'No Lobby'})
         
-        players_dict = dict(game.players or {})
-        players_dict[str(tg_id)] = selected_cards
-        game.players = players_dict
-        game.save(update_fields=['players'])
+        # FIXED: Force Django to save the JSONField
+        current_players = dict(game.players) if game.players else {}
+        current_players[str(tg_id)] = selected_cards
+        game.players = current_players
+        game.save()
         
         user.operational_credit -= total_cost
-        user.save(update_fields=['operational_credit'])
-        
+        user.save()
         return JsonResponse({'status': 'ok'})
     except Exception as e:
         return JsonResponse({'status': 'error', 'error': str(e)})
@@ -156,7 +154,7 @@ def get_game_info(request, game_id, tg_id):
                         resp['winning_card'] = winning_card_num
                         resp['winning_board'] = winning_board
             except Exception as e:
-                print(f"Error fetching winning board: {e}")
+                pass
             
         return JsonResponse(resp)
     except Exception as e: return JsonResponse({'error': str(e)}, status=404)
@@ -210,6 +208,7 @@ def check_win(request, game_id, tg_id):
         return JsonResponse({'status': 'NOT_YET'})
     except Exception as e:
         return JsonResponse({'status': 'error', 'msg': str(e)})
+
 
 def send_telegram_message(chat_id, text):
     token = settings.TELEGRAM_BOT_TOKEN
