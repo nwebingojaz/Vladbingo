@@ -25,11 +25,11 @@ def lobby_info(request, tg_id):
     rooms = GameRound.objects.exclude(status="ENDED").values('id', 'bet_amount', 'players', 'created_at', 'status', 'called_numbers')
     room_data = []
     now = timezone.now()
+    
     for r in rooms:
-        p_count = len(r['players'])
-        total_cards = sum(len(c) if isinstance(c, list) else 1 for c in r['players'].values())
-        
-        # 27% Commission (73% Payout)
+        players_dict = r['players'] or {}
+        p_count = len(players_dict)
+        total_cards = sum(len(c) if isinstance(c, list) else 1 for c in players_dict.values())
         win_amount = float(r['bet_amount'] * total_cards) * 0.73
         
         elapsed = (now - r['created_at']).total_seconds()
@@ -39,6 +39,7 @@ def lobby_info(request, tg_id):
             'called_count': len(r['called_numbers']),
             'time_left': max(0, 60 - int(elapsed))
         })
+        
     active_game = GameRound.objects.filter(players__has_key=str(tg_id)).exclude(status="ENDED").last()
     return JsonResponse({'balance': float(user.operational_credit), 'rooms': room_data, 'active_game_id': active_game.id if active_game else None})
 
@@ -62,24 +63,31 @@ def get_history(request, tg_id):
     return JsonResponse({'winners': winners_data, 'my_bets': my_bets_data})
 
 def join_room(request, tg_id, bet, card_num):
-    user = User.objects.get(username=f"tg_{tg_id}")
-    selected_cards = [int(x) for x in str(card_num).split(',') if x.isdigit()]
-    
-    if len(selected_cards) == 0: return JsonResponse({'status': 'error', 'error': 'No cards selected'})
-    if len(selected_cards) > 4: return JsonResponse({'status': 'error', 'error': 'Max 4 cards allowed!'})
-    
-    total_cost = Decimal(str(bet)) * len(selected_cards)
-    if user.operational_credit < total_cost: 
-        return JsonResponse({'status': 'error', 'error': f'Low Balance! You need {total_cost} ETB'})
+    try:
+        user = User.objects.get(username=f"tg_{tg_id}")
+        selected_cards = [int(x) for x in str(card_num).split(',') if x.isdigit()]
         
-    game = GameRound.objects.filter(status="LOBBY", bet_amount=bet).first()
-    if not game: return JsonResponse({'status': 'error', 'error': 'No Lobby'})
-    
-    game.players[str(tg_id)] = selected_cards
-    game.save()
-    user.operational_credit -= total_cost
-    user.save()
-    return JsonResponse({'status': 'ok'})
+        if len(selected_cards) == 0: return JsonResponse({'status': 'error', 'error': 'No cards selected'})
+        if len(selected_cards) > 4: return JsonResponse({'status': 'error', 'error': 'Max 4 cards allowed!'})
+        
+        total_cost = Decimal(str(bet)) * len(selected_cards)
+        if user.operational_credit < total_cost: 
+            return JsonResponse({'status': 'error', 'error': f'Low Balance! You need {total_cost} ETB'})
+            
+        game = GameRound.objects.filter(status="LOBBY", bet_amount=bet).first()
+        if not game: return JsonResponse({'status': 'error', 'error': 'No Lobby'})
+        
+        players_dict = dict(game.players or {})
+        players_dict[str(tg_id)] = selected_cards
+        game.players = players_dict
+        game.save(update_fields=['players'])
+        
+        user.operational_credit -= total_cost
+        user.save(update_fields=['operational_credit'])
+        
+        return JsonResponse({'status': 'ok'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'error': str(e)})
 
 def get_game_info(request, game_id, tg_id):
     try:
@@ -102,7 +110,6 @@ def get_game_info(request, game_id, tg_id):
             'prize': float(prize), 'status': game.status
         }
         
-        # --- BULLETPROOF GRAND WINNER DATA ---
         if game.status == 'ENDED':
             winner_user = User.objects.filter(username=game.winner_username).first()
             if winner_user and winner_user.real_name:
@@ -115,14 +122,12 @@ def get_game_info(request, game_id, tg_id):
             try:
                 if game.winner_username:
                     w_tg = game.winner_username.replace('tg_', '')
-                    # Failsafe get: check both string and int keys
                     w_cards = game.players.get(w_tg) or game.players.get(int(w_tg)) or []
                     if isinstance(w_cards, int): w_cards = [w_cards]
                     
                     winning_card_num = None
                     winning_board = None
                     
-                    # Find exactly which card won
                     called_set = set(game.called_numbers)
                     called_set.add("FREE")
                     
@@ -143,7 +148,6 @@ def get_game_info(request, game_id, tg_id):
                             winning_board = board
                             break
                     
-                    # Fallback just in case
                     if not winning_card_num and w_cards:
                         winning_card_num = w_cards[0]
                         winning_board = PermanentCard.objects.get(card_number=winning_card_num).board
@@ -213,7 +217,7 @@ def send_telegram_message(chat_id, text):
     try:
         requests.post(url, json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"}, timeout=5)
     except Exception as e:
-        print(f"TELEGRAM API ERROR: {e}")
+        pass
 
 def send_gateway_otp(phone_number, otp_code):
     gateway_token = os.environ.get("GATEWAY_TOKEN") 
@@ -226,7 +230,7 @@ def send_gateway_otp(phone_number, otp_code):
         response = requests.post(url, headers=headers, json=payload, timeout=5)
         response.raise_for_status()
     except Exception as e:
-        print(f"GATEWAY API ERROR: {e}")
+        pass
 
 @csrf_exempt
 def send_otp(request):
