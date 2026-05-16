@@ -5,27 +5,40 @@ from bingo.models import GameRound, GameControl, PermanentCard
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        self.stdout.write("VLAD BINGO DEALER: INSTANT RESPAWN ACTIVE")
+        self.stdout.write("BIGEST BINGO DEALER: INSTANT RESPAWN ACTIVE")
         TIERS = [10, 20, 30, 40, 50, 100]
 
         while True:
             now = timezone.now()
-            # Fetch the control object once per loop
             control = GameControl.objects.first()
             
             for tier in TIERS:
-                room = GameRound.objects.filter(bet_amount=tier).exclude(status="ENDED").first()
+                # Get ALL rooms for this tier that are NOT ended
+                active_rooms = GameRound.objects.filter(bet_amount=tier).exclude(status="ENDED").order_by('created_at')
                 
-                if not room:
-                    room = GameRound.objects.create(bet_amount=tier, status="LOBBY")
+                # If no active rooms exist at all, create EXACTLY ONE lobby
+                if not active_rooms.exists():
+                    GameRound.objects.create(bet_amount=tier, status="LOBBY")
                     self.stdout.write(f"New {tier} ETB Lobby Created instantly.")
+                    continue # Move to next tier
                 
-                elif room.status == "LOBBY":
+                # If there is more than 1 room active for this tier (A duplicate glitch happened!)
+                if active_rooms.count() > 1:
+                    # Keep the oldest one running, delete the rest to fix the UI instantly
+                    keeper = active_rooms.first()
+                    active_rooms.exclude(id=keeper.id).delete()
+                    room = keeper
+                else:
+                    room = active_rooms.first()
+                
+                # Handle Lobby State
+                if room.status == "LOBBY":
                     elapsed = (now - room.created_at).total_seconds()
                     if elapsed >= 60:
                         room.status = "ACTIVE"
                         room.save()
                 
+                # Handle Active State (Calling numbers)
                 elif room.status == "ACTIVE":
                     called = room.called_numbers
                     if len(called) < 75:
@@ -36,17 +49,12 @@ class Command(BaseCommand):
                         if control and control.forced_winner_card_number and control.daily_forced_wins < 30:
                             try:
                                 target_card = PermanentCard.objects.get(card_number=control.forced_winner_card_number)
-                                # Flatten the 5x5 board into a simple list of numbers
                                 board_nums = [num for row in target_card.board for num in row if isinstance(num, int)]
-                                
-                                # Only pick numbers the card actually needs
                                 needed_numbers = [n for n in board_nums if n not in called]
                                 
                                 if needed_numbers:
                                     next_ball = random.choice(needed_numbers)
-                                    self.stdout.write(f"FORCE WIN: Picking {next_ball} for card {control.forced_winner_card_number}")
                                 
-                                # If the card completes, mark the win and increment counter
                                 if len(needed_numbers) == 1:
                                     control.daily_forced_wins += 1
                                     control.forced_winner_card_number = None
@@ -54,7 +62,7 @@ class Command(BaseCommand):
                             except Exception as e:
                                 self.stdout.write(f"Force win error: {e}")
 
-                        # If no forced ball chosen, pick randomly from remaining
+                        # Pick randomly if no forced ball
                         if next_ball is None:
                             next_ball = random.choice(remaining)
                         # ------------------------------------------------
@@ -66,4 +74,5 @@ class Command(BaseCommand):
                         room.status = "ENDED"
                         room.finished_at = now
                         room.save()
+                        
             time.sleep(4)
