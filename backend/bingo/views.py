@@ -89,13 +89,48 @@ def get_game_info(request, game_id, tg_id):
         
         boards_data = []
         for c_num in user_cards:
-            card_obj = PermanentCard.objects.get(card_number=c_num)
-            boards_data.append({"card_number": c_num, "board": card_obj.board})
+            try:
+                card_obj = PermanentCard.objects.get(card_number=c_num)
+                boards_data.append({"card_number": c_num, "board": card_obj.board})
+            except: pass
             
-        total_cards_in_game = sum(len(cards) if isinstance(cards, list) else 1 for cards in game.players.values())
+        total_cards_in_game = 0
+        for cards in game.players.values():
+            if isinstance(cards, list): total_cards_in_game += len(cards)
+            else: total_cards_in_game += 1
+            
         prize = (Decimal(total_cards_in_game) * game.bet_amount) * Decimal("0.80")
         
-        return JsonResponse({'boards_data': boards_data, 'called': game.called_numbers, 'prize': float(prize), 'status': game.status})
+        resp = {
+            'boards_data': boards_data, 'called': game.called_numbers, 
+            'prize': float(prize), 'status': game.status
+        }
+        
+        # GRAND WINNER DATA
+        if game.status == 'ENDED':
+            winner_user = User.objects.filter(username=game.winner_username).first()
+            if winner_user and winner_user.real_name:
+                resp['winner'] = winner_user.real_name
+            else:
+                resp['winner'] = game.winner_username.replace('tg_', '') if game.winner_username else "PLAYER"
+                
+            resp['prize'] = float(game.winner_prize)
+            
+            try:
+                if game.winner_username:
+                    w_tg = game.winner_username.replace('tg_', '')
+                    w_cards = game.players.get(w_tg, [])
+                    if isinstance(w_cards, int): w_cards = [w_cards]
+                    
+                    if w_cards:
+                        winning_card_num = w_cards[0] 
+                        w_card_obj = PermanentCard.objects.get(card_number=winning_card_num)
+                        resp['winning_card'] = winning_card_num
+                        resp['winning_board'] = w_card_obj.board
+            except Exception as e:
+                print(f"Error fetching winning board: {e}")
+            
+        return JsonResponse(resp)
     except Exception as e: return JsonResponse({'error': str(e)}, status=404)
 
 def check_win(request, game_id, tg_id):
@@ -168,20 +203,11 @@ def send_gateway_otp(phone_number, otp_code):
     url = "https://gatewayapi.telegram.org/sendVerificationMessage"
     
     # Format phone number for Telegram (+251...)
-    if phone_number.startswith("0"):
-        phone_number = "+251" + phone_number[1:]
-    elif not phone_number.startswith("+"):
-        phone_number = "+" + phone_number
+    if phone_number.startswith("0"): phone_number = "+251" + phone_number[1:]
+    elif not phone_number.startswith("+"): phone_number = "+" + phone_number
         
-    headers = {
-        "Authorization": f"Bearer {gateway_token}",
-        "Content-Type": "application/json"
-    }
-    
-    payload = {
-        "phone_number": phone_number,
-        "code": otp_code
-    }
+    headers = { "Authorization": f"Bearer {gateway_token}", "Content-Type": "application/json" }
+    payload = { "phone_number": phone_number, "code": otp_code }
     
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=5)
@@ -198,11 +224,7 @@ def send_otp(request):
         
         try:
             user = User.objects.get(username=f"tg_{tg_id}")
-            
-            # Save the phone number to their profile
-            if phone:
-                user.phone_number = phone
-                
+            if phone: user.phone_number = phone
             if not user.phone_number:
                 return JsonResponse({"status": "error", "message": "Phone number is required."})
                 
@@ -213,7 +235,6 @@ def send_otp(request):
             
             # Send using the Official Gateway!
             send_gateway_otp(user.phone_number, otp)
-            
             return JsonResponse({"status": "success", "message": "OTP sent! Check your Telegram Verification Codes."})
         except User.DoesNotExist:
             return JsonResponse({"status": "error", "message": "User not found."})
@@ -246,7 +267,6 @@ def submit_deposit(request):
         try:
             user = User.objects.get(username=f"tg_{tg_id}")
             Transaction.objects.create(agent=user, amount=amount, note=f"TXID: {tx_id}", type=f"DEPOSIT_{method.upper()}", status="pending")
-            # Notify Admin Channel
             send_telegram_message(settings.CHANNEL_ID, f"🟢 <b>NEW DEPOSIT</b>\nUser: {tg_id}\nAmount: {amount} ETB\nMethod: {method}\nTXID: {tx_id}")
             return JsonResponse({"status": "success", "message": "Deposit submitted! Waiting for Admin approval."})
         except User.DoesNotExist:
@@ -268,7 +288,6 @@ def submit_withdrawal(request):
             user.save()
             Transaction.objects.create(agent=user, amount=amount, note=f"To: {account}", type="WITHDRAWAL", status="pending")
             
-            # Notify Admin Channel
             send_telegram_message(settings.CHANNEL_ID, f"🔴 <b>NEW WITHDRAWAL</b>\nUser: {tg_id}\nAmount: {amount} ETB\nAccount: {account}\nPhone: {user.phone_number}")
             return JsonResponse({"status": "success", "message": "Withdrawal requested successfully!"})
         except User.DoesNotExist:
@@ -287,8 +306,7 @@ def submit_transfer(request):
             if amount < 10: return JsonResponse({"status": "error", "message": "Minimum transfer is 10 ETB."})
             
             receiver = User.objects.filter(phone_number=target_account).first()
-            if not receiver:
-                receiver = User.objects.filter(username=f"tg_{target_account}").first()
+            if not receiver: receiver = User.objects.filter(username=f"tg_{target_account}").first()
             
             if not receiver: return JsonResponse({"status": "error", "message": "Receiver account not found!"})
             if sender == receiver: return JsonResponse({"status": "error", "message": "You cannot transfer to yourself!"})
@@ -319,5 +337,42 @@ def change_password(request):
             user.set_password(new_pass)
             user.save()
             return JsonResponse({"status": "success", "message": "Security PIN updated successfully!"})
+        except User.DoesNotExist:
+            return JsonResponse({"status": "error", "message": "User not found."})
+
+@csrf_exempt
+def redeem_promo(request):
+    if request.method == "POST":
+        data = json.loads(request.body)
+        tg_id = data.get('tg_id')
+        promo_code = str(data.get('promo_code', '')).strip()
+        
+        try:
+            user = User.objects.get(username=f"tg_{tg_id}")
+            
+            if getattr(user, 'used_promo_code', False):
+                return JsonResponse({"status": "error", "message": "You have already used a promo code!"})
+                
+            if promo_code == str(tg_id):
+                return JsonResponse({"status": "error", "message": "You cannot use your own code!"})
+                
+            friend = User.objects.filter(username=f"tg_{promo_code}").first()
+            if not friend:
+                return JsonResponse({"status": "error", "message": "Invalid Promo Code!"})
+                
+            user.operational_credit += 10
+            user.used_promo_code = True
+            user.save()
+            
+            friend.operational_credit += 10
+            friend.save()
+            
+            Transaction.objects.create(agent=user, amount=10, note=f"Used promo code: {promo_code}", type="BONUS", status="approved")
+            Transaction.objects.create(agent=friend, amount=10, note=f"Referral bonus from: {tg_id}", type="REFERRAL_BONUS", status="approved")
+            
+            if friend.telegram_id:
+                send_telegram_message(friend.telegram_id, f"🎉 <b>Referral Bonus!</b>\nA friend just used your promo code! <b>10 ETB</b> has been added to your balance.")
+                
+            return JsonResponse({"status": "success", "message": "🎉 Success! 10 ETB added to your balance."})
         except User.DoesNotExist:
             return JsonResponse({"status": "error", "message": "User not found."})
