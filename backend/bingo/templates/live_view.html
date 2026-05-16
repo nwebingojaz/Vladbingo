@@ -93,7 +93,6 @@
         </div>
     </div>
     
-    <!-- ROOM NAV BAR -->
     <div class="bg-slate-900/80 p-2 flex justify-around items-center text-[10px] font-bold text-blue-400 uppercase border-b border-blue-900/50">
         <div>🎲 ክፍል (Room): <span id="nav-room" class="text-white">10</span></div>
         <div>🎁 ሽልማት (Win): <span id="nav-prize" class="text-white">0</span></div>
@@ -170,6 +169,7 @@
             <div class="text-white font-black text-2xl"><span id="wallet-bal">0.00</span> <span class="text-sm text-blue-400">ETB</span></div>
         </div>
 
+        <!-- DEPOSIT -->
         <div id="w-sec-deposit" class="w-section">
             <div id="dep-step-1">
                 <button onclick="showDepositForm('M-Pesa')" class="w-full bg-white text-green-600 font-bold py-4 rounded-xl mb-3 flex items-center justify-center gap-2"><span class="text-2xl">📱</span> M-Pesa (ሳፋሪኮም)</button>
@@ -189,6 +189,7 @@
             </div>
         </div>
 
+        <!-- WITHDRAW -->
         <div id="w-sec-withdraw" class="w-section hidden bg-slate-800 p-4 rounded-xl border border-slate-700">
             <h3 class="text-red-400 font-black mb-4">ገንዘብ ያውጡ (Withdraw)</h3>
             <input type="tel" id="with-phone" placeholder="ስልክ ቁጥርዎን (Phone)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
@@ -201,6 +202,7 @@
             <button onclick="submitAction('/api/submit-withdrawal/', {amount: document.getElementById('with-amount').value, account: document.getElementById('with-account').value, bank: document.getElementById('with-bank').value, otp: document.getElementById('with-otp').value})" class="w-full bg-red-600 font-black text-white py-3 rounded-xl hover:bg-red-700 transition-colors">አረጋግጥ (Confirm)</button>
         </div>
 
+        <!-- TRANSFER -->
         <div id="w-sec-transfer" class="w-section hidden bg-slate-800 p-4 rounded-xl border border-slate-700">
             <h3 class="text-green-400 font-black mb-4">ያስተላልፉ (Transfer)</h3>
             <input type="number" id="tr-amount" placeholder="የገንዘብ መጠን (Amount ETB)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
@@ -209,7 +211,7 @@
         </div>
     </div>
 
-    <!-- REFERRAL / PROMO MODAL -->
+    <!-- REFERRAL MODAL -->
     <div id="m-referral" class="modal" style="background: rgba(15, 23, 42, 0.98);">
         <div class="flex justify-between items-center mb-6">
             <h2 class="text-green-400 font-black text-xl uppercase">ጋብዘው ይሸለሙ</h2>
@@ -251,9 +253,9 @@
     </div>
 
     <!-- GRAND WINNER MODAL -->
-    <div id="m-win" class="modal" style="background: rgba(11, 15, 25, 0.98); justify-content:center; align-items:center;">
+    <div id="m-win" class="modal" style="background: rgba(11, 15, 25, 0.98); justify-content:center; align-items:center; z-index: 9999;">
         <div class="relative w-full max-w-sm flex flex-col items-center">
-            <div class="bg-yellow-500 text-black text-sm font-black px-6 py-2 rounded-full mb-4 shadow-[0_0_20px_rgba(234,179,8,0.6)]">GRAND WINNER</div>
+            <div class="bg-yellow-500 text-black text-sm font-black px-6 py-2 rounded-full mb-4 shadow-[0_0_20px_rgba(234,179,8,0.6)] animate-pulse">GRAND WINNER</div>
             <div class="text-6xl font-black text-yellow-400 italic tracking-tighter mb-8 drop-shadow-lg" style="-webkit-text-stroke: 2px white;">BINGO!</div>
             <div class="bg-white p-3 rounded-2xl w-full mb-6 relative shadow-[0_0_40px_rgba(255,255,255,0.2)]">
                 <div class="absolute -top-4 right-4 bg-yellow-400 text-black text-xs font-bold px-3 py-1 rounded shadow-lg border border-yellow-200">#<span id="win-card-num-display"></span></div>
@@ -262,8 +264,8 @@
                 </div>
                 <div id="win-card-grid" class="grid grid-cols-5 gap-1"></div>
             </div>
-            <div id="win-name-display" class="text-4xl font-black text-white uppercase tracking-widest mb-2"></div>
-            <div class="text-gray-400 text-[10px] font-bold tracking-widest mb-8">TICKET #<span id="win-ticket-sub"></span> • <span id="win-prize-display" class="text-green-400 text-lg"></span> ETB</div>
+            <div id="win-name-display" class="text-4xl font-black text-white uppercase tracking-widest mb-2">PLAYER</div>
+            <div class="text-gray-400 text-[10px] font-bold tracking-widest mb-8">TICKET #<span id="win-ticket-sub"></span> • <span id="win-prize-display" class="text-green-400 text-lg">0</span> ETB</div>
             <button onclick="location.reload()" class="border-2 border-gray-500 text-gray-300 font-bold rounded-full px-8 py-3 hover:bg-gray-800 transition-colors uppercase tracking-widest active:scale-95">BACK TO LOBBY</button>
         </div>
     </div>
@@ -281,27 +283,23 @@
         let activeBet = 10; let myCards = []; let historyData = {winners: [], my_bets: []}; let currentRoomTime = 0; let currentRoomStatus = 'LOBBY'; let myActiveGameId = null;
         let currentMethod = ""; let autoMode = false; let autoBingoFired = false; let globalCalledNumbers = [];
 
-        // --- URL HASH DIRECT ROUTING ---
         window.addEventListener('DOMContentLoaded', (event) => {
             const hash = window.location.hash.substring(1);
             if (['deposit', 'withdraw', 'transfer'].includes(hash)) { openWallet(hash); history.replaceState(null, null, ' '); } 
             else if (hash === 'history') { openHistory(); history.replaceState(null, null, ' '); }
         });
 
-        // --- UI TOGGLES ---
         function toggleMenu() { const sb = document.getElementById('sidebar'); const ov = document.getElementById('sidebar-overlay'); if(sb.classList.contains('open')) { sb.classList.remove('open'); ov.style.display='none'; } else { sb.classList.add('open'); ov.style.display='block'; } }
         function showScreen(id) { document.getElementById('v-lobby').classList.add('hidden'); document.getElementById('v-selector').classList.add('hidden'); document.getElementById('v-play').classList.add('hidden'); document.getElementById(id).classList.remove('hidden'); if(id==='v-selector'){ myCards=[]; updateBuyButton(); } }
         function openWallet(tab) { document.getElementById('m-wallet').style.display = 'flex'; document.getElementById('wallet-bal').innerText = document.getElementById('bal-header').innerText; openWalletTab(tab); }
         function openWalletTab(tab) { ['deposit', 'withdraw', 'transfer'].forEach(t => { document.getElementById('w-tab-'+t).classList.remove('active'); document.getElementById('w-sec-'+t).classList.add('hidden'); }); document.getElementById('w-tab-'+tab).classList.add('active'); document.getElementById('w-sec-'+tab).classList.remove('hidden'); }
         function openSettings() { document.getElementById('m-settings').style.display = 'flex'; }
-        
-        // --- REFERRAL LOGIC ---
         function openReferral() { document.getElementById('m-referral').style.display = 'flex'; document.getElementById('my-promo-code').innerText = uid; }
+        
         function copyPromoMessage() { const shareText = `🎰 Play BIGEST BINGO BOT and win real money!\n\nUse my Promo Code [ ${uid} ] in the Wallet to get 10 ETB Free Bonus!\n\n1. Open: https://t.me/Bigestbingobot\n2. Go to Refer & Earn 🎟️\n3. Paste my code in the Promo box!\n\nGood luck! 🍀`; if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(shareText).then(() => { tg.showAlert("✅ Promo message copied! Paste it to your friends."); }).catch(err => { fallbackCopy(shareText); }); } else { fallbackCopy(shareText); } }
         function fallbackCopy(text) { let textArea = document.createElement("textarea"); textArea.value = text; textArea.style.position = "fixed"; document.body.appendChild(textArea); textArea.focus(); textArea.select(); try { document.execCommand('copy'); tg.showAlert("✅ Promo message copied! Paste it to your friends."); } catch (err) { tg.showAlert("⚠️ Could not copy automatically. Your code is: " + uid); } document.body.removeChild(textArea); }
         function redeemPromo() { const code = document.getElementById('promo-code').value; if(!code) return tg.showAlert("Please enter a promo code!"); if(code == uid) return tg.showAlert("You cannot use your own code!"); fetch('/api/redeem-promo/', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ tg_id: uid, promo_code: code }) }).then(r=>r.json()).then(d => { tg.showAlert(d.message); if(d.status === 'success') { document.getElementById('promo-code').value = ''; refreshLobby(); } }).catch(e => tg.showAlert("⚠️ Connection error.")); }
 
-        // --- DEPOSIT / OTP LOGIC ---
         function showDepositForm(method) { currentMethod = method; document.getElementById('dep-step-1').classList.add('hidden'); document.getElementById('dep-step-2').classList.remove('hidden'); document.getElementById('dep-title').innerText = method + " Deposit"; const accInfo = document.getElementById('dep-account-info'); if (method === 'M-Pesa') accInfo.innerHTML = "0707659618<br><span class='text-sm text-gray-400'>ስም (Name): Biniyam Nigatu</span>"; else if (method === 'Telebirr') accInfo.innerHTML = "0977733630<br><span class='text-sm text-gray-400'>ስም (Name): Solomon</span>"; else if (method === 'CBE') accInfo.innerHTML = "1000379893698<br><span class='text-sm text-gray-400'>ስም (Name): Yeabkal</span>"; }
         function backToDepositMethods() { document.getElementById('dep-step-2').classList.add('hidden'); document.getElementById('dep-step-1').classList.remove('hidden'); document.getElementById('dep-amount').value = ''; document.getElementById('dep-txid').value = ''; }
         
@@ -330,11 +328,10 @@
         function showToast(msg) { const t = document.getElementById('toast-msg'); t.innerText = msg; t.classList.remove('opacity-0'); setTimeout(() => { t.classList.add('opacity-0'); }, 1500); }
         function appLoop() { if (myActiveGameId) { updatePlayHall(); } else { refreshLobby(); } }
 
-        function refreshLobby() { fetch('/api/lobby-info/'+uid+'/').then(r=>r.json()).then(d => { document.getElementById('bal-header').innerText = d.balance.toFixed(2); if(d.active_game_id) { myActiveGameId = d.active_game_id; showScreen('v-play'); updatePlayHall(); return; } const list = document.getElementById('room-list'); list.innerHTML = ''; d.rooms.sort((a,b) => a.bet - b.bet); d.rooms.forEach(room => { const isLive = room.status === 'ACTIVE'; list.innerHTML += `<div onclick="selectRoom(${room.bet})" class="room-card ${isLive ? 'live' : ''} cursor-pointer"><div class="flex justify-between w-full"><div><div class="text-white font-black text-xl">Bingo ${room.bet}</div><div class="text-[11px] font-bold ${isLive ? 'text-red-400' : 'text-blue-400'} mt-1">${isLive ? 'እየተጠራ ነው: ' + room.called_count + '/75' : 'ሊጀምር ነው: ' + room.time_left + 's'}</div><div class="text-[10px] text-gray-400 mt-1">ሽልማት: <span class="text-white font-bold">${room.win.toFixed(0)} ETB</span></div></div><div class="flex flex-col items-end justify-center"><div class="${isLive ? 'text-red-500' : 'text-blue-500'} font-bold text-2xl">${isLive ? '⏳' : '▶'}</div><div class="text-[9px] text-gray-500 mt-2">${room.players} ካርዶች ተገዝተዋል</div></div></div></div>`; if(activeBet == room.bet) { currentRoomTime = room.time_left; currentRoomStatus = room.status; document.getElementById('nav-prize').innerText = room.win.toFixed(0); updateBanner(room.status, room.called_count, room.called_numbers); } }); }); }
+        function refreshLobby() { fetch('/api/lobby-info/'+uid+'/').then(r=>r.json()).then(d => { document.getElementById('bal-header').innerText = d.balance.toFixed(2); if(d.active_game_id) { myActiveGameId = d.active_game_id; showScreen('v-play'); updatePlayHall(); return; } const list = document.getElementById('room-list'); list.innerHTML = ''; d.rooms.sort((a,b) => a.bet - b.bet); d.rooms.forEach(room => { const isLive = room.status === 'ACTIVE'; list.innerHTML += `<div onclick="selectRoom(${room.bet})" class="room-card ${isLive ? 'live' : ''} cursor-pointer"><div class="flex justify-between w-full"><div><div class="text-white font-black text-xl">Bingo ${room.bet}</div><div class="text-[11px] font-bold ${isLive ? 'text-red-400' : 'text-blue-400'} mt-1">${isLive ? 'እየተጠራ ነው: ' + room.called_count + '/75' : 'ሊጀምር ነው: ' + room.time_left + 's'}</div><div class="text-[10px] text-gray-400 mt-1">ሽልማት: <span class="text-white font-bold">${room.win.toFixed(0)} ETB</span></div></div><div class="flex flex-col items-end justify-center"><div class="${isLive ? 'text-red-500' : 'text-blue-500'} font-bold text-2xl">${isLive ? '⏳' : '▶'}</div><div class="text-[9px] text-gray-500 mt-2">${room.players} ካርዶች ተገዝተዋል</div></div></div></div>`; if(activeBet == room.bet) { currentRoomTime = room.time_left; currentRoomStatus = room.status; document.getElementById('nav-prize').innerText = room.win.toFixed(0); } }); }); }
 
         function checkLocal1LineWin() { for (let s=1; s<=4; s++) { const pc = document.getElementById('play-card-' + s); if (!pc || pc.children.length === 0) continue; const cells = Array.from(pc.querySelectorAll('div')); if(cells.length < 25) continue; let grid = []; for(let i=0; i<5; i++) { grid.push(cells.slice(i*5, i*5+5).map(c => c.classList.contains('is-marked') || c.innerText === '⭐')); } for(let i=0; i<5; i++) { if(grid[i].every(v=>v)) return true; if(grid.every(row=>row[i])) return true; } if([0,1,2,3,4].every(i => grid[i][i])) return true; if([0,1,2,3,4].every(i => grid[i][4-i])) return true; if([grid[0][0], grid[0][4], grid[4][0], grid[4][4]].every(v=>v)) return true; } return false; }
         
-        // --- GAME ENGINE: AUTO MODE & BIG BALL TRACKER ---
         function toggleAutoMode(el) { autoMode = el.checked; if(autoMode) markCardsInstantly(); }
 
         function markCardsInstantly() {
@@ -343,10 +340,7 @@
                 document.querySelectorAll(`#play-card-${s} div`).forEach(cell => {
                     let val = cell.innerText;
                     if(val !== '⭐' && globalCalledNumbers.includes(parseInt(val))) {
-                        if(!cell.classList.contains('is-marked')) {
-                            cell.classList.add('bg-red-500', 'text-white', 'border-red-400', 'is-marked');
-                            cell.classList.remove('text-blue-200');
-                        }
+                        if(!cell.classList.contains('is-marked')) { cell.classList.add('bg-red-500', 'text-white', 'border-red-400', 'is-marked'); cell.classList.remove('text-blue-200'); }
                     }
                 });
             }
@@ -358,10 +352,10 @@
             if(!myActiveGameId) return;
             fetch(`/api/game-info/${myActiveGameId}/${uid}/`).then(r=>r.json()).then(d => {
                 
-                // GRAND WINNER SCREEN RENDERER
+                // === GRAND WINNER RENDER LOGIC ===
                 if(d.status === 'ENDED') { 
                     document.getElementById('m-win').style.display = 'flex';
-                    document.getElementById('win-name-display').innerText = d.winner ? d.winner.replace('tg_', '') : "PLAYER";
+                    document.getElementById('win-name-display').innerText = d.winner ? d.winner : "PLAYER";
                     document.getElementById('win-prize-display').innerText = d.prize.toFixed(2);
                     document.getElementById('win-card-num-display').innerText = d.winning_card || "N/A";
                     document.getElementById('win-ticket-sub').innerText = d.winning_card || "N/A";
@@ -389,8 +383,7 @@
                 
                 const badge = document.getElementById('play-status-badge'); if(d.status === 'ACTIVE') { badge.innerText = "እየተጠራ ነው: " + d.called.length + "/75"; badge.className = "text-[10px] bg-red-500/20 border border-red-500 text-red-500 px-3 py-1 rounded-full font-black animate-pulse"; }
                 
-                // BIG BALL TRACKER UPDATE
-                globalCalledNumbers = d.called;
+                globalCalledNumbers = d.called || [];
                 if(d.called && d.called.length > 0) {
                     let latest = d.called[d.called.length - 1];
                     document.getElementById('latest-ball').innerText = latest;
@@ -405,16 +398,15 @@
                     document.getElementById('recent-balls').innerHTML = recentHtml;
                 }
 
-                // DRAW 4 SLOTS DYNAMICALLY
                 if(d.boards_data && d.boards_data.length > 0) {
-                    for(let i=0; i<d.boards_data.length; i++) {
+                    d.boards_data.forEach((boardObj, i) => {
                         let slotNum = i + 1; let pc = document.getElementById('play-card-' + slotNum);
                         if(pc && pc.children.length === 0) {
-                            let parentDiv = pc.parentElement; parentDiv.className = "bg-slate-800 p-1 rounded-xl border-2 border-yellow-500 relative shadow-[0_0_15px_rgba(234,179,8,0.2)]"; parentDiv.innerHTML = `<div class="absolute -top-3 left-2 bg-yellow-500 text-black text-[9px] font-black px-2 py-0.5 rounded">#${d.boards_data[i].card_number}</div><div class="grid grid-cols-5 gap-0.5 mb-0.5 text-center mt-2"><div class="font-black text-[10px] text-blue-400">B</div><div class="font-black text-[10px] text-blue-400">I</div><div class="font-black text-[10px] text-blue-400">N</div><div class="font-black text-[10px] text-blue-400">G</div><div class="font-black text-[10px] text-blue-400">O</div></div><div id="play-card-${slotNum}" class="grid grid-cols-5 gap-0.5"></div>`;
+                            let parentDiv = pc.parentElement; parentDiv.className = "bg-slate-800 p-1 rounded-xl border-2 border-yellow-500 relative shadow-[0_0_15px_rgba(234,179,8,0.2)]"; parentDiv.innerHTML = `<div class="absolute -top-3 left-2 bg-yellow-500 text-black text-[9px] font-black px-2 py-0.5 rounded">#${boardObj.card_number}</div><div class="grid grid-cols-5 gap-0.5 mb-0.5 text-center mt-2"><div class="font-black text-[10px] text-blue-400">B</div><div class="font-black text-[10px] text-blue-400">I</div><div class="font-black text-[10px] text-blue-400">N</div><div class="font-black text-[10px] text-blue-400">G</div><div class="font-black text-[10px] text-blue-400">O</div></div><div id="play-card-${slotNum}" class="grid grid-cols-5 gap-0.5"></div>`;
                             pc = document.getElementById('play-card-' + slotNum); 
-                            d.boards_data[i].board.forEach(row => row.forEach(val => { let cell = document.createElement('div'); cell.className = 'w-[8vw] h-[8vw] max-w-[40px] max-h-[40px] flex items-center justify-center text-[10px] font-black rounded border border-blue-900/50 bg-slate-900 shadow-inner cursor-pointer transition-colors'; if (val === 'FREE') { cell.innerText = '⭐'; cell.classList.add('bg-blue-600', 'text-yellow-400', 'is-marked'); } else { cell.innerText = val; cell.classList.add('text-blue-200'); cell.onclick = function() { if(autoMode) return; this.classList.toggle('bg-red-500'); this.classList.toggle('text-white'); this.classList.toggle('border-red-400'); this.classList.toggle('text-blue-200'); this.classList.toggle('is-marked'); activateBingoButton(); }; } pc.appendChild(cell); }));
+                            boardObj.board.forEach(row => row.forEach(val => { let cell = document.createElement('div'); cell.className = 'w-[8vw] h-[8vw] max-w-[40px] max-h-[40px] flex items-center justify-center text-[10px] font-black rounded border border-blue-900/50 bg-slate-900 shadow-inner cursor-pointer transition-colors'; if (val === 'FREE') { cell.innerText = '⭐'; cell.classList.add('bg-blue-600', 'text-yellow-400', 'is-marked'); } else { cell.innerText = val; cell.classList.add('text-blue-200'); cell.onclick = function() { if(autoMode) return; this.classList.toggle('bg-red-500'); this.classList.toggle('text-white'); this.classList.toggle('border-red-400'); this.classList.toggle('text-blue-200'); this.classList.toggle('is-marked'); activateBingoButton(); }; } pc.appendChild(cell); }));
                         }
-                    }
+                    });
                     if (autoMode) markCardsInstantly();
                 }
                 activateBingoButton();
@@ -423,24 +415,11 @@
         function activateBingoButton() { const btn = document.getElementById('bingo-btn'); if(checkLocal1LineWin()) { btn.className = "w-full py-4 bg-gradient-to-r from-red-500 to-red-700 rounded-2xl font-black text-xl shadow-[0_0_20px_rgba(239,68,68,0.4)] text-white active:scale-95 transition-all tracking-widest"; } else { btn.className = "w-full py-4 bg-slate-700 text-slate-400 rounded-2xl font-black text-xl border-2 border-slate-600 transition-all tracking-widest"; } }
         function hitBingo() { if(!checkLocal1LineWin()) return tg.showAlert("⚠️ ትንሽ ይጠብቁ! ትክክለኛ መስመር አልሰሩም!"); fetch(`/api/check-win/${myActiveGameId}/${uid}/?marked=0`).then(r=>r.json()).then(d => { if (d.status === 'WINNER') { } else if (d.status === 'NOT_YET') { tg.showAlert("❌ እስካሁን አላሸነፉም! ሻጩ ቁጥር እስኪጠራ ይጠብቁ።"); autoBingoFired = false; } }); }
 
-        function updateBanner(status, count, called_numbers) { const b = document.getElementById('active-call-banner'); const btn = document.getElementById('join-btn'); const gGrid = document.getElementById('grid-container'); const sTrack = document.getElementById('spectator-tracker'); if(status === 'ACTIVE') { b.classList.remove('hidden'); document.getElementById('call-count').innerText=count; btn.disabled=true; btn.style.opacity="0.3"; btn.innerText="WAITING..."; gGrid.classList.add('hidden'); sTrack.classList.remove('hidden'); buildTracker('spectator-tracker'); document.querySelectorAll('#spectator-tracker .tracker-dot').forEach(el=>el.classList.remove('called')); if(called_numbers) called_numbers.forEach(n => { let dot = document.getElementById('spectator-tracker-dot-'+n); if(dot) dot.classList.add('called'); }); } else { b.classList.add('hidden'); btn.disabled=false; updateBuyButton(); gGrid.classList.remove('hidden'); sTrack.classList.add('hidden'); } }
         function updateBuyButton() { const btn = document.getElementById('join-btn'); if (myCards.length === 0) { btn.innerText = "▶ ካርድ ይግዙ"; btn.style.opacity = "0.5"; } else { const totalCost = myCards.length * activeBet; btn.innerText = `▶ ${myCards.length} ካርድ ይግዙ (${totalCost} ETB)`; btn.style.opacity = "1"; } }
         function getMaxCards() { return (activeBet == 10) ? 1000 : 500; }
         function selectRoom(t) { activeBet=t; document.getElementById('nav-room').innerText=t; showScreen('v-selector'); initGrid(); appLoop(); updateBuyButton(); }
         function initGrid() { const g = document.getElementById('grid-container'); g.innerHTML = ''; let maxCards = getMaxCards(); for(let i=1; i<=maxCards; i++) { let b = document.createElement('button'); b.className="card-num"; b.id="c-"+i; b.innerText=i; b.onclick=()=>selectCard(i); g.appendChild(b); } }
-        
-        function selectCard(n) { 
-            const btn = document.getElementById('c-'+n); 
-            if (myCards.includes(n)) { 
-                myCards = myCards.filter(id => id !== n); btn.classList.remove('active'); 
-                if(myCards.length > 0) previewCard(myCards[myCards.length-1]); else document.getElementById('mini-grid').innerHTML = ''; 
-            } else { 
-                if(myCards.length >= 4) return tg.showAlert("በአንድ ጊዜ ከ 4 ካርድ በላይ መግዛት አይቻልም!"); 
-                myCards.push(n); btn.classList.add('active'); showToast("ካርድ #" + n + " ተመርጧል! (" + myCards.length + "/4)"); previewCard(n); 
-            } 
-            updateBuyButton(); 
-        }
-        
+        function selectCard(n) { const btn = document.getElementById('c-'+n); if (myCards.includes(n)) { myCards = myCards.filter(id => id !== n); btn.classList.remove('active'); if(myCards.length > 0) previewCard(myCards[myCards.length-1]); else document.getElementById('mini-grid').innerHTML = ''; } else { if(myCards.length >= 4) return tg.showAlert("በአንድ ጊዜ ከ 4 ካርድ በላይ መግዛት አይቻልም!"); myCards.push(n); btn.classList.add('active'); showToast("ካርድ #" + n + " ተመርጧል! (" + myCards.length + "/4)"); previewCard(n); } updateBuyButton(); }
         function previewCard(n) { document.getElementById('prev-num').innerText="#"+n; fetch('/api/card-data/'+n+'/').then(r=>r.json()).then(d=>{ const mini = document.getElementById('mini-grid'); mini.innerHTML = ''; d.board.forEach(row=>row.forEach(v=>{ let c=document.createElement('div'); c.className='mini-cell'; c.innerText=v==='FREE'?'X':v; mini.appendChild(c); })); }); }
         function pickRandom() { if(myCards.length >= 4) return tg.showAlert("በአንድ ጊዜ ከ 4 ካርድ በላይ መግዛት አይቻልም!"); let maxCards = getMaxCards(); let r = Math.floor(Math.random()*maxCards)+1; while(myCards.includes(r)) { r = Math.floor(Math.random()*maxCards)+1; } selectCard(r); }
         function joinGame() { if(myCards.length === 0) return tg.showAlert("ቢያንስ 1 ካርድ ይምረጡ!"); const cardsString = myCards.join(','); fetch(`/api/join-room/${uid}/${activeBet}/${cardsString}/`).then(r=>r.json()).then(d=>{ if(d.status==='ok') location.reload(); else tg.showAlert(d.error); }); }
