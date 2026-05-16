@@ -27,10 +27,9 @@ def lobby_info(request, tg_id):
     now = timezone.now()
     for r in rooms:
         p_count = len(r['players'])
-        # Calculate total cards bought by all players for accurate prize pool
         total_cards = sum(len(c) if isinstance(c, list) else 1 for c in r['players'].values())
         
-        # FIXED: 27% Commission (73% Payout)
+        # 27% Commission (73% Payout)
         win_amount = float(r['bet_amount'] * total_cards) * 0.73
         
         elapsed = (now - r['created_at']).total_seconds()
@@ -62,7 +61,6 @@ def get_history(request, tg_id):
         })
     return JsonResponse({'winners': winners_data, 'my_bets': my_bets_data})
 
-# --- MULTI-CARD JOIN ROOM LOGIC ---
 def join_room(request, tg_id, bet, card_num):
     user = User.objects.get(username=f"tg_{tg_id}")
     selected_cards = [int(x) for x in str(card_num).split(',') if x.isdigit()]
@@ -97,8 +95,6 @@ def get_game_info(request, game_id, tg_id):
             except: pass
             
         total_cards_in_game = sum(len(cards) if isinstance(cards, list) else 1 for cards in game.players.values())
-        
-        # FIXED: 27% Commission (73% Payout)
         prize = (Decimal(total_cards_in_game) * game.bet_amount) * Decimal("0.73")
         
         resp = {
@@ -106,7 +102,7 @@ def get_game_info(request, game_id, tg_id):
             'prize': float(prize), 'status': game.status
         }
         
-        # GRAND WINNER DATA
+        # --- BULLETPROOF GRAND WINNER DATA ---
         if game.status == 'ENDED':
             winner_user = User.objects.filter(username=game.winner_username).first()
             if winner_user and winner_user.real_name:
@@ -119,14 +115,42 @@ def get_game_info(request, game_id, tg_id):
             try:
                 if game.winner_username:
                     w_tg = game.winner_username.replace('tg_', '')
-                    w_cards = game.players.get(w_tg, [])
+                    # Failsafe get: check both string and int keys
+                    w_cards = game.players.get(w_tg) or game.players.get(int(w_tg)) or []
                     if isinstance(w_cards, int): w_cards = [w_cards]
                     
-                    if w_cards:
-                        winning_card_num = w_cards[0] 
-                        w_card_obj = PermanentCard.objects.get(card_number=winning_card_num)
+                    winning_card_num = None
+                    winning_board = None
+                    
+                    # Find exactly which card won
+                    called_set = set(game.called_numbers)
+                    called_set.add("FREE")
+                    
+                    for c_num in w_cards:
+                        card_obj = PermanentCard.objects.get(card_number=c_num)
+                        board = card_obj.board
+                        lines = 0
+                        for i in range(5):
+                            if all(board[i][c] in called_set for c in range(5)): lines += 1
+                            if all(board[r][i] in called_set for r in range(5)): lines += 1
+                        if all(board[i][i] in called_set for i in range(5)): lines += 1
+                        if all(board[i][4-i] in called_set for i in range(5)): lines += 1
+                        corners = [board[0][0], board[0][4], board[4][0], board[4][4]]
+                        if all(c in called_set for c in corners): lines += 1
+                        
+                        if lines >= 1:
+                            winning_card_num = c_num
+                            winning_board = board
+                            break
+                    
+                    # Fallback just in case
+                    if not winning_card_num and w_cards:
+                        winning_card_num = w_cards[0]
+                        winning_board = PermanentCard.objects.get(card_number=winning_card_num).board
+                        
+                    if winning_card_num:
                         resp['winning_card'] = winning_card_num
-                        resp['winning_board'] = w_card_obj.board
+                        resp['winning_board'] = winning_board
             except Exception as e:
                 print(f"Error fetching winning board: {e}")
             
@@ -172,8 +196,6 @@ def check_win(request, game_id, tg_id):
         
         if winning_card:
             total_cards = sum(len(cards) if isinstance(cards, list) else 1 for cards in game.players.values())
-            
-            # FIXED: 27% Commission (73% Payout)
             prize = (Decimal(total_cards) * game.bet_amount) * Decimal("0.73")
             
             user.operational_credit += prize; user.save()
@@ -185,13 +207,7 @@ def check_win(request, game_id, tg_id):
     except Exception as e:
         return JsonResponse({'status': 'error', 'msg': str(e)})
 
-
-# ==========================================
-# TELEGRAM GATEWAY OTP & WALLET LOGIC
-# ==========================================
-
 def send_telegram_message(chat_id, text):
-    # Standard Bot API (Used for sending alerts to your Admin Channel)
     token = settings.TELEGRAM_BOT_TOKEN
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     try:
@@ -200,17 +216,12 @@ def send_telegram_message(chat_id, text):
         print(f"TELEGRAM API ERROR: {e}")
 
 def send_gateway_otp(phone_number, otp_code):
-    # Official Telegram Gateway API (Used for the Blue Shield OTPs)
     gateway_token = os.environ.get("GATEWAY_TOKEN") 
     url = "https://gatewayapi.telegram.org/sendVerificationMessage"
-    
-    # Format phone number for Telegram (+251...)
     if phone_number.startswith("0"): phone_number = "+251" + phone_number[1:]
     elif not phone_number.startswith("+"): phone_number = "+" + phone_number
-        
     headers = { "Authorization": f"Bearer {gateway_token}", "Content-Type": "application/json" }
     payload = { "phone_number": phone_number, "code": otp_code }
-    
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=5)
         response.raise_for_status()
@@ -223,19 +234,14 @@ def send_otp(request):
         data = json.loads(request.body)
         tg_id = data.get('tg_id')
         phone = data.get('phone', '') 
-        
         try:
             user = User.objects.get(username=f"tg_{tg_id}")
             if phone: user.phone_number = phone
-            if not user.phone_number:
-                return JsonResponse({"status": "error", "message": "Phone number is required."})
-                
+            if not user.phone_number: return JsonResponse({"status": "error", "message": "Phone number is required."})
             otp = str(random.randint(100000, 999999))
             user.otp_code = otp
             user.otp_expiry = timezone.now() + timedelta(minutes=5)
             user.save()
-            
-            # Send using the Official Gateway!
             send_gateway_otp(user.phone_number, otp)
             return JsonResponse({"status": "success", "message": "OTP sent! Check your Telegram Verification Codes."})
         except User.DoesNotExist:
@@ -246,11 +252,9 @@ def verify_otp(request):
     if request.method == "POST":
         data = json.loads(request.body)
         tg_id = data.get('tg_id')
-        otp = str(data.get('otp')).strip() # Clean the input
-        
+        otp = str(data.get('otp')).strip()
         try:
             user = User.objects.get(username=f"tg_{tg_id}")
-            
             if user.otp_code == otp:
                 user.otp_code = None
                 user.save()
@@ -287,11 +291,9 @@ def submit_withdrawal(request):
             user = User.objects.get(username=f"tg_{tg_id}")
             if user.operational_credit < amount: return JsonResponse({"status": "error", "message": "Insufficient balance!"})
             if amount < 50: return JsonResponse({"status": "error", "message": "Minimum withdrawal is 50 ETB."})
-            
             user.operational_credit -= amount
             user.save()
             Transaction.objects.create(agent=user, amount=amount, note=f"To: {account}", type="WITHDRAWAL", status="pending")
-            
             send_telegram_message(settings.CHANNEL_ID, f"🔴 <b>NEW WITHDRAWAL</b>\nUser: {tg_id}\nAmount: {amount} ETB\nAccount: {account}\nPhone: {user.phone_number}")
             return JsonResponse({"status": "success", "message": "Withdrawal requested successfully!"})
         except User.DoesNotExist:
@@ -308,24 +310,18 @@ def submit_transfer(request):
             sender = User.objects.get(username=f"tg_{tg_id}")
             if sender.operational_credit < amount: return JsonResponse({"status": "error", "message": "Insufficient balance!"})
             if amount < 10: return JsonResponse({"status": "error", "message": "Minimum transfer is 10 ETB."})
-            
             receiver = User.objects.filter(phone_number=target_account).first()
             if not receiver: receiver = User.objects.filter(username=f"tg_{target_account}").first()
-            
             if not receiver: return JsonResponse({"status": "error", "message": "Receiver account not found!"})
             if sender == receiver: return JsonResponse({"status": "error", "message": "You cannot transfer to yourself!"})
-            
             sender.operational_credit -= amount
             sender.save()
             receiver.operational_credit += amount
             receiver.save()
-            
             Transaction.objects.create(agent=sender, amount=amount, note=f"Transfer to {target_account}", type="TRANSFER_OUT", status="approved")
             Transaction.objects.create(agent=receiver, amount=amount, note=f"Transfer from {tg_id}", type="TRANSFER_IN", status="approved")
-            
             if receiver.telegram_id:
                 send_telegram_message(receiver.telegram_id, f"💸 <b>Transfer Received!</b>\nYou received {amount} ETB from user {tg_id}.")
-                
             return JsonResponse({"status": "success", "message": f"Successfully transferred {amount} ETB!"})
         except User.DoesNotExist:
             return JsonResponse({"status": "error", "message": "User not found."})
@@ -350,33 +346,21 @@ def redeem_promo(request):
         data = json.loads(request.body)
         tg_id = data.get('tg_id')
         promo_code = str(data.get('promo_code', '')).strip()
-        
         try:
             user = User.objects.get(username=f"tg_{tg_id}")
-            
-            if getattr(user, 'used_promo_code', False):
-                return JsonResponse({"status": "error", "message": "You have already used a promo code!"})
-                
-            if promo_code == str(tg_id):
-                return JsonResponse({"status": "error", "message": "You cannot use your own code!"})
-                
+            if getattr(user, 'used_promo_code', False): return JsonResponse({"status": "error", "message": "You have already used a promo code!"})
+            if promo_code == str(tg_id): return JsonResponse({"status": "error", "message": "You cannot use your own code!"})
             friend = User.objects.filter(username=f"tg_{promo_code}").first()
-            if not friend:
-                return JsonResponse({"status": "error", "message": "Invalid Promo Code!"})
-                
+            if not friend: return JsonResponse({"status": "error", "message": "Invalid Promo Code!"})
             user.operational_credit += 10
             user.used_promo_code = True
             user.save()
-            
             friend.operational_credit += 10
             friend.save()
-            
             Transaction.objects.create(agent=user, amount=10, note=f"Used promo code: {promo_code}", type="BONUS", status="approved")
             Transaction.objects.create(agent=friend, amount=10, note=f"Referral bonus from: {tg_id}", type="REFERRAL_BONUS", status="approved")
-            
             if friend.telegram_id:
                 send_telegram_message(friend.telegram_id, f"🎉 <b>Referral Bonus!</b>\nA friend just used your promo code! <b>10 ETB</b> has been added to your balance.")
-                
             return JsonResponse({"status": "success", "message": "🎉 Success! 10 ETB added to your balance."})
         except User.DoesNotExist:
             return JsonResponse({"status": "error", "message": "User not found."})
