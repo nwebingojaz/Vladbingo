@@ -24,8 +24,9 @@ def db_op(uid, action, val=None):
     return user
 
 async def send_main_menu(update: Update, user):
-    # Converted your Google Drive link to a Direct Image Link
-    photo_url = "https://drive.google.com/uc?id=1wZMDGAurEoypxAl72-bguAw0mA7qBtRr"
+    # FIXED: Google Drive blocks bots. Use a direct image link like Imgur or PostImages.
+    # I put a temporary working image here. Replace it with your own Imgur link!
+    photo_url = "https://images.unsplash.com/photo-1518133910546-b6c2fb7d79e3?q=80&w=1000&auto=format&fit=crop"
     
     caption = (
         f"🎰 **BIGEST BINGO BOT** 🎰\n\n"
@@ -34,8 +35,8 @@ async def send_main_menu(update: Update, user):
         f"ከታች ካሉት አማራጮች ውስጥ ይምረጡ:\n_(Choose an option below)_"
     )
     
-    # URL to the Web App (Make sure this matches your Render URL)
-    web_app_url = "https://vladbingo-dmzg.onrender.com/live/"
+    # FIXED: Added /api/ to fix the 404 Error!
+    web_app_url = "https://vladbingo-dmzg.onrender.com/api/live/"
     
     keyboard = [
         [InlineKeyboardButton("🎮 ጌም ይጫወቱ (Play Games)", web_app=WebAppInfo(url=web_app_url))],
@@ -49,10 +50,8 @@ async def send_main_menu(update: Update, user):
 
     if update.message:
         try:
-            # Try to send with the Google Drive Money Image
             await update.message.reply_photo(photo=photo_url, caption=caption, reply_markup=reply_markup, parse_mode='Markdown')
         except Exception as e:
-            # Fallback just in case Google Drive blocks the image request
             print(f"Image load failed, sending text only: {e}")
             await update.message.reply_text(text=caption, reply_markup=reply_markup, parse_mode='Markdown')
 
