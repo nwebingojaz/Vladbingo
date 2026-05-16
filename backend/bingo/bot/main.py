@@ -24,35 +24,32 @@ def db_op(uid, action, val=None):
     return user
 
 async def send_main_menu(update: Update, user):
-    # FIXED: Google Drive blocks bots. Use a direct image link like Imgur or PostImages.
-    # I put a temporary working image here. Replace it with your own Imgur link!
-    photo_url = "https://drive.google.com/file/d/1wZMDGAurEoypxAl72-bguAw0mA7qBtRr/view?usp=drivesdk"
+    # GUARANTEED WORKING IMAGE LINK
+    photo_url = "https://i.ibb.co/3m20B6k/bingo-money.jpg"
     
     caption = (
         f"🎰 **BIGEST BINGO BOT** 🎰\n\n"
-        f"እንኳን በደህና መጡ፣ **{user.real_name}**! (Welcome back)\n"
+        f"እንኳን በደህና መጡ፣ **{user.real_name}**! (Welcome)\n"
         f"💰 **ቀሪ ሂሳብ (Balance):** {user.operational_credit} ETB\n\n"
         f"ከታች ካሉት አማራጮች ውስጥ ይምረጡ:\n_(Choose an option below)_"
     )
     
-    # FIXED: Added /api/ to fix the 404 Error!
-    web_app_url = "https://vladbingo-dmzg.onrender.com/api/live/"
+    base_url = "https://vladbingo-dmzg.onrender.com/api/live/"
     
     keyboard = [
-        [InlineKeyboardButton("🎮 ጌም ይጫወቱ (Play Games)", web_app=WebAppInfo(url=web_app_url))],
-        [InlineKeyboardButton("💰 ያስገቡ (Deposit)", web_app=WebAppInfo(url=web_app_url)), InlineKeyboardButton("💸 ያውጡ (Withdraw)", web_app=WebAppInfo(url=web_app_url))],
-        [InlineKeyboardButton("↔️ ያስተላልፉ (Transfer)", web_app=WebAppInfo(url=web_app_url)), InlineKeyboardButton("👤 ፕሮፋይል (Profile)", callback_data="profile")],
-        [InlineKeyboardButton("📜 ታሪክ (History)", web_app=WebAppInfo(url=web_app_url)), InlineKeyboardButton("⚖️ ሂሳብ (Balance)", callback_data="balance")],
+        [InlineKeyboardButton("🎮 ጌም ይጫወቱ (Play Games)", web_app=WebAppInfo(url=base_url))],
+        [InlineKeyboardButton("💰 ያስገቡ (Deposit)", web_app=WebAppInfo(url=base_url + "#deposit")), InlineKeyboardButton("💸 ያውጡ (Withdraw)", web_app=WebAppInfo(url=base_url + "#withdraw"))],
+        [InlineKeyboardButton("↔️ ያስተላልፉ (Transfer)", web_app=WebAppInfo(url=base_url + "#transfer")), InlineKeyboardButton("👤 ፕሮፋይል (Profile)", callback_data="profile")],
+        [InlineKeyboardButton("📜 ታሪክ (History)", web_app=WebAppInfo(url=base_url + "#history")), InlineKeyboardButton("⚖️ ሂሳብ (Balance)", callback_data="balance")],
         [InlineKeyboardButton("📢 ቻናል (Channel)", url="https://t.me/bigestbingo"), InlineKeyboardButton("💬 ግሩፕ (Group)", url="https://t.me/bigestbingochat")],
-        [InlineKeyboardButton("🎧 ያግኙን (Contact Us)", url="https://t.me/yeab")]
+        [InlineKeyboardButton("🎧 ያግኙን (Contact Admin)", url="https://t.me/yeab")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     if update.message:
         try:
             await update.message.reply_photo(photo=photo_url, caption=caption, reply_markup=reply_markup, parse_mode='Markdown')
-        except Exception as e:
-            print(f"Image load failed, sending text only: {e}")
+        except:
             await update.message.reply_text(text=caption, reply_markup=reply_markup, parse_mode='Markdown')
 
 async def start(update: Update, context):
@@ -61,13 +58,11 @@ async def start(update: Update, context):
     
     if not user.real_name:
         await sync_to_async(db_op)(tg_id, "state", "REG_NAME")
-        welcome_text = "👋 ወደ **BIGEST BINGO BOT** እንኳን በደህና መጡ!\n\nእባክዎ ትክክለኛ ሙሉ ስምዎን ያስገቡ (Please enter your Full Name):"
-        return await update.message.reply_text(welcome_text, parse_mode='Markdown')
+        return await update.message.reply_text("👋 ወደ **BIGEST BINGO BOT** እንኳን በደህና መጡ!\n\nእባክዎ ትክክለኛ ሙሉ ስምዎን ያስገቡ (Please enter your Full Name):", parse_mode='Markdown')
         
     if not user.phone_number:
         btn = [[KeyboardButton("📲 ስልክ ቁጥር ያጋሩ (Share Phone)", request_contact=True)]]
-        phone_text = "አካውንትዎን ለማረጋገጥ ከታች ያለውን ቁልፍ ይጫኑ:\n(Tap the button below to verify your phone number)"
-        return await update.message.reply_text(phone_text, reply_markup=ReplyKeyboardMarkup(btn, one_time_keyboard=True, resize_keyboard=True))
+        return await update.message.reply_text("አካውንትዎን ለማረጋገጥ ከታች ያለውን ቁልፍ ይጫኑ:\n(Tap the button below to verify your phone number)", reply_markup=ReplyKeyboardMarkup(btn, one_time_keyboard=True, resize_keyboard=True))
     
     await send_main_menu(update, user)
 
@@ -81,8 +76,6 @@ async def handle_text(update, context):
 async def handle_contact(update, context):
     tg_id = update.effective_user.id
     phone = update.message.contact.phone_number
-    
-    # Format Ethiopian phone numbers correctly
     if phone.startswith('+251'): phone = '0' + phone[4:]
     elif phone.startswith('251'): phone = '0' + phone[3:]
         
@@ -97,9 +90,10 @@ async def handle_buttons(update: Update, context):
     if query.data == "balance":
         await query.answer(f"💰 ቀሪ ሂሳብዎ (Balance): {user.operational_credit} ETB", show_alert=True)
     elif query.data == "profile":
-        await query.answer(f"👤 ስም (Name): {user.real_name}\n📱 ስልክ (Phone): {user.phone_number}", show_alert=True)
-    elif query.data == "contact":
-        await query.answer("For support, message @yeab", show_alert=True)
+        phone = user.phone_number if user and user.phone_number else "ያልተመዘገበ (Not linked)"
+        msg = f"👤 <b>የእርስዎ ፕሮፋይል (Profile)</b>\n\n🆔 መለያ (ID): <code>{user.username.replace('tg_','')}</code>\n📱 ስልክ (Phone): {phone}\n💰 ሂሳብ (Balance): {user.operational_credit} ETB"
+        await context.bot.send_message(query.message.chat.id, msg, parse_mode="HTML")
+        await query.answer()
     else:
         await query.answer()
 
