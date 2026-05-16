@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
+from django.db.models.signals import pre_save
+from django.dispatch import receiver
 
 class User(AbstractUser):
     operational_credit = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -45,3 +47,34 @@ class GameControl(models.Model):
             self.daily_forced_wins = 0
             self.last_reset = timezone.now().date()
         super().save(*args, **kwargs)
+
+# ==========================================
+# AUTOMATIC BALANCE HANDLER (DJANGO SIGNAL)
+# ==========================================
+@receiver(pre_save, sender=Transaction)
+def handle_transaction_approval(sender, instance, **kwargs):
+    # Check if this transaction already exists in the database
+    if instance.id:
+        try:
+            old_transaction = Transaction.objects.get(id=instance.id)
+            
+            # If Admin changes status from "pending" to "approved"
+            if old_transaction.status == 'pending' and instance.status == 'approved':
+                
+                # DEPOSIT: Give the player their money!
+                if instance.type.startswith('DEPOSIT'):
+                    user = instance.agent
+                    user.operational_credit += instance.amount
+                    user.save()
+                    
+            # If Admin changes status from "pending" to "rejected"
+            if old_transaction.status == 'pending' and instance.status == 'rejected':
+                
+                # WITHDRAWAL REJECTED: Refund the money back to the player
+                if instance.type == 'WITHDRAWAL':
+                    user = instance.agent
+                    user.operational_credit += instance.amount
+                    user.save()
+                    
+        except Transaction.DoesNotExist:
+            pass
