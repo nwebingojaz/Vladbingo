@@ -1,532 +1,89 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>BIGEST BINGO BOT</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        body { background-color: #0b0f19; color: white; font-family: sans-serif; overflow: hidden; }
-        .header-bg { background: #0f172a; border-bottom: 2px solid #3b82f6; }
-        .room-card { background: #1e293b; border-radius: 12px; padding: 15px; margin-bottom: 10px; border-left: 4px solid #3b82f6; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        .room-card.live { border-left-color: #ef4444; opacity: 0.8; }
-        .active-banner { background: #0b0f19; border: 2px solid #ef4444; color: #ef4444; border-radius: 8px; padding: 6px; text-align: center; font-weight: 900; margin-bottom: 10px; animation: pulse 2s infinite; }
-        .card-num { height: 32px; background: #1e293b; border: 1px solid #3b82f6; border-radius: 4px; font-size: 0.65rem; font-weight: bold; color: #93c5fd; }
-        .card-num.active { background: #3b82f6 !important; color: white; border-color: white; transform: scale(1.1); box-shadow: 0 0 10px #3b82f6; }
-        .preview-container { border: 2px solid #3b82f6; border-radius: 12px; padding: 10px; background: rgba(0,0,0,0.4); width: 135px; }
-        .mini-cell { aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; border: 0.1px solid #1e3a8a; color: #93c5fd;}
-        
-        .tracker-row { display: grid; grid-template-columns: 15px repeat(15, 1fr); gap: 2px; margin-bottom: 4px; align-items: center;}
-        .tracker-letter { font-weight: 900; font-size: 12px; color: #60a5fa; text-align: center; }
-        .tracker-dot { font-size: 7px; font-weight: bold; text-align: center; padding: 4px 0; border-radius: 3px; background-color: #1e293b; color: #64748b; transition: 0.2s;}
-        .tracker-dot.called { background-color: #ef4444 !important; color: white !important; transform: scale(1.15); box-shadow: 0 0 5px #ef4444;}
-        
-        .btn-start { background: linear-gradient(135deg, #ef4444, #dc2626); border-radius: 12px; padding: 15px; font-weight: 900; font-size: 1.1rem; width: 100%; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4); color: white; transition: 0.2s;}
-        .btn-start:active { transform: scale(0.95); }
-        .btn-random { background: #1e293b; border: 1px solid #3b82f6; border-radius: 12px; width: 100%; padding: 10px; font-size: 0.8rem; font-weight: bold; color: #3b82f6; margin-bottom: 8px; }
-        
-        .modal { background: rgba(11, 15, 25, 1); position: fixed; inset: 0; z-index: 50; padding: 20px; display: none; flex-direction: column; overflow-y:auto; }
-        .history-row { background: #1e293b; margin-bottom: 4px; padding: 10px; border-radius: 6px; font-size: 10px; display: flex; justify-content: space-between; }
-        
-        #sidebar { position: fixed; top: 0; left: -100%; width: 75%; max-width: 300px; height: 100%; background: #0f172a; z-index: 100; transition: 0.3s; box-shadow: 5px 0 15px rgba(0,0,0,0.5); }
-        #sidebar.open { left: 0; }
-        #sidebar-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 90; display: none; }
-        .menu-item { display: flex; align-items: center; gap: 15px; padding: 15px 20px; font-size: 1.1rem; font-weight: bold; border-bottom: 1px solid #1e293b; color: #e2e8f0; }
-        .menu-item:active { background: #1e293b; }
+import time, random
+from django.core.management.base import BaseCommand
+from django.utils import timezone
+from bingo.models import GameRound, GameControl, PermanentCard
+import traceback
 
-        .wallet-tab { flex: 1; text-align: center; padding: 12px 0; font-size: 11px; font-weight: 900; color: #64748b; border-bottom: 3px solid transparent; }
-        .wallet-tab.active { color: #3b82f6; border-bottom-color: #3b82f6; }
+class Command(BaseCommand):
+    def handle(self, *args, **options):
+        self.stdout.write("BIGEST BINGO DEALER: INSTANT RESPAWN ACTIVE")
+        TIERS = [10, 20, 30, 40, 50, 100]
 
-        /* SWITCH IN ENGLISH */
-        .switch { position: relative; display: inline-block; width: 120px; height: 34px; background-color: #1e293b; border-radius: 34px; border: 1px solid #3b82f6; cursor: pointer; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: 34px; transition: .4s; }
-        .slider:before { position: absolute; content: "MANUAL"; height: 26px; width: 54px; left: 4px; bottom: 3px; background-color: #3b82f6; color: white; font-size: 10px; font-weight: bold; display: flex; align-items: center; justify-content: center; border-radius: 34px; transition: .4s; }
-        input:checked + .slider { background-color: #0b0f19; }
-        input:checked + .slider:before { transform: translateX(56px); background-color: #10b981; content: "AUTO"; }
+        while True:
+            try:
+                now = timezone.now()
+                # Use .first() safely. If table doesn't exist, it skips gracefully
+                try:
+                    control = GameControl.objects.first()
+                except Exception:
+                    control = None
 
-        .celebration { background: #3b82f6; border-radius: 24px; padding: 24px; text-align: center; max-width: 320px; width: 100%; border: 4px solid #93c5fd; box-shadow: 0 0 50px rgba(59, 130, 246, 0.8); }
-        .win-grid-cell { aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 900; border-radius: 4px; border: 1px solid #e2e8f0; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
-    </style>
-</head>
-<body class="antialiased select-none">
-
-    <div id="toast-msg" class="fixed top-16 left-1/2 transform -translate-x-1/2 bg-blue-600 border-2 border-blue-400 text-white font-black px-6 py-3 rounded-full shadow-[0_0_20px_rgba(59,130,246,0.6)] transition-all duration-300 opacity-0 pointer-events-none z-50 text-sm tracking-wider">
-        ካርድ #--- ተመርጧል!
-    </div>
-
-    <!-- SIDEBAR -->
-    <div id="sidebar-overlay" onclick="toggleMenu()"></div>
-    <div id="sidebar" class="flex flex-col">
-        <div class="p-6 bg-blue-600 flex items-center gap-4">
-            <div class="bg-white p-3 rounded-full text-2xl">👤</div>
-            <div>
-                <div class="font-black text-white text-lg">ተጫዋች (PLAYER)</div>
-                <div class="text-blue-200 text-xs font-bold" id="menu-id">መለያ: Loading...</div>
-            </div>
-        </div>
-        <div class="flex-1 overflow-y-auto py-2">
-            <div class="menu-item" onclick="toggleMenu(); showLobby()">🏠 ዋና ገፅ (Home)</div>
-            <div class="menu-item" onclick="toggleMenu(); openWallet('deposit')">👛 ዋሌት (Wallet)</div>
-            <div class="menu-item" onclick="toggleMenu(); openHistory()">📜 የጨዋታ ታሪክ (History)</div>
-            <div class="menu-item" onclick="toggleMenu(); openReferral()">🎟️ ጋብዘው ይሸለሙ (Refer)</div>
-            <div class="menu-item" onclick="toggleMenu(); openSettings()">⚙️ ሴቲንግ (Settings)</div>
-            
-            <div class="mt-4 mb-2 px-4 text-xs font-black text-slate-500 uppercase tracking-widest">ማህበረሰብ (Community)</div>
-            <div class="menu-item text-blue-400" onclick="tg.openTelegramLink('https://t.me/bigestbingo')">📢 ዋና ቻናል (Channel)</div>
-            <div class="menu-item text-blue-400" onclick="tg.openTelegramLink('https://t.me/bigestbingochat')">💬 መወያያ ግሩፕ (Group)</div>
-        </div>
-        <div class="menu-item text-red-400 border-t-2 border-slate-800" onclick="tg.close()">🚪 ይውጡ (Exit Game)</div>
-    </div>
-    
-    <!-- HEADER -->
-    <div class="header-bg p-3 flex justify-between items-center shadow-lg relative z-40">
-        <div class="flex items-center gap-3">
-            <button onclick="toggleMenu()" class="text-white text-2xl px-2">☰</button>
-            <div class="flex items-center gap-1"><div class="bg-blue-600 p-1 rounded font-black text-[10px] text-white italic">BIGEST</div><div class="font-black text-xs uppercase text-white">BINGO BOT</div></div>
-        </div>
-        <div class="flex items-center gap-2">
-            <div class="bg-slate-800 px-3 py-1.5 rounded-full flex items-center gap-2 border border-blue-900" onclick="openWallet('deposit')">
-                <span class="text-yellow-400 text-sm">👛</span><span id="bal-header" class="font-bold text-sm">0.00</span>
-            </div>
-            <!-- THE HOOK BUTTON (+) -->
-            <button onclick="openWallet('deposit')" class="bg-green-500 hover:bg-green-600 text-white font-black w-8 h-8 rounded-full shadow-[0_0_10px_rgba(34,197,94,0.6)] flex items-center justify-center text-xl transition-transform active:scale-90 pb-1">+</button>
-        </div>
-    </div>
-    
-    <!-- ROOM NAV BAR -->
-    <div class="bg-slate-900/80 p-2 flex justify-around items-center text-[10px] font-bold text-blue-400 uppercase border-b border-blue-900/50">
-        <div>🎲 ክፍል (Room): <span id="nav-room" class="text-white">10</span></div>
-        <div>🎁 ሽልማት (WIN): <span id="nav-prize" class="text-white">0</span></div>
-        <div onclick="location.reload()">🔄 አድስ (REFRESH)</div>
-    </div>
-    
-    <div id="timer-bar" class="bg-black/60 p-1 text-center border-b border-white/5">
-        <span class="text-[10px] text-blue-400 font-bold uppercase">ጨዋታው ሊጀምር ነው: </span>
-        <span id="timer" class="text-[10px] font-mono font-black text-white ml-1">00:00</span>
-    </div>
-    
-    <!-- LOBBY -->
-    <div id="v-lobby" class="p-4 h-screen overflow-y-auto pb-32"><div id="room-list"></div></div>
-
-    <!-- SELECTOR -->
-    <div id="v-selector" class="hidden p-4 h-screen overflow-y-auto pb-32 relative">
-        <button onclick="showLobby()" class="text-blue-400 text-[10px] font-bold mb-3 flex items-center gap-1">← ተመለስ (Back)</button>
-        <div id="active-call-banner" class="active-banner hidden">እየተጠራ ነው <span id="call-count">0</span>/75</div>
-        <div id="grid-container" class="grid grid-cols-10 gap-1 h-64 overflow-y-auto mb-6 p-2 bg-black/30 rounded-xl"></div>
-        <div id="spectator-tracker" class="hidden mb-6 p-2 bg-slate-900/80 rounded-xl border border-blue-900/50"></div>
-        <div class="flex gap-4 items-end bg-slate-800/50 p-3 rounded-2xl border border-white/5">
-            <div class="preview-container"><div id="mini-grid" class="grid grid-cols-5 gap-0.5"></div><div class="text-[9px] text-center mt-2 text-blue-400 font-bold uppercase">ካርድ <span id="prev-num">#---</span></div></div>
-            <div class="flex-1">
-                <button onclick="pickRandom()" class="btn-random">🎲 በዕድል (RANDOM)</button>
-                <button id="join-btn" onclick="joinGame()" class="btn-start opacity-50">▶ ግዛ (BUY)</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- LIVE PLAY HALL -->
-    <div id="v-play" class="hidden p-4 h-screen overflow-y-auto pb-32">
-        <!-- BIG BALL TRACKER & AUTO SWITCH -->
-        <div class="flex justify-between items-center mb-4 bg-slate-900 p-3 rounded-2xl border border-slate-700 shadow-lg relative">
-            <div class="flex items-center gap-3">
-                <div class="w-14 h-14 bg-gradient-to-br from-white to-slate-300 rounded-full flex items-center justify-center border-4 border-slate-400 shadow-[0_0_15px_rgba(255,255,255,0.3)]">
-                    <span id="latest-ball" class="text-2xl font-black text-slate-900">--</span>
-                </div>
-                <div id="recent-balls" class="flex gap-1 overflow-hidden w-[110px] whitespace-nowrap bg-slate-800 p-1.5 rounded-full border border-slate-700 shadow-inner">
-                </div>
-            </div>
-            <div class="flex flex-col items-end">
-                <label class="switch scale-75 origin-right"><input type="checkbox" id="auto-toggle" onchange="toggleAutoMode(this)"><span class="slider"></span></label>
-                <div class="text-[9px] text-yellow-400 font-bold mt-1 tracking-widest"><span id="called-count-badge">0</span>/75</div>
-            </div>
-        </div>
-
-        <div id="play-tracker" class="mb-4 p-2 bg-slate-900/80 rounded-xl border border-blue-900/50 hidden"></div>
-        
-        <!-- 4 SLOTS GRID -->
-        <div id="multi-card-container" class="grid grid-cols-2 gap-2 mb-6">
-            <div class="bg-slate-900/50 p-1 rounded-xl border-2 border-slate-700 border-dashed flex items-center justify-center min-h-[120px]" id="slot-1"><div id="play-card-1" class="w-full"></div></div>
-            <div class="bg-slate-900/50 p-1 rounded-xl border-2 border-slate-700 border-dashed flex items-center justify-center min-h-[120px]" id="slot-2"><div id="play-card-2" class="w-full"></div></div>
-            <div class="bg-slate-900/50 p-1 rounded-xl border-2 border-slate-700 border-dashed flex items-center justify-center min-h-[120px]" id="slot-3"><div id="play-card-3" class="w-full"></div></div>
-            <div class="bg-slate-900/50 p-1 rounded-xl border-2 border-slate-700 border-dashed flex items-center justify-center min-h-[120px]" id="slot-4"><div id="play-card-4" class="w-full"></div></div>
-        </div>
-        <button onclick="hitBingo()" id="bingo-btn" class="w-full py-4 bg-slate-700 text-slate-400 rounded-2xl font-black text-xl border-2 border-slate-600 transition-all tracking-widest shadow-lg">BINGO!</button>
-    </div>
-
-    <!-- WALLET MODAL -->
-    <div id="m-wallet" class="modal">
-        <div class="flex justify-between items-center mb-4">
-            <h2 class="text-white font-black text-2xl">ዋሌት (Wallet)</h2>
-            <button onclick="document.getElementById('m-wallet').style.display='none'" class="text-2xl text-gray-400">✕</button>
-        </div>
-        <div class="flex bg-slate-800 rounded-xl mb-6 border border-slate-700">
-            <div id="w-tab-deposit" onclick="openWalletTab('deposit')" class="wallet-tab active flex flex-col items-center"><span class="text-lg">📥</span>ያስገቡ</div>
-            <div id="w-tab-withdraw" onclick="openWalletTab('withdraw')" class="wallet-tab flex flex-col items-center"><span class="text-lg">📤</span>ያውጡ</div>
-            <div id="w-tab-transfer" onclick="openWalletTab('transfer')" class="wallet-tab flex flex-col items-center"><span class="text-lg">💸</span>ያስተላልፉ</div>
-        </div>
-        <div class="bg-blue-900/30 p-4 rounded-xl border border-blue-500/30 mb-4 flex justify-between items-center">
-            <div class="text-gray-400 text-xs font-bold uppercase">ቀሪ ሂሳብ</div>
-            <div class="text-white font-black text-2xl"><span id="wallet-bal">0.00</span> <span class="text-sm text-blue-400">ETB</span></div>
-        </div>
-
-        <div id="w-sec-deposit" class="w-section">
-            <div id="dep-step-1">
-                <button onclick="showDepositForm('M-Pesa')" class="w-full bg-white text-green-600 font-bold py-4 rounded-xl mb-3 flex items-center justify-center gap-2"><span class="text-2xl">📱</span> M-Pesa (ሳፋሪኮም)</button>
-                <button onclick="showDepositForm('Telebirr')" class="w-full bg-white text-blue-600 font-bold py-4 rounded-xl mb-3 flex items-center justify-center gap-2"><span class="text-2xl">📱</span> ቴሌብር (Telebirr)</button>
-                <button onclick="showDepositForm('CBE')" class="w-full bg-white text-purple-700 font-bold py-4 rounded-xl flex items-center justify-center gap-2"><span class="text-2xl">🏦</span> ንግድ ባንክ (CBE)</button>
-            </div>
-            <div id="dep-step-2" class="hidden bg-slate-800 p-4 rounded-xl border border-blue-900/50 mt-4">
-                <div class="flex items-center mb-4">
-                    <button onclick="backToDepositMethods()" class="text-blue-400 font-bold text-sm flex items-center gap-1 active:scale-95 transition-transform"><span class="text-lg">←</span> ተመለስ</button>
-                    <h3 id="dep-title" class="flex-1 text-center font-bold text-yellow-400 text-lg pr-8">ገንዘብ ያስገቡ</h3>
-                </div>
-                <div class="bg-red-900/40 border border-red-500 rounded p-2 mb-4 text-center"><p class="text-red-400 text-[10px] font-bold uppercase">⚠️ ማሳሰቢያ ⚠️</p><p class="text-white text-[9px]">በሞባይል አፕሊኬሽን ወይም በአጭር ቁጥር ብቻ ይጠቀሙ።<br>በአካል ባንክ ውስጥ ሄደው አያስገቡ።</p></div>
-                <div class="text-sm text-gray-300 mb-4 bg-black/30 p-3 rounded">1. ገንዘቡን ወደዚህ ያስገቡ:<br><strong id="dep-account-info" class="text-white text-xl tracking-wider text-blue-300"></strong><br><br>2. ከአጭር የፅሁፍ መልዕክት (SMS) ላይ የትራንዛክሽን ቁጥሩን (TXID) ኮፒ ያድርጉ።<br>3. ከታች ባለው ቦታ ላይ ያስገቡ።</div>
-                <input type="number" id="dep-amount" placeholder="የገንዘብ መጠን (Amount)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
-                <input type="text" id="dep-txid" placeholder="የትራንዛክሽን ቁጥር (TxID)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-6 text-white">
-                <button onclick="submitDeposit()" class="w-full bg-blue-600 font-black text-white py-3 rounded-xl hover:bg-blue-700 transition-colors">አረጋግጥ (Submit)</button>
-            </div>
-        </div>
-
-        <div id="w-sec-withdraw" class="w-section hidden bg-slate-800 p-4 rounded-xl border border-slate-700">
-            <h3 class="text-red-400 font-black mb-4">ገንዘብ ያውጡ (Withdraw)</h3>
-            <input type="tel" id="with-phone" placeholder="ስልክ ቁጥርዎን (Phone)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
-            <input type="number" id="with-amount" placeholder="የገንዘብ መጠን (Min 50 ETB)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
-            <select id="with-bank" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
-                <option value="M-Pesa">M-Pesa (ሳፋሪኮም)</option><option value="Telebirr">Telebirr (ቴሌብር)</option><option value="CBE">CBE (ንግድ ባንክ)</option><option value="Awash">Awash Bank (አዋሽ ባንክ)</option><option value="Dashen">Dashen Bank (ዳሽን ባንክ)</option><option value="Abyssinia">Bank of Abyssinia (አቢሲንያ ባንክ)</option>
-            </select>
-            <input type="text" id="with-account" placeholder="የአካውንት ቁጥር (Account Number)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-4 text-white">
-            <div class="flex gap-2 mb-4"><input type="text" id="with-otp" placeholder="የማረጋገጫ ኮድ (OTP Code)" class="flex-1 bg-slate-900 border border-slate-700 rounded p-3 text-white"><button id="btn-with-otp" onclick="requestOTP('withdraw')" class="bg-red-500 text-white font-bold px-4 rounded hover:bg-red-600 transition-colors">ኮድ ላክ</button></div>
-            <button onclick="submitAction('/api/submit-withdrawal/', {amount: document.getElementById('with-amount').value, account: document.getElementById('with-account').value, bank: document.getElementById('with-bank').value, otp: document.getElementById('with-otp').value})" class="w-full bg-red-600 font-black text-white py-3 rounded-xl hover:bg-red-700 transition-colors">አረጋግጥ (Confirm)</button>
-        </div>
-
-        <div id="w-sec-transfer" class="w-section hidden bg-slate-800 p-4 rounded-xl border border-slate-700">
-            <h3 class="text-green-400 font-black mb-4">ያስተላልፉ (Transfer)</h3>
-            <input type="number" id="tr-amount" placeholder="የገንዘብ መጠን (Amount ETB)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
-            <input type="text" id="tr-phone" placeholder="የጓደኛዎ ስልክ ወይም መለያ (Phone/ID)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-4 text-white">
-            <button onclick="submitTransferAction('/api/submit-transfer/', {amount: document.getElementById('tr-amount').value, account: document.getElementById('tr-phone').value})" class="w-full bg-green-600 font-black text-white py-3 rounded-xl">ላክ (Send Money)</button>
-        </div>
-    </div>
-
-    <!-- REFERRAL MODAL -->
-    <div id="m-referral" class="modal" style="background: rgba(15, 23, 42, 0.98);">
-        <div class="flex justify-between items-center mb-6">
-            <h2 class="text-green-400 font-black text-xl uppercase">ጋብዘው ይሸለሙ</h2>
-            <button onclick="document.getElementById('m-referral').style.display='none'" class="text-2xl text-gray-400">✕</button>
-        </div>
-        <div class="bg-slate-800 p-6 rounded-xl border border-green-900/50 text-center">
-            <div class="text-5xl mb-4">🎁</div>
-            <h3 class="text-white font-bold text-lg mb-2">ለእያንዳንዱ ጓደኛ 10 ብር ያግኙ!</h3>
-            <p class="text-sm text-gray-300 mb-6">የፕሮሞ ኮድዎን ለጓደኞችዎ ያጋሩ። ሲመዘገቡ <b>ሁለታችሁም የ 10 ብር ስጦታ ወዲያውኑ ታገኛላችሁ!</b></p>
-            <div class="bg-slate-900 border-2 border-green-500 border-dashed rounded-xl p-4 mb-6">
-                <p class="text-xs text-green-400 font-bold uppercase mb-1">የእርስዎ ፕሮሞ ኮድ (Your Code)</p>
-                <p id="my-promo-code" class="text-3xl font-black text-white tracking-widest"></p>
-            </div>
-            <button onclick="copyPromoMessage()" class="w-full bg-green-600 hover:bg-green-700 text-white font-black py-4 rounded-xl shadow-[0_0_15px_rgba(22,163,74,0.4)] active:scale-95 transition-all flex items-center justify-center gap-2 mb-6">
-                <span>📋</span> መልዕክቱን ኮፒ አድርግ (COPY)
-            </button>
-            <h3 class="text-white font-bold text-sm mb-2 text-left">ጓደኛ ጋብዞዎታል?</h3>
-            <div class="flex gap-2">
-                <input type="text" id="promo-code" placeholder="የጓደኛዎን ኮድ ያስገቡ" class="flex-1 bg-slate-900 border border-green-700/50 rounded p-3 text-white text-sm">
-                <button onclick="redeemPromo()" class="bg-green-600 text-white font-black px-4 rounded hover:bg-green-700 transition-colors">አረጋግጥ</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- SETTINGS MODAL -->
-    <div id="m-settings" class="modal" style="background: rgba(15, 23, 42, 0.98);">
-        <div class="flex justify-between items-center mb-6">
-            <h2 class="text-white font-black text-xl">ሴቲንግ (Settings)</h2>
-            <button onclick="document.getElementById('m-settings').style.display='none'" class="text-2xl text-gray-400">✕</button>
-        </div>
-        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
-            <h3 class="text-blue-400 font-bold mb-2">የይለፍ ቃል ይቀይሩ (Change Password)</h3>
-            <p class="text-xs text-gray-400 mb-4">የይለፍ ቃልዎን ለማደስ በስልክዎ የሚላከውን ኮድ ያስገቡ።</p>
-            <input type="tel" id="set-phone" placeholder="ስልክ ቁጥርዎን (Phone)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
-            <input type="password" id="set-pass" placeholder="አዲስ የይለፍ ቃል (New Password)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
-            <div class="flex gap-2 mb-4"><input type="text" id="set-otp" placeholder="የማረጋገጫ ኮድ (OTP)" class="flex-1 bg-slate-900 border border-slate-700 rounded p-3 text-white"><button id="btn-set-otp" onclick="requestOTP('password')" class="bg-red-500 text-white font-bold px-4 rounded hover:bg-red-600 transition-colors">ኮድ ላክ</button></div>
-            <button onclick="submitAction('/api/change-password/', {password: document.getElementById('set-pass').value, otp: document.getElementById('set-otp').value})" class="w-full bg-blue-600 font-black text-white py-3 rounded-xl hover:bg-blue-700 transition-colors">አረጋግጥ (Update)</button>
-        </div>
-    </div>
-
-    <!-- GRAND WINNER MODAL -->
-    <div id="m-win" class="modal" style="background: rgba(11, 15, 25, 0.98); justify-content:center; align-items:center; z-index: 9999;">
-        <div class="relative w-full max-w-sm flex flex-col items-center">
-            <div class="bg-yellow-500 text-black text-sm font-black px-6 py-2 rounded-full mb-4 shadow-[0_0_20px_rgba(234,179,8,0.6)] animate-pulse">GRAND WINNER</div>
-            <div class="text-6xl font-black text-yellow-400 italic tracking-tighter mb-8 drop-shadow-lg" style="-webkit-text-stroke: 2px white;">BINGO!</div>
-            <div class="bg-white p-3 rounded-2xl w-full mb-6 relative shadow-[0_0_40px_rgba(255,255,255,0.2)]">
-                <div class="absolute -top-4 right-4 bg-yellow-400 text-black text-xs font-bold px-3 py-1 rounded shadow-lg border border-yellow-200">#<span id="win-card-num-display"></span></div>
-                <div class="grid grid-cols-5 gap-1 text-center mb-2">
-                    <div class="bg-blue-600 text-white font-black rounded text-sm py-1">B</div><div class="bg-red-600 text-white font-black rounded text-sm py-1">I</div><div class="bg-slate-600 text-white font-black rounded text-sm py-1">N</div><div class="bg-green-600 text-white font-black rounded text-sm py-1">G</div><div class="bg-yellow-500 text-white font-black rounded text-sm py-1">O</div>
-                </div>
-                <div id="win-card-grid" class="grid grid-cols-5 gap-1"></div>
-            </div>
-            <div id="win-name-display" class="text-4xl font-black text-white uppercase tracking-widest mb-2">PLAYER</div>
-            <div class="text-gray-400 text-[10px] font-bold tracking-widest mb-8">TICKET #<span id="win-ticket-sub"></span> • <span id="win-prize-display" class="text-green-400 text-lg">0</span> ETB</div>
-            <button onclick="showLobby()" class="border-2 border-gray-500 text-gray-300 font-bold rounded-full px-8 py-3 hover:bg-gray-800 transition-colors uppercase tracking-widest active:scale-95">BACK TO LOBBY</button>
-        </div>
-    </div>
-    
-    <!-- HISTORY MODAL -->
-    <div id="m-history" class="modal">
-        <div class="flex justify-between items-center mb-2"><h2 class="text-blue-400 font-black italic uppercase text-lg">ታሪክ (History)</h2><button onclick="document.getElementById('m-history').style.display='none'" class="text-2xl text-gray-400">✕</button></div>
-        <div class="flex mb-4"><div id="tab-bets" onclick="switchTab('bets')" class="tab-btn active">የእኔ ጨዋታዎች</div><div id="tab-win" onclick="switchTab('win')" class="tab-btn">አሸናፊዎች</div></div>
-        <div id="history-content" class="h-full overflow-y-auto pb-20"></div>
-    </div>
-
-    <script>
-        const tg = window.Telegram.WebApp; const uid = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : 0;
-        document.getElementById('menu-id').innerText = "መለያ (ID): " + uid;
-        
-        // --- STATE PRESERVATION ---
-        let activeBet = parseInt(sessionStorage.getItem('activeBet')) || 10; 
-        let myCards = JSON.parse(sessionStorage.getItem('myCards')) || []; 
-        let isFirstLoad = true;
-        
-        let historyData = {winners: [], my_bets: []}; let currentRoomTime = 0; let currentRoomStatus = 'LOBBY'; let myActiveGameId = null;
-        let currentMethod = ""; let autoMode = false; let autoBingoFired = false; let globalCalledNumbers = [];
-
-        window.addEventListener('DOMContentLoaded', (event) => {
-            const hash = window.location.hash.substring(1);
-            if (['deposit', 'withdraw', 'transfer'].includes(hash)) { openWallet(hash); history.replaceState(null, null, ' '); } 
-            else if (hash === 'history') { openHistory(); history.replaceState(null, null, ' '); }
-        });
-
-        function toggleMenu() { const sb = document.getElementById('sidebar'); const ov = document.getElementById('sidebar-overlay'); if(sb.classList.contains('open')) { sb.classList.remove('open'); ov.style.display='none'; } else { sb.classList.add('open'); ov.style.display='block'; } }
-        
-        function showScreen(id) { 
-            sessionStorage.setItem('currentScreen', id);
-            document.getElementById('v-lobby').classList.add('hidden'); document.getElementById('v-selector').classList.add('hidden'); document.getElementById('v-play').classList.add('hidden'); document.getElementById(id).classList.remove('hidden'); 
-            if(id==='v-selector'){ updateBuyButton(); } 
-        }
-        
-        function showLobby() {
-            sessionStorage.setItem('currentScreen', 'v-lobby');
-            myCards = [];
-            sessionStorage.removeItem('myCards');
-            document.getElementById('v-selector').classList.add('hidden');
-            document.getElementById('m-win').style.display='none';
-            document.getElementById('v-lobby').classList.remove('hidden');
-            updateBuyButton();
-        }
-
-        function openWallet(tab) { document.getElementById('m-wallet').style.display = 'flex'; document.getElementById('wallet-bal').innerText = document.getElementById('bal-header').innerText; openWalletTab(tab); }
-        function openWalletTab(tab) { ['deposit', 'withdraw', 'transfer'].forEach(t => { document.getElementById('w-tab-'+t).classList.remove('active'); document.getElementById('w-sec-'+t).classList.add('hidden'); }); document.getElementById('w-tab-'+tab).classList.add('active'); document.getElementById('w-sec-'+tab).classList.remove('hidden'); }
-        function openSettings() { document.getElementById('m-settings').style.display = 'flex'; }
-        
-        function openReferral() { document.getElementById('m-referral').style.display = 'flex'; document.getElementById('my-promo-code').innerText = uid; }
-        function copyPromoMessage() { const shareText = `🎰 Play BIGEST BINGO BOT and win real money!\n\nUse my Promo Code [ ${uid} ] in the Wallet to get 10 ETB Free Bonus!\n\n1. Open: https://t.me/Bigestbingobot\n2. Go to Refer & Earn 🎟️\n3. Paste my code in the Promo box!\n\nGood luck! 🍀`; if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(shareText).then(() => { tg.showAlert("✅ Promo message copied! Paste it to your friends."); }).catch(err => { fallbackCopy(shareText); }); } else { fallbackCopy(shareText); } }
-        function fallbackCopy(text) { let textArea = document.createElement("textarea"); textArea.value = text; textArea.style.position = "fixed"; document.body.appendChild(textArea); textArea.focus(); textArea.select(); try { document.execCommand('copy'); tg.showAlert("✅ Promo message copied! Paste it to your friends."); } catch (err) { tg.showAlert("⚠️ Could not copy automatically. Your code is: " + uid); } document.body.removeChild(textArea); }
-        function redeemPromo() { const code = document.getElementById('promo-code').value; if(!code) return tg.showAlert("Please enter a promo code!"); if(code == uid) return tg.showAlert("You cannot use your own code!"); fetch('/api/redeem-promo/', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ tg_id: uid, promo_code: code }) }).then(r=>r.json()).then(d => { tg.showAlert(d.message); if(d.status === 'success') { document.getElementById('promo-code').value = ''; refreshLobby(); } }).catch(e => tg.showAlert("⚠️ Connection error.")); }
-
-        function showDepositForm(method) { currentMethod = method; document.getElementById('dep-step-1').classList.add('hidden'); document.getElementById('dep-step-2').classList.remove('hidden'); document.getElementById('dep-title').innerText = method + " Deposit"; const accInfo = document.getElementById('dep-account-info'); if (method === 'M-Pesa') accInfo.innerHTML = "0707659618<br><span class='text-sm text-gray-400'>ስም (Name): Biniyam Nigatu</span>"; else if (method === 'Telebirr') accInfo.innerHTML = "0977733630<br><span class='text-sm text-gray-400'>ስም (Name): Solomon</span>"; else if (method === 'CBE') accInfo.innerHTML = "1000379893698<br><span class='text-sm text-gray-400'>ስም (Name): Yeabkal</span>"; }
-        function backToDepositMethods() { document.getElementById('dep-step-2').classList.add('hidden'); document.getElementById('dep-step-1').classList.remove('hidden'); document.getElementById('dep-amount').value = ''; document.getElementById('dep-txid').value = ''; }
-        
-        function requestOTP(formType) { 
-            let phoneNum = ""; let btnId = "";
-            if(formType === 'withdraw') { phoneNum = document.getElementById('with-phone').value; btnId = 'btn-with-otp'; }
-            if(formType === 'password') { phoneNum = document.getElementById('set-phone').value; btnId = 'btn-set-otp'; }
-            if(!phoneNum) return showToast("⚠️ ስልክ ቁጥር ያስገቡ! (Enter Phone)");
-            showToast("⏳ ኮድ እየተላከ ነው... (Sending)");
-            fetch('/api/send-otp/', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ tg_id: uid, phone: phoneNum }) })
-            .then(r => { if(!r.ok) throw new Error("Server error " + r.status); return r.json(); }).then(d => { tg.showAlert(d.message); }).catch(err => { tg.showAlert("⚠️ Server Error: Make sure TELEGRAM_BOT_TOKEN is in your Web Service environment variables on Render!"); }); 
-        }
-        
-        function submitDeposit() { const amount = document.getElementById('dep-amount').value, txid = document.getElementById('dep-txid').value; if(!amount || !txid) return tg.showAlert("እባክዎትን ሁሉንም ቦታ ይሙሉ።"); fetch('/api/submit-deposit/', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ tg_id: uid, amount: amount, tx_id: txid, method: currentMethod }) }).then(r=>r.json()).then(d => { tg.showAlert(d.message); if(d.status === 'success') { document.getElementById('m-deposit').style.display = 'none'; backToDepositMethods(); } }).catch(e => tg.showAlert("⚠️ Error submitting deposit.")); }
-        
-        function submitAction(url, payload) {
-            if(!payload.otp) return showToast("⚠️ ኮድ ያስገቡ! (OTP required)");
-            payload.tg_id = uid; showToast("⏳ በማረጋገጥ ላይ...");
-            fetch('/api/verify-otp/', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ tg_id: uid, otp: payload.otp }) }).then(r=>r.json()).then(d => { 
-                if(d.status === 'success') { fetch(url, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) }).then(r2=>r2.json()).then(d2 => { tg.showAlert(d2.message); if(d2.status==='success') location.reload(); }); } 
-                else tg.showAlert("❌ " + d.message); 
-            }).catch(e => tg.showAlert("⚠️ አጋጥሟል! እንደገና ይሞክሩ።"));
-        }
-        function submitTransferAction(url, payload) { if(!payload.amount || !payload.account) return tg.showAlert("እባክዎትን ሁሉንም ቦታ ይሙሉ።"); payload.tg_id = uid; fetch(url, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) }).then(r=>r.json()).then(d => { tg.showAlert(d.message); if(d.status==='success') location.reload(); }); }
-
-        function showToast(msg) { const t = document.getElementById('toast-msg'); t.innerText = msg; t.classList.remove('opacity-0'); setTimeout(() => { t.classList.add('opacity-0'); }, 1500); }
-        function appLoop() { if (myActiveGameId) { updatePlayHall(); } else { refreshLobby(); } }
-
-        function refreshLobby() { 
-            fetch('/api/lobby-info/'+uid+'/').then(r=>r.json()).then(d => { 
-                document.getElementById('bal-header').innerText = d.balance.toFixed(2); 
-                
-                if(d.active_game_id) { 
-                    myActiveGameId = d.active_game_id; 
-                    showScreen('v-play'); 
-                    updatePlayHall(); 
-                    return; 
-                } 
-                
-                // --- STATE RESTORE LOGIC (Only runs on fresh reload) ---
-                if(isFirstLoad) {
-                    isFirstLoad = false;
-                    const savedScreen = sessionStorage.getItem('currentScreen');
-                    if(savedScreen === 'v-selector') {
-                        document.getElementById('nav-room').innerText = activeBet;
-                        document.getElementById('v-lobby').classList.add('hidden');
-                        document.getElementById('v-selector').classList.remove('hidden');
-                        initGrid();
-                        myCards.forEach(c => {
-                            let btn = document.getElementById('c-'+c);
-                            if(btn) btn.classList.add('active');
-                        });
-                        if(myCards.length > 0) previewCard(myCards[myCards.length-1]);
-                        updateBuyButton();
-                    }
-                }
-                // -----------------------------------------------------
-
-                const list = document.getElementById('room-list'); list.innerHTML = ''; d.rooms.sort((a,b) => a.bet - b.bet); 
-                d.rooms.forEach(room => { 
-                    const isLive = room.status === 'ACTIVE'; 
-                    list.innerHTML += `<div onclick="selectRoom(${room.bet})" class="room-card ${isLive ? 'live' : ''} cursor-pointer"><div class="flex justify-between w-full"><div><div class="text-white font-black text-xl">Bingo ${room.bet}</div><div class="text-[11px] font-bold ${isLive ? 'text-red-400' : 'text-blue-400'} mt-1">${isLive ? 'እየተጠራ ነው: ' + room.called_count + '/75' : 'ሊጀምር ነው: ' + room.time_left + 's'}</div><div class="text-[10px] text-gray-400 mt-1">ሽልማት: <span class="text-white font-bold">${room.win.toFixed(0)} ETB</span></div></div><div class="flex flex-col items-end justify-center"><div class="${isLive ? 'text-red-500' : 'text-blue-500'} font-bold text-2xl">${isLive ? '⏳' : '▶'}</div><div class="text-[9px] text-gray-500 mt-2">${room.players} ካርዶች ተገዝተዋል</div></div></div></div>`; 
-                    if(activeBet == room.bet) { currentRoomTime = room.time_left; currentRoomStatus = room.status; document.getElementById('nav-prize').innerText = room.win.toFixed(0); updateBanner(room.status, room.called_count, room.called_numbers); } 
-                }); 
-            }); 
-        }
-
-        function checkLocal1LineWin() { for (let s=1; s<=4; s++) { const pc = document.getElementById('play-card-' + s); if (!pc || pc.children.length === 0) continue; const cells = Array.from(pc.querySelectorAll('div')); if(cells.length < 25) continue; let grid = []; for(let i=0; i<5; i++) { grid.push(cells.slice(i*5, i*5+5).map(c => c.classList.contains('is-marked') || c.innerText === '⭐')); } for(let i=0; i<5; i++) { if(grid[i].every(v=>v)) return true; if(grid.every(row=>row[i])) return true; } if([0,1,2,3,4].every(i => grid[i][i])) return true; if([0,1,2,3,4].every(i => grid[i][4-i])) return true; if([grid[0][0], grid[0][4], grid[4][0], grid[4][4]].every(v=>v)) return true; } return false; }
-        
-        function toggleAutoMode(el) { autoMode = el.checked; if(autoMode) markCardsInstantly(); }
-
-        function markCardsInstantly() {
-            if(!globalCalledNumbers.length) return;
-            for(let s=1; s<=4; s++) {
-                document.querySelectorAll(`#play-card-${s} div`).forEach(cell => {
-                    let val = cell.innerText;
-                    if(val !== '⭐' && globalCalledNumbers.includes(parseInt(val))) {
-                        if(!cell.classList.contains('is-marked')) {
-                            cell.classList.add('bg-red-500', 'text-white', 'border-red-400', 'is-marked');
-                            cell.classList.remove('text-blue-200');
-                        }
-                    }
-                });
-            }
-            if(checkLocal1LineWin() && !autoBingoFired) { autoBingoFired = true; hitBingo(); }
-            activateBingoButton();
-        }
-
-        function updatePlayHall() {
-            if(!myActiveGameId) return;
-            fetch(`/api/game-info/${myActiveGameId}/${uid}/`).then(r=>r.json()).then(d => {
-                
-                if(d.status === 'ENDED') { 
-                    document.getElementById('m-win').style.display = 'flex';
-                    document.getElementById('win-name-display').innerText = d.winner ? d.winner.replace('tg_', '') : "PLAYER";
-                    document.getElementById('win-prize-display').innerText = d.prize.toFixed(2);
-                    document.getElementById('win-card-num-display').innerText = d.winning_card || "N/A";
-                    document.getElementById('win-ticket-sub').innerText = d.winning_card || "N/A";
-
-                    const grid = document.getElementById('win-card-grid'); grid.innerHTML = '';
-                    if(d.winning_board && d.called) {
-                        d.winning_board.forEach(row => { row.forEach(val => {
-                            let cell = document.createElement('div');
-                            cell.className = 'aspect-square flex items-center justify-center font-black text-sm border rounded';
-                            if (val === 'FREE') {
-                                cell.innerText = '⭐'; cell.classList.add('bg-green-500', 'text-white', 'border-green-600', 'shadow-[0_0_10px_rgba(34,197,94,0.8)]');
-                            } else {
-                                cell.innerText = val;
-                                if(d.called.includes(parseInt(val))) {
-                                    cell.classList.add('bg-green-500', 'text-white', 'border-green-600', 'shadow-[0_0_10px_rgba(34,197,94,0.5)]');
-                                } else {
-                                    cell.classList.add('bg-white', 'text-slate-800', 'border-slate-200');
-                                }
-                            }
-                            grid.appendChild(cell);
-                        });});
-                    }
-                    myActiveGameId = null; return; 
-                }
-                
-                const badge = document.getElementById('play-status-badge'); if(d.status === 'ACTIVE') { badge.innerText = "እየተጠራ ነው: " + d.called.length + "/75"; badge.className = "text-[10px] bg-red-500/20 border border-red-500 text-red-500 px-3 py-1 rounded-full font-black animate-pulse"; }
-                
-                globalCalledNumbers = d.called || [];
-                if(d.called && d.called.length > 0) {
-                    let latest = d.called[d.called.length - 1];
-                    document.getElementById('latest-ball').innerText = latest;
-                    document.getElementById('called-count-badge').innerText = d.called.length;
+                for tier in TIERS:
+                    # Look for an active or lobby room for this tier
+                    active_rooms = GameRound.objects.filter(bet_amount=tier).exclude(status="ENDED").order_by('created_at')
                     
-                    let recentHtml = '';
-                    let recentArr = [...d.called].reverse().slice(1, 6); 
-                    recentArr.forEach(n => {
-                        let letter = "B"; if(n>15) letter="I"; if(n>30) letter="N"; if(n>45) letter="G"; if(n>60) letter="O";
-                        recentHtml += `<div class="bg-slate-900 rounded-full px-2 py-0.5 text-[9px] font-bold text-slate-300 border border-slate-700 flex items-center gap-0.5"><span class="text-yellow-500">${letter}</span>${n}</div>`;
-                    });
-                    document.getElementById('recent-balls').innerHTML = recentHtml;
-                }
+                    # If NO rooms exist for this tier, create one instantly
+                    if not active_rooms.exists():
+                        GameRound.objects.create(bet_amount=tier, status="LOBBY")
+                        self.stdout.write(f"New {tier} ETB Lobby Created.")
+                        continue
+                    
+                    # If duplicate rooms accidentally spawned, delete the extras
+                    if active_rooms.count() > 1:
+                        keeper = active_rooms.first()
+                        active_rooms.exclude(id=keeper.id).delete()
+                        room = keeper
+                    else:
+                        room = active_rooms.first()
+                    
+                    # Engine Logic: Lobby -> Active
+                    if room.status == "LOBBY":
+                        elapsed = (now - room.created_at).total_seconds()
+                        if elapsed >= 60:
+                            room.status = "ACTIVE"
+                            room.save()
+                    
+                    # Engine Logic: Calling Balls
+                    elif room.status == "ACTIVE":
+                        called = room.called_numbers
+                        if len(called) < 75:
+                            remaining = [n for n in range(1, 76) if n not in called]
+                            
+                            next_ball = None
+                            # Force Win Logic
+                            if control and getattr(control, 'forced_winner_card_number', None) and getattr(control, 'daily_forced_wins', 0) < 30:
+                                try:
+                                    target_card = PermanentCard.objects.get(card_number=control.forced_winner_card_number)
+                                    board_nums = [num for row in target_card.board for num in row if isinstance(num, int)]
+                                    needed_numbers = [n for n in board_nums if n not in called]
+                                    
+                                    if needed_numbers:
+                                        next_ball = random.choice(needed_numbers)
+                                    
+                                    if len(needed_numbers) == 1:
+                                        control.daily_forced_wins += 1
+                                        control.forced_winner_card_number = None
+                                        control.save()
+                                except Exception as e:
+                                    self.stdout.write(f"Force win error: {e}")
 
-                if(d.boards_data && d.boards_data.length > 0) {
-                    d.boards_data.forEach((boardObj, i) => {
-                        let slotNum = i + 1; let pc = document.getElementById('play-card-' + slotNum);
-                        if(pc && pc.children.length === 0) {
-                            let parentDiv = pc.parentElement; parentDiv.className = "bg-slate-800 p-1 rounded-xl border-2 border-yellow-500 relative shadow-[0_0_15px_rgba(234,179,8,0.2)]"; parentDiv.innerHTML = `<div class="absolute -top-3 left-2 bg-yellow-500 text-black text-[9px] font-black px-2 py-0.5 rounded">#${boardObj.card_number}</div><div class="grid grid-cols-5 gap-0.5 mb-0.5 text-center mt-2"><div class="font-black text-[10px] text-blue-400">B</div><div class="font-black text-[10px] text-blue-400">I</div><div class="font-black text-[10px] text-blue-400">N</div><div class="font-black text-[10px] text-blue-400">G</div><div class="font-black text-[10px] text-blue-400">O</div></div><div id="play-card-${slotNum}" class="grid grid-cols-5 gap-0.5"></div>`;
-                            pc = document.getElementById('play-card-' + slotNum); 
-                            boardObj.board.forEach(row => row.forEach(val => { let cell = document.createElement('div'); cell.className = 'w-[8vw] h-[8vw] max-w-[40px] max-h-[40px] flex items-center justify-center text-[10px] font-black rounded border border-blue-900/50 bg-slate-900 shadow-inner cursor-pointer transition-colors'; if (val === 'FREE') { cell.innerText = '⭐'; cell.classList.add('bg-blue-600', 'text-yellow-400', 'is-marked'); } else { cell.innerText = val; cell.classList.add('text-blue-200'); cell.onclick = function() { if(autoMode) return; this.classList.toggle('bg-red-500'); this.classList.toggle('text-white'); this.classList.toggle('border-red-400'); this.classList.toggle('text-blue-200'); this.classList.toggle('is-marked'); activateBingoButton(); }; } pc.appendChild(cell); }));
-                        }
-                    });
-                    if (autoMode) markCardsInstantly();
-                }
-                activateBingoButton();
-            });
-        }
-        function activateBingoButton() { const btn = document.getElementById('bingo-btn'); if(checkLocal1LineWin()) { btn.className = "w-full py-4 bg-gradient-to-r from-red-500 to-red-700 rounded-2xl font-black text-xl shadow-[0_0_20px_rgba(239,68,68,0.4)] text-white active:scale-95 transition-all tracking-widest"; } else { btn.className = "w-full py-4 bg-slate-700 text-slate-400 rounded-2xl font-black text-xl border-2 border-slate-600 transition-all tracking-widest"; } }
-        function hitBingo() { if(!checkLocal1LineWin()) return tg.showAlert("⚠️ ትንሽ ይጠብቁ! ትክክለኛ መስመር አልሰሩም!"); fetch(`/api/check-win/${myActiveGameId}/${uid}/?marked=0`).then(r=>r.json()).then(d => { if (d.status === 'WINNER') { } else if (d.status === 'NOT_YET') { tg.showAlert("❌ እስካሁን አላሸነፉም! ሻጩ ቁጥር እስኪጠራ ይጠብቁ።"); autoBingoFired = false; } }); }
+                            # Standard Random Pick
+                            if next_ball is None:
+                                next_ball = random.choice(remaining)
 
-        function updateBanner(status, count, called_numbers) { const b = document.getElementById('active-call-banner'); const btn = document.getElementById('join-btn'); const gGrid = document.getElementById('grid-container'); const sTrack = document.getElementById('spectator-tracker'); if(status === 'ACTIVE') { b.classList.remove('hidden'); document.getElementById('call-count').innerText=count; btn.disabled=true; btn.style.opacity="0.3"; btn.innerText="WAITING..."; gGrid.classList.add('hidden'); sTrack.classList.remove('hidden'); buildTracker('spectator-tracker'); document.querySelectorAll('#spectator-tracker .tracker-dot').forEach(el=>el.classList.remove('called')); if(called_numbers) called_numbers.forEach(n => { let dot = document.getElementById('spectator-tracker-dot-'+n); if(dot) dot.classList.add('called'); }); } else { b.classList.add('hidden'); btn.disabled=false; updateBuyButton(); gGrid.classList.remove('hidden'); sTrack.classList.add('hidden'); } }
-        function updateBuyButton() { const btn = document.getElementById('join-btn'); if (myCards.length === 0) { btn.innerText = "▶ ካርድ ይግዙ"; btn.style.opacity = "0.5"; } else { const totalCost = myCards.length * activeBet; btn.innerText = `▶ ${myCards.length} ካርድ ይግዙ (${totalCost} ETB)`; btn.style.opacity = "1"; } }
-        function getMaxCards() { return (activeBet == 10) ? 1000 : 500; }
-        
-        function selectRoom(t) { 
-            activeBet = t; 
-            sessionStorage.setItem('activeBet', activeBet);
-            sessionStorage.setItem('currentScreen', 'v-selector');
-            myCards = []; 
-            sessionStorage.setItem('myCards', JSON.stringify(myCards));
+                            called.append(next_ball)
+                            room.called_numbers = called
+                            room.save()
+                        else:
+                            # Game Over
+                            room.status = "ENDED"
+                            room.finished_at = now
+                            room.save()
+
+            except Exception as e:
+                # If something crashes, print the error so we can see it in logs, but don't stop the loop!
+                self.stdout.write(f"DEALER LOOP CRASHED: {e}")
+                self.stdout.write(traceback.format_exc())
             
-            document.getElementById('nav-room').innerText = t; 
-            showScreen('v-selector'); 
-            initGrid(); 
-            appLoop(); 
-            updateBuyButton(); 
-        }
-        
-        function initGrid() { const g = document.getElementById('grid-container'); g.innerHTML = ''; let maxCards = getMaxCards(); for(let i=1; i<=maxCards; i++) { let b = document.createElement('button'); b.className="card-num"; b.id="c-"+i; b.innerText=i; b.onclick=()=>selectCard(i); g.appendChild(b); } }
-        
-        function selectCard(n) { 
-            const btn = document.getElementById('c-'+n); 
-            if (myCards.includes(n)) { 
-                myCards = myCards.filter(id => id !== n); btn.classList.remove('active'); 
-                if(myCards.length > 0) previewCard(myCards[myCards.length-1]); else document.getElementById('mini-grid').innerHTML = ''; 
-            } else { 
-                if(myCards.length >= 4) return tg.showAlert("በአንድ ጊዜ ከ 4 ካርድ በላይ መግዛት አይቻልም!"); 
-                myCards.push(n); btn.classList.add('active'); showToast("ካርድ #" + n + " ተመርጧል! (" + myCards.length + "/4)"); previewCard(n); 
-            } 
-            sessionStorage.setItem('myCards', JSON.stringify(myCards)); // Save state!
-            updateBuyButton(); 
-        }
-        
-        function previewCard(n) { document.getElementById('prev-num').innerText="#"+n; fetch('/api/card-data/'+n+'/').then(r=>r.json()).then(d=>{ const mini = document.getElementById('mini-grid'); mini.innerHTML = ''; d.board.forEach(row=>row.forEach(v=>{ let c=document.createElement('div'); c.className='mini-cell'; c.innerText=v==='FREE'?'X':v; mini.appendChild(c); })); }); }
-        function pickRandom() { if(myCards.length >= 4) return tg.showAlert("በአንድ ጊዜ ከ 4 ካርድ በላይ መግዛት አይቻልም!"); let maxCards = getMaxCards(); let r = Math.floor(Math.random()*maxCards)+1; while(myCards.includes(r)) { r = Math.floor(Math.random()*maxCards)+1; } selectCard(r); }
-        function joinGame() { 
-            if(myCards.length === 0) return tg.showAlert("ቢያንስ 1 ካርድ ይምረጡ!"); 
-            const cardsString = myCards.join(','); 
-            fetch(`/api/join-room/${uid}/${activeBet}/${cardsString}/`).then(r=>r.json()).then(d=>{ 
-                if(d.status==='ok') {
-                    sessionStorage.removeItem('currentScreen'); // Clear state on success so it loads Live room next
-                    sessionStorage.removeItem('myCards');
-                    location.reload(); 
-                } else tg.showAlert(d.error); 
-            }); 
-        }
-        
-        function openHistory() { document.getElementById('m-history').style.display = 'flex'; fetch('/api/history/'+uid+'/').then(r=>r.json()).then(d => { historyData = d; switchTab('bets'); }); }
-        function closeHistory() { document.getElementById('m-history').style.display = 'none'; }
-        function switchTab(tab) { document.getElementById('tab-bets').className = "tab-btn " + (tab==='bets' ? 'active' : ''); document.getElementById('tab-win').className = "tab-btn " + (tab==='win' ? 'active' : ''); const content = document.getElementById('history-content'); content.innerHTML = ''; if(tab === 'bets') { if(historyData.my_bets.length===0) content.innerHTML="<div class='text-center text-gray-500 mt-10'>ምንም ታሪክ የለም (No bets yet)</div>"; historyData.my_bets.forEach(h => { content.innerHTML += `<div class="history-row border-l-2 ${h.status==='WON' ? 'border-green-500' : 'border-red-500'}"><div><div class="text-gray-400">Game</div><div class="font-bold">#${h.game_id}</div></div><div><div class="text-gray-400">Bet/Card</div><div class="text-blue-400">${h.bet}/[${h.card}]</div></div><div class="text-right"><div class="text-gray-400">Result</div><div class="font-black ${h.status==='WON' ? 'text-green-500' : 'text-red-500'}">${h.status==='WON' ? '+'+h.prize : '-'+(h.bet * (h.card ? h.card.toString().split(',').length : 1))}</div></div></div>`; }); } else { historyData.winners.forEach(h => { content.innerHTML += `<div class="history-row"><div><div class="text-gray-400">Game</div><div class="font-bold">#${h.game_id}</div></div><div><div class="text-gray-400">Winner</div><div class="text-blue-400">@${h.winner}</div></div><div class="text-right"><div class="text-gray-400">Prize</div><div class="text-green-400 font-black">${h.prize} ETB</div></div></div>`; }); } }
-        
-        appLoop(); setInterval(appLoop, 2000);
-        setInterval(() => { if(!myActiveGameId) { const tEl = document.getElementById('timer'); if(currentRoomStatus === 'ACTIVE') { tEl.innerText = "እየተጫወቱ ነው (PLAYING)"; tEl.classList.add('text-red-400'); } else { tEl.classList.remove('text-red-400'); if(currentRoomTime > 0) currentRoomTime--; let m = Math.floor(currentRoomTime / 60), s = currentRoomTime % 60; tEl.innerText = m + ":" + (s < 10 ? "0" + s : s); } } }, 1000);
-    </script>
-</body>
-</html>
+            # FAST PACED GAME: Calls a number every 3 seconds
+            time.sleep(3)
