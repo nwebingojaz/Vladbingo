@@ -29,7 +29,9 @@ def lobby_info(request, tg_id):
         p_count = len(r['players'])
         # Calculate total cards bought by all players for accurate prize pool
         total_cards = sum(len(c) if isinstance(c, list) else 1 for c in r['players'].values())
-        win_amount = float(r['bet_amount'] * total_cards) * 0.8
+        
+        # FIXED: 27% Commission (73% Payout)
+        win_amount = float(r['bet_amount'] * total_cards) * 0.73
         
         elapsed = (now - r['created_at']).total_seconds()
         room_data.append({
@@ -95,7 +97,9 @@ def get_game_info(request, game_id, tg_id):
             except: pass
             
         total_cards_in_game = sum(len(cards) if isinstance(cards, list) else 1 for cards in game.players.values())
-        prize = (Decimal(total_cards_in_game) * game.bet_amount) * Decimal("0.80")
+        
+        # FIXED: 27% Commission (73% Payout)
+        prize = (Decimal(total_cards_in_game) * game.bet_amount) * Decimal("0.73")
         
         resp = {
             'boards_data': boards_data, 'called': game.called_numbers, 
@@ -168,7 +172,9 @@ def check_win(request, game_id, tg_id):
         
         if winning_card:
             total_cards = sum(len(cards) if isinstance(cards, list) else 1 for cards in game.players.values())
-            prize = (Decimal(total_cards) * game.bet_amount) * Decimal("0.80")
+            
+            # FIXED: 27% Commission (73% Payout)
+            prize = (Decimal(total_cards) * game.bet_amount) * Decimal("0.73")
             
             user.operational_credit += prize; user.save()
             game.status = "ENDED"; game.winner_username = user.username; game.winner_prize = prize
@@ -245,7 +251,6 @@ def verify_otp(request):
         try:
             user = User.objects.get(username=f"tg_{tg_id}")
             
-            # FIX: Removed the strict timezone.now() check to stop timezone mismatch errors!
             if user.otp_code == otp:
                 user.otp_code = None
                 user.save()
