@@ -1,15 +1,33 @@
 import os, sys, django
 from pathlib import Path
 from asgiref.sync import sync_to_async
+from django.db.models import Sum
+from django.utils import timezone
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, WebAppInfo
-from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 
+# ==========================================
+# 1. BOOTSTRAP DJANGO
+# ==========================================
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(BASE_DIR))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "vlad_bingo.settings")
 django.setup()
-from bingo.models import User
 
+from bingo.models import User, Transaction, GameControl, GameRound
+
+# ==========================================
+# 2. ADMIN CONFIGURATION
+# ==========================================
+# Make sure to set ADMIN_TG_ID in your Render environment variables!
+ADMIN_TG_ID = os.environ.get("ADMIN_TG_ID", "YOUR_TG_ID") 
+
+def is_admin(tg_id):
+    return str(tg_id) == str(ADMIN_TG_ID)
+
+# ==========================================
+# 3. DATABASE WRAPPERS (Sync to Async)
+# ==========================================
 def db_op(uid, action, val=None):
     user, _ = User.objects.get_or_create(username=f"tg_{uid}")
     if action == "name": 
@@ -23,8 +41,68 @@ def db_op(uid, action, val=None):
     user.save()
     return user
 
+@sync_to_async
+def get_pending_transactions():
+    return list(Transaction.objects.filter(status="pending").order_by('timestamp'))
+
+@sync_to_async
+def process_transaction(tx_id, new_status):
+    try:
+        tx = Transaction.objects.get(id=tx_id)
+        if tx.status != 'pending': return False, f"Transaction #{tx_id} is already {tx.status}."
+        tx.status = new_status; tx.save()
+        return True, f"Transaction #{tx_id} successfully {new_status}!"
+    except Transaction.DoesNotExist: return False, f"Transaction #{tx_id} not found."
+
+@sync_to_async
+def set_force_win(card_number):
+    control, _ = GameControl.objects.get_or_create(id=1)
+    if card_number == 0:
+        control.forced_winner_card_number = None; control.save()
+        return "Cleared forced winner."
+    else:
+        control.forced_winner_card_number = card_number; control.save()
+        return f"Card #{card_number} is now forced to win!"
+
+@sync_to_async
+def get_casino_stats():
+    total_users = User.objects.count()
+    total_liability = User.objects.aggregate(Sum('operational_credit'))['operational_credit__sum'] or 0
+    today = timezone.now().date()
+    deposits = Transaction.objects.filter(type__startswith='DEPOSIT', status='approved', timestamp__date=today).aggregate(Sum('amount'))['amount__sum'] or 0
+    withdrawals = Transaction.objects.filter(type='WITHDRAWAL', status='approved', timestamp__date=today).aggregate(Sum('amount'))['amount__sum'] or 0
+    return f"📊 <b>CASINO STATS</b>\n\n👥 Total Users: {total_users}\n💰 Wallet Liability: {total_liability} ETB\n\n<b>TODAY:</b>\n📥 Deposits: {deposits} ETB\n📤 Withdrawals: {withdrawals} ETB\n💵 Net: {deposits - withdrawals} ETB"
+
+@sync_to_async
+def get_and_mark_finished_rooms():
+    finished_rooms = list(GameRound.objects.filter(status="ENDED", winner_username__isnull=False))
+    for room in finished_rooms:
+        room.status = "ANNOUNCED"
+        room.save(update_fields=['status'])
+    return finished_rooms
+
+# ==========================================
+# 4. BACKGROUND BROADCASTER JOB
+# ==========================================
+async def broadcast_winners_task(context: ContextTypes.DEFAULT_TYPE):
+    channel_id = os.environ.get("CHANNEL_ID", "@bigestbingo")
+    finished_rooms = await get_and_mark_finished_rooms()
+    
+    for room in finished_rooms:
+        msg = (f"🏆 *Game Finished!*\n\n"
+               f"💰 Bet: {room.bet_amount} ETB\n"
+               f"👤 Winner: {room.winner_username}\n"
+               f"🎁 Prize: {room.winner_prize} ETB\n\n"
+               f"Play now: https://t.me/Bigestbingobot")
+        try:
+            await context.bot.send_message(chat_id=channel_id, text=msg, parse_mode="Markdown")
+        except Exception as e:
+            print(f"Broadcast failed: {e}")
+
+# ==========================================
+# 5. USER FLOW COMMANDS (Your original code)
+# ==========================================
 async def send_main_menu(update: Update, user):
-    # GUARANTEED WORKING IMAGE LINK
     photo_url = "https://i.ibb.co/3m20B6k/bingo-money.jpg"
     
     caption = (
@@ -33,6 +111,10 @@ async def send_main_menu(update: Update, user):
         f"💰 **ቀሪ ሂሳብ (Balance):** {user.operational_credit} ETB\n\n"
         f"ከታች ካሉት አማራጮች ውስጥ ይምረጡ:\n_(Choose an option below)_"
     )
+
+    # Append Admin Commands if the user is an admin
+    if is_admin(user.username.replace('tg_', '')):
+        caption += "\n\n👑 *Admin Commands:*\n/pending - View pending TXs\n/approve [id] - Approve TX\n/reject [id] - Reject TX\n/forcewin [card_num] - Force a card\n/stats - View Casino Stats"
     
     base_url = "https://vladbingo-dmzg.onrender.com/api/live/"
     
@@ -97,6 +179,46 @@ async def handle_buttons(update: Update, context):
     else:
         await query.answer()
 
+# ==========================================
+# 6. ADMIN COMMAND HANDLERS
+# ==========================================
+async def cmd_pending(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.message.from_user.id): return
+    txs = await get_pending_transactions()
+    if not txs: return await update.message.reply_text("✅ No pending transactions!")
+    msg = "📝 <b>PENDING TRANSACTIONS:</b>\n\n"
+    for tx in txs: msg += f"<b>ID:</b> <code>{tx.id}</code>\n<b>Type:</b> {tx.type}\n<b>Amount:</b> {tx.amount} ETB\n<b>Note:</b> {tx.note}\n--------------------\n"
+    await update.message.reply_text(msg, parse_mode="HTML")
+
+async def cmd_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.message.from_user.id): return
+    try:
+        success, msg = await process_transaction(int(context.args[0]), "approved")
+        await update.message.reply_text(f"✅ {msg}" if success else f"⚠️ {msg}")
+    except (IndexError, ValueError): await update.message.reply_text("⚠️ Usage: /approve <transaction_id>")
+
+async def cmd_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.message.from_user.id): return
+    try:
+        success, msg = await process_transaction(int(context.args[0]), "rejected")
+        await update.message.reply_text(f"🚫 {msg}" if success else f"⚠️ {msg}")
+    except (IndexError, ValueError): await update.message.reply_text("⚠️ Usage: /reject <transaction_id>")
+
+async def cmd_forcewin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.message.from_user.id): return
+    try:
+        msg = await set_force_win(int(context.args[0]))
+        await update.message.reply_text(f"🎯 {msg}")
+    except (IndexError, ValueError): await update.message.reply_text("⚠️ Usage: /forcewin <card_number>\nUse 0 to clear.")
+
+async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.message.from_user.id): return
+    msg = await get_casino_stats()
+    await update.message.reply_text(msg, parse_mode="HTML")
+
+# ==========================================
+# 7. RUN BOT
+# ==========================================
 def run():
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     if not token:
@@ -104,13 +226,27 @@ def run():
         return
         
     app = Application.builder().token(token).post_init(lambda a: a.bot.delete_webhook(drop_pending_updates=True)).build()
+    
+    # Add User Handlers
     app.add_handler(CommandHandler("start", start))
+    
+    # Add Admin Command Handlers
+    app.add_handler(CommandHandler("pending", cmd_pending))
+    app.add_handler(CommandHandler("approve", cmd_approve))
+    app.add_handler(CommandHandler("reject", cmd_reject))
+    app.add_handler(CommandHandler("forcewin", cmd_forcewin))
+    app.add_handler(CommandHandler("stats", cmd_stats))
+    
+    # Add Text/Contact/Callback Handlers
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
     app.add_handler(CallbackQueryHandler(handle_buttons))
     
-    print("BIGEST BINGO BOT Started successfully!")
-    app.run_polling()
+    # Start the Broadcaster Background Job (Runs every 10 seconds)
+    app.job_queue.run_repeating(broadcast_winners_task, interval=10, first=5)
+    
+    print("🚀 BIGEST BINGO BOT & BROADCASTER ARE RUNNING...")
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__": 
     run()
