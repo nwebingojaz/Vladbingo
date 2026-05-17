@@ -9,79 +9,83 @@ from django.http import JsonResponse, HttpResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
+from django.db import transaction
 from .models import User, PermanentCard, GameRound, Transaction, GameControl
 
-def home(request): return HttpResponse("<h1>BIGEST BINGO BOT ENGINE ACTIVE</h1>")
-def live_view(request): return render(request, 'live_view.html')
+def home(request): 
+    return HttpResponse("<h1>BIGEST BINGO BOT ENGINE ACTIVE</h1>")
+
+def live_view(request): 
+    return render(request, 'live_view.html')
 
 # ==========================================
-# CRASH-PROOF TIME-BASED GAME ENGINE
+# ATOMIC TIME-BASED GAME ENGINE
 # ==========================================
-def process_game_state(game):
-    if game.status == "ENDED": return
-    now = timezone.now()
-    elapsed = (now - game.created_at).total_seconds()
-    
-    # 1. LOBBY PHASE
-    if game.status == "LOBBY":
-        if elapsed >= 60:
-            if not game.players:
-                game.created_at = now # Reset timer if empty
-                game.save(update_fields=['created_at'])
-            else:
-                game.status = "ACTIVE"
-                game.save(update_fields=['status'])
-                elapsed = (now - game.created_at).total_seconds() # Recalculate
-                
-    # 2. ACTIVE PHASE (Calling Balls based on time)
-    if game.status == "ACTIVE":
-        time_in_active = elapsed - 60
-        expected_balls = int(time_in_active / 3) # 1 ball every 3 seconds
-        
-        if expected_balls > 75: expected_balls = 75
-        current_balls = len(game.called_numbers)
-        
-        if expected_balls > current_balls:
-            remaining = [n for n in range(1, 76) if n not in game.called_numbers]
-            balls_to_add = expected_balls - current_balls
+def process_game_state(game_id):
+    try:
+        with transaction.atomic():
+            game = GameRound.objects.select_for_update(nowait=True).get(id=game_id)
+            if game.status == "ENDED": return
             
-            try: control = GameControl.objects.first()
-            except: control = None
+            now = timezone.now()
+            elapsed = (now - game.created_at).total_seconds()
             
-            for _ in range(balls_to_add):
-                if not remaining: break
+            if game.status == "LOBBY":
+                if elapsed >= 60:
+                    if not game.players:
+                        game.created_at = now 
+                        game.save(update_fields=['created_at'])
+                    else:
+                        game.status = "ACTIVE"
+                        game.created_at = now 
+                        game.save(update_fields=['status', 'created_at'])
+                        
+            elif game.status == "ACTIVE":
+                expected_balls = int(elapsed / 3)
+                if expected_balls > 75: expected_balls = 75
                 
-                next_ball = None
-                # Force Win Logic
-                if control and getattr(control, 'forced_winner_card_number', None) and getattr(control, 'daily_forced_wins', 0) < 30:
-                    try:
-                        target_card = PermanentCard.objects.get(card_number=control.forced_winner_card_number)
-                        board_nums = [num for row in target_card.board for num in row if isinstance(num, int)]
-                        needed = [n for n in board_nums if n not in game.called_numbers]
-                        if needed:
-                            next_ball = random.choice(needed)
-                        if len(needed) <= 1:
-                            control.daily_forced_wins += 1
-                            control.forced_winner_card_number = None
-                            control.save()
-                    except: pass
+                current_called = list(game.called_numbers)
+                current_balls = len(current_called)
                 
-                if next_ball is None:
-                    next_ball = random.choice(remaining)
+                if expected_balls > current_balls:
+                    remaining = [n for n in range(1, 76) if n not in current_called]
+                    balls_to_add = expected_balls - current_balls
                     
-                game.called_numbers.append(next_ball)
-                remaining.remove(next_ball)
-                
-            game.save(update_fields=['called_numbers'])
-            
-        if len(game.called_numbers) >= 75:
-            game.status = "ENDED"
-            game.finished_at = now
-            game.save(update_fields=['status', 'finished_at'])
+                    try: control = GameControl.objects.first()
+                    except: control = None
+                    
+                    for _ in range(balls_to_add):
+                        if not remaining: break
+                        next_ball = None
+                        if control and getattr(control, 'forced_winner_card_number', None) and getattr(control, 'daily_forced_wins', 0) < 30:
+                            try:
+                                target_card = PermanentCard.objects.get(card_number=control.forced_winner_card_number)
+                                board_nums = [num for row in target_card.board for num in row if isinstance(num, int)]
+                                needed = [n for n in board_nums if n not in current_called]
+                                if needed:
+                                    next_ball = random.choice(needed)
+                                if len(needed) <= 1:
+                                    control.daily_forced_wins += 1
+                                    control.forced_winner_card_number = None
+                                    control.save()
+                            except: pass
+                        
+                        if next_ball is None:
+                            next_ball = random.choice(remaining)
+                            
+                        current_called.append(next_ball)
+                        remaining.remove(next_ball)
+                        
+                    game.called_numbers = current_called
+                    game.save(update_fields=['called_numbers'])
+                    
+                if len(game.called_numbers) >= 75:
+                    game.status = "ENDED"
+                    game.finished_at = now
+                    game.save(update_fields=['status', 'finished_at'])
+    except:
+        pass
 
-# ==========================================
-# VIEWS
-# ==========================================
 
 def get_card_data(request, num):
     try:
@@ -91,26 +95,33 @@ def get_card_data(request, num):
 
 def lobby_info(request, tg_id):
     user, _ = User.objects.get_or_create(username=f"tg_{tg_id}")
-    rooms = GameRound.objects.exclude(status="ENDED")
     
-    # Process all rooms to ensure time is perfectly synced
-    for r in rooms: process_game_state(r)
+    rooms = list(GameRound.objects.exclude(status="ENDED").values_list('id', flat=True))
+    for r_id in rooms: process_game_state(r_id)
         
+    updated_rooms = GameRound.objects.exclude(status="ENDED")
     room_data = []
     now = timezone.now()
-    for r in rooms:
+    
+    for r in updated_rooms:
         players_dict = r.players if r.players else {}
         p_count = len(players_dict)
         total_cards = sum(len(c) if isinstance(c, list) else 1 for c in players_dict.values())
         win_amount = float(r.bet_amount * total_cards) * 0.73
         
-        elapsed = (now - r.created_at).total_seconds()
+        if r.status == "LOBBY":
+            elapsed = (now - r.created_at).total_seconds()
+            time_left = max(0, 60 - int(elapsed))
+        else:
+            time_left = 0
+            
         room_data.append({
             'id': r.id, 'bet': float(r.bet_amount), 'players': p_count,
             'win': win_amount, 'status': r.status,
             'called_count': len(r.called_numbers),
-            'time_left': max(0, 60 - int(elapsed))
+            'time_left': time_left
         })
+        
     active_game = GameRound.objects.filter(players__has_key=str(tg_id)).exclude(status="ENDED").last()
     return JsonResponse({'balance': float(user.operational_credit), 'rooms': room_data, 'active_game_id': active_game.id if active_game else None})
 
@@ -133,9 +144,11 @@ def get_history(request, tg_id):
         })
     return JsonResponse({'winners': winners_data, 'my_bets': my_bets_data})
 
+@csrf_exempt
+@transaction.atomic
 def join_room(request, tg_id, bet, card_num):
     try:
-        user = User.objects.get(username=f"tg_{tg_id}")
+        user = User.objects.select_for_update().get(username=f"tg_{tg_id}")
         selected_cards = [int(x) for x in str(card_num).split(',') if x.isdigit()]
         
         if len(selected_cards) == 0: return JsonResponse({'status': 'error', 'error': 'No cards selected'})
@@ -145,8 +158,8 @@ def join_room(request, tg_id, bet, card_num):
         if user.operational_credit < total_cost: 
             return JsonResponse({'status': 'error', 'error': f'Low Balance! You need {total_cost} ETB'})
             
-        game = GameRound.objects.filter(status="LOBBY", bet_amount=bet).first()
-        if not game: return JsonResponse({'status': 'error', 'error': 'No Lobby'})
+        game = GameRound.objects.select_for_update().filter(status="LOBBY", bet_amount=bet).first()
+        if not game: return JsonResponse({'status': 'error', 'error': 'Room is already playing. Wait for next round.'})
         
         current_players = dict(game.players) if game.players else {}
         current_players[str(tg_id)] = selected_cards
@@ -161,9 +174,8 @@ def join_room(request, tg_id, bet, card_num):
 
 def get_game_info(request, game_id, tg_id):
     try:
+        process_game_state(game_id)
         game = GameRound.objects.get(id=game_id)
-        process_game_state(game) # Progress the game engine automatically!
-        
         user_cards = game.players.get(str(tg_id), [])
         if isinstance(user_cards, int): user_cards = [user_cards]
         
@@ -201,12 +213,12 @@ def get_game_info(request, game_id, tg_id):
                         card_obj = PermanentCard.objects.get(card_number=c_num)
                         board = card_obj.board; lines = 0
                         for i in range(5):
-                            if all(board[i][c] in called_set for c in range(5)): lines += 1
-                            if all(board[r][i] in called_set for r in range(5)): lines += 1
-                        if all(board[i][i] in called_set for i in range(5)): lines += 1
-                        if all(board[i][4-i] in called_set for i in range(5)): lines += 1
+                            if all(board[i][c] == "FREE" or board[i][c] in called_set for c in range(5)): lines += 1
+                            if all(board[r][i] == "FREE" or board[r][i] in called_set for r in range(5)): lines += 1
+                        if all(board[i][i] == "FREE" or board[i][i] in called_set for i in range(5)): lines += 1
+                        if all(board[i][4-i] == "FREE" or board[i][4-i] in called_set for i in range(5)): lines += 1
                         corners = [board[0][0], board[0][4], board[4][0], board[4][4]]
-                        if all(c in called_set for c in corners): lines += 1
+                        if all(c == "FREE" or c in called_set for c in corners): lines += 1
                         
                         if lines >= 1:
                             winning_card_num = c_num; winning_board = board; break
@@ -222,10 +234,12 @@ def get_game_info(request, game_id, tg_id):
         return JsonResponse(resp)
     except Exception as e: return JsonResponse({'error': str(e)}, status=404)
 
+@csrf_exempt
+@transaction.atomic
 def check_win(request, game_id, tg_id):
     try:
-        user = User.objects.get(username=f"tg_{tg_id}")
-        game = GameRound.objects.get(id=game_id)
+        user = User.objects.select_for_update().get(username=f"tg_{tg_id}")
+        game = GameRound.objects.select_for_update().get(id=game_id)
         if game.status != "ACTIVE": return JsonResponse({'status': 'WAITING'})
         
         user_cards = game.players.get(str(tg_id), [])
@@ -257,15 +271,14 @@ def check_win(request, game_id, tg_id):
             total_cards = sum(len(cards) if isinstance(cards, list) else 1 for cards in game.players.values())
             prize = (Decimal(total_cards) * game.bet_amount) * Decimal("0.73")
             
-            user.operational_credit += prize; user.save()
+            user.operational_credit += prize; user.save(update_fields=['operational_credit'])
             game.status = "ENDED"; game.winner_username = user.username; game.winner_prize = prize
-            game.finished_at = timezone.now(); game.save()
+            game.finished_at = timezone.now(); game.save(update_fields=['status', 'winner_username', 'winner_prize', 'finished_at'])
             return JsonResponse({'status': 'WINNER', 'prize': float(prize), 'winning_card': winning_card})
             
         return JsonResponse({'status': 'NOT_YET'})
     except Exception as e: return JsonResponse({'status': 'error', 'msg': str(e)})
 
-# --- TELEGRAM GATEWAY OTP & WALLET LOGIC KEEPS GOING BELOW ---
 def send_telegram_message(chat_id, text):
     try: requests.post(f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage", json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"}, timeout=5)
     except: pass
