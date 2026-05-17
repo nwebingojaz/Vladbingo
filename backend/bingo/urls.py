@@ -10,17 +10,11 @@ from .views import (
 urlpatterns = [
     path('live/', live_view),
     path('lobby-info/<int:tg_id>/', lobby_info),
-    
-    # CRITICAL FIX: Changed <int:card_num> to <str:card_num> to allow multiple cards!
     path('join-room/<int:tg_id>/<int:bet>/<str:card_num>/', join_room),
-    
     path('card-data/<int:num>/', get_card_data),
     path('game-info/<int:game_id>/<int:tg_id>/', get_game_info),
     path('history/<int:tg_id>/', get_history),
-    
     path('check-win/<int:game_id>/<int:tg_id>/', check_win),
-    
-    # Wallet & Security Routes
     path('send-otp/', send_otp),
     path('verify-otp/', verify_otp),
     path('submit-deposit/', submit_deposit),
