@@ -436,12 +436,14 @@
                 }
                 
                 const badge = document.getElementById('play-status-badge'); 
-                if(d.status === 'ACTIVE') { 
-                    badge.innerText = "እየተጠራ ነው: " + d.called.length + "/75"; 
-                    badge.className = "text-[10px] bg-red-500/20 border border-red-500 text-red-500 px-3 py-1 rounded-full font-black animate-pulse"; 
-                } else {
-                    badge.innerText = "ይጠብቁ (WAITING)"; 
-                    badge.className = "text-[10px] bg-blue-500/20 border border-blue-500 text-blue-500 px-3 py-1 rounded-full font-black"; 
+                if (badge) {
+                    if(d.status === 'ACTIVE') { 
+                        badge.innerText = "እየተጠራ ነው: " + d.called.length + "/75"; 
+                        badge.className = "text-[10px] bg-red-500/20 border border-red-500 text-red-500 px-3 py-1 rounded-full font-black animate-pulse"; 
+                    } else {
+                        badge.innerText = "ይጠብቁ (WAITING)"; 
+                        badge.className = "text-[10px] bg-blue-500/20 border border-blue-500 text-blue-500 px-3 py-1 rounded-full font-black"; 
+                    }
                 }
                 
                 document.getElementById('nav-prize').innerText = d.prize.toFixed(0);
