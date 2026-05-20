@@ -1,12 +1,15 @@
 import time, random, traceback
 from django.core.management.base import BaseCommand
 from django.utils import timezone
+from channels.layers import get_channel_layer # Import for WebSockets
+from asgiref.sync import async_to_sync           # Import for sync-to-async
 from bingo.models import GameRound, GameControl, PermanentCard
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        self.stdout.write("BIGEST BINGO DEALER: ENGINE STARTED (STABLE MODE)")
+        self.stdout.write("BIGEST BINGO DEALER: ENGINE STARTED (WEBSOCKET MODE)")
         TIERS = [10, 20, 30, 40, 50, 100]
+        channel_layer = get_channel_layer() # Initialize layer
 
         while True:
             try:
@@ -28,25 +31,16 @@ class Command(BaseCommand):
                     else:
                         room = active_rooms.first()
                     
-                    # -----------------------------
-                    # STATE MACHINE: LOBBY -> ACTIVE
-                    # -----------------------------
                     if room.status == "LOBBY":
                         elapsed = (now - room.created_at).total_seconds()
-                        
-                        # CRITICAL FIX: Only start the game if time is up AND there are players.
-                        # If time is up but 0 players, just reset the clock so the room ID stays the same!
                         if elapsed >= 60:
                             if not room.players:
-                                room.created_at = now  # Reset timer, keep the same room
+                                room.created_at = now
                                 room.save(update_fields=['created_at'])
                             else:
                                 room.status = "ACTIVE"
                                 room.save(update_fields=['status'])
                     
-                    # -----------------------------
-                    # STATE MACHINE: CALLING BALLS
-                    # -----------------------------
                     elif room.status == "ACTIVE":
                         called = room.called_numbers
                         if len(called) < 75:
@@ -71,12 +65,32 @@ class Command(BaseCommand):
                             called.append(next_ball)
                             room.called_numbers = called
                             room.save(update_fields=['called_numbers'])
+
+                            # 🚀 WEBSOCKET BROADCAST
+                            async_to_sync(channel_layer.group_send)(
+                                f'game_{room.id}',
+                                {
+                                    'type': 'bingo_message',
+                                    'message': {
+                                        'action': 'new_ball',
+                                        'ball': next_ball,
+                                        'called_count': len(called)
+                                    }
+                                }
+                            )
                         else:
                             room.status = "ENDED"
                             room.finished_at = now
                             room.save(update_fields=['status', 'finished_at'])
+                            
+                            # 🚀 GAME OVER BROADCAST
+                            async_to_sync(channel_layer.group_send)(
+                                f'game_{room.id}',
+                                {'type': 'bingo_message', 'message': {'action': 'game_ended'}}
+                            )
 
             except Exception as e:
                 self.stdout.write(f"ENGINE ERROR: {e}")
+                traceback.print_exc()
             
             time.sleep(3)
