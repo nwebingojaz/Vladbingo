@@ -277,6 +277,10 @@
         
         let historyData = {winners: [], my_bets: []}; let currentRoomTime = 0; let currentRoomStatus = 'LOBBY'; let myActiveGameId = null;
         let currentMethod = ""; let autoMode = false; let autoBingoFired = false; let globalCalledNumbers = [];
+        
+        // WebSocket Globals
+        let gameSocket = null;
+        let cardsLoaded = false;
 
         window.addEventListener('DOMContentLoaded', (event) => {
             const hash = window.location.hash.substring(1);
@@ -337,7 +341,86 @@
         function submitTransferAction(url, payload) { if(!payload.amount || !payload.account) return tg.showAlert("እባክዎትን ሁሉንም ቦታ ይሙሉ።"); payload.tg_id = uid; fetch(url, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) }).then(r=>r.json()).then(d => { tg.showAlert(d.message); if(d.status==='success') location.reload(); }); }
 
         function showToast(msg) { const t = document.getElementById('toast-msg'); t.innerText = msg; t.classList.remove('opacity-0'); setTimeout(() => { t.classList.add('opacity-0'); }, 1500); }
-        function appLoop() { if (myActiveGameId) { updatePlayHall(); } else { refreshLobby(); } }
+        
+        // WebSocket Connection Manager
+        function connectWebSocket(gameId) {
+            if (gameSocket) return;
+            const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+            const socketUrl = protocol + window.location.host + '/ws/game/' + gameId + '/';
+            
+            gameSocket = new WebSocket(socketUrl);
+            
+            gameSocket.onmessage = function(e) {
+                const data = JSON.parse(e.data);
+                
+                if (data.action === 'new_ball') {
+                    // Update latest ball drawn
+                    document.getElementById('latest-ball').innerText = data.ball;
+                    document.getElementById('called-count-badge').innerText = data.called_count;
+                    
+                    const badge = document.getElementById('play-status-badge');
+                    if (badge) {
+                        badge.innerText = "እየተጠራ ነው: " + data.called_count + "/75";
+                        badge.className = "text-[10px] bg-red-500/20 border border-red-500 text-red-500 px-3 py-1 rounded-full font-black animate-pulse";
+                    }
+
+                    if (!globalCalledNumbers.includes(data.ball)) {
+                        globalCalledNumbers.push(data.ball);
+                    }
+                    
+                    // Add dynamically to the recent balls queue
+                    let letter = "B"; if(data.ball>15) letter="I"; if(data.ball>30) letter="N"; if(data.ball>45) letter="G"; if(data.ball>60) letter="O";
+                    let ballHtml = `<div class="bg-slate-900 rounded-full px-2 py-0.5 text-[9px] font-bold text-slate-300 border border-slate-700 flex items-center gap-0.5"><span class="text-yellow-500">${letter}</span>${data.ball}</div>`;
+                    
+                    const recentContainer = document.getElementById('recent-balls');
+                    recentContainer.innerHTML = ballHtml + recentContainer.innerHTML;
+                    
+                    if (recentContainer.children.length > 5) {
+                        recentContainer.removeChild(recentContainer.lastChild);
+                    }
+                    
+                    if (autoMode) {
+                        markCardsInstantly();
+                    }
+                    activateBingoButton();
+                } 
+                else if (data.action === 'game_ended') {
+                    cardsLoaded = false;
+                    disconnectWebSocket();
+                    updatePlayHall();
+                }
+            };
+            
+            gameSocket.onclose = function(e) {
+                gameSocket = null;
+            };
+            
+            gameSocket.onerror = function(e) {
+                console.error("WS error:", e);
+            };
+        }
+
+        function disconnectWebSocket() {
+            if (gameSocket) {
+                gameSocket.close();
+                gameSocket = null;
+            }
+        }
+
+        function appLoop() { 
+            if (myActiveGameId) { 
+                // Fetch layouts once, then stream balls via WS
+                if (!cardsLoaded) {
+                    updatePlayHall(); 
+                    cardsLoaded = true;
+                }
+                connectWebSocket(myActiveGameId);
+            } else { 
+                disconnectWebSocket();
+                cardsLoaded = false;
+                refreshLobby(); 
+            } 
+        }
 
         function refreshLobby() { 
             fetch('/api/lobby-info/'+uid+'/').then(r=>r.json()).then(d => { 
@@ -537,8 +620,24 @@
         function closeHistory() { document.getElementById('m-history').style.display = 'none'; }
         function switchTab(tab) { document.getElementById('tab-bets').className = "tab-btn " + (tab==='bets' ? 'active' : ''); document.getElementById('tab-win').className = "tab-btn " + (tab==='win' ? 'active' : ''); const content = document.getElementById('history-content'); content.innerHTML = ''; if(tab === 'bets') { if(historyData.my_bets.length===0) content.innerHTML="<div class='text-center text-gray-500 mt-10'>ምንም ታሪክ የለም (No bets yet)</div>"; historyData.my_bets.forEach(h => { content.innerHTML += `<div class="history-row border-l-2 ${h.status==='WON' ? 'border-green-500' : 'border-red-500'}"><div><div class="text-gray-400">Game</div><div class="font-bold">#${h.game_id}</div></div><div><div class="text-gray-400">Bet/Card</div><div class="text-blue-400">${h.bet}/[${h.card}]</div></div><div class="text-right"><div class="text-gray-400">Result</div><div class="font-black ${h.status==='WON' ? 'text-green-500' : 'text-red-500'}">${h.status==='WON' ? '+'+h.prize : '-'+(h.bet * (h.card ? h.card.toString().split(',').length : 1))}</div></div></div>`; }); } else { historyData.winners.forEach(h => { content.innerHTML += `<div class="history-row"><div><div class="text-gray-400">Game</div><div class="font-bold">#${h.game_id}</div></div><div><div class="text-gray-400">Winner</div><div class="text-blue-400">@${h.winner}</div></div><div class="text-right"><div class="text-gray-400">Prize</div><div class="text-green-400 font-black">${h.prize} ETB</div></div></div>`; }); } }
         
-        appLoop(); setInterval(appLoop, 2000);
-        setInterval(() => { if(!myActiveGameId) { const tEl = document.getElementById('timer'); const lbl = document.getElementById('timer-label'); if(currentRoomStatus === 'ACTIVE') { lbl.innerText = "ጨዋታው ላይ ነው:"; tEl.innerText = "(PLAYING)"; tEl.classList.add('text-red-400'); } else { lbl.innerText = "ጨዋታው ሊጀምር ነው: "; tEl.classList.remove('text-red-400'); if(currentRoomTime > 0) currentRoomTime--; let m = Math.floor(currentRoomTime / 60), s = currentRoomTime % 60; tEl.innerText = m + ":" + (s < 10 ? "0" + s : s); } } }, 1000);
+        // Loop execution configurations
+        appLoop(); 
+        setInterval(appLoop, 3000); // Check room transitions every 3 seconds
+        
+        setInterval(() => { 
+            if(!myActiveGameId) { 
+                const tEl = document.getElementById('timer'); 
+                const lbl = document.getElementById('timer-label'); 
+                if(currentRoomStatus === 'ACTIVE') { 
+                    lbl.innerText = "ጨዋታው ላይ ነው:"; tEl.innerText = "(PLAYING)"; tEl.classList.add('text-red-400'); 
+                } else { 
+                    lbl.innerText = "ጨዋታው ሊጀምር ነው: "; tEl.classList.remove('text-red-400'); 
+                    if(currentRoomTime > 0) currentRoomTime--; 
+                    let m = Math.floor(currentRoomTime / 60), s = currentRoomTime % 60; 
+                    tEl.innerText = m + ":" + (s < 10 ? "0" + s : s); 
+                } 
+            } 
+        }, 1000);
     </script>
 </body>
 </html>
