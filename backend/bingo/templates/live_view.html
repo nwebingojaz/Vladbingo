@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>BIGEST BINGO BOT</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -36,6 +37,9 @@
 
         .wallet-tab { flex: 1; text-align: center; padding: 12px 0; font-size: 11px; font-weight: 900; color: #64748b; border-bottom: 3px solid transparent; }
         .wallet-tab.active { color: #3b82f6; border-bottom-color: #3b82f6; }
+
+        .tab-btn { flex: 1; text-align: center; padding: 10px 0; font-size: 12px; font-weight: bold; color: #64748b; border-bottom: 2px solid transparent; cursor: pointer; transition: 0.2s; }
+        .tab-btn.active { color: #3b82f6; border-bottom-color: #3b82f6; }
 
         .switch { position: relative; display: inline-block; width: 120px; height: 34px; background-color: #1e293b; border-radius: 34px; border: 1px solid #3b82f6; cursor: pointer; }
         .switch input { opacity: 0; width: 0; height: 0; }
@@ -132,8 +136,10 @@
                 <div id="recent-balls" class="flex gap-1 overflow-hidden w-[110px] whitespace-nowrap bg-slate-800 p-1.5 rounded-full border border-slate-700 shadow-inner">
                 </div>
             </div>
-            <div class="flex flex-col items-end">
+            <div class="flex flex-col items-end gap-1">
                 <label class="switch scale-75 origin-right"><input type="checkbox" id="auto-toggle" onchange="toggleAutoMode(this)"><span class="slider"></span></label>
+                <!-- FIX 1: Added play-status-badge element directly to the container -->
+                <div id="play-status-badge" class="text-[9px] bg-blue-500/20 border border-blue-500 text-blue-500 px-3 py-1 rounded-full font-black uppercase">ይጠብቁ (WAITING)</div>
                 <div class="text-[9px] text-yellow-400 font-bold mt-1 tracking-widest"><span id="called-count-badge">0</span>/75</div>
             </div>
         </div>
@@ -175,7 +181,7 @@
                     <button onclick="backToDepositMethods()" class="text-blue-400 font-bold text-sm flex items-center gap-1 active:scale-95 transition-transform"><span class="text-lg">←</span> ተመለስ</button>
                     <h3 id="dep-title" class="flex-1 text-center font-bold text-yellow-400 text-lg pr-8">ገንዘብ ያስገቡ</h3>
                 </div>
-                <div class="bg-red-900/40 border border-red-500 rounded p-2 mb-4 text-center"><p class="text-red-400 text-[10px] font-bold uppercase">⚠️ ማሳሰቢያ ⚠️</p><p class="text-white text-[9px]">በሞባይል አፕሊኬሽን ወይም በአጭር ቁጥር ብቻ ይጠቀሙ።<br>በአካል ባንክ ውስጥ ሄደው አያስገቡ።</p></div>
+                <div class="bg-red-900/40 border border-red-500 rounded p-2 mb-4 text-center"><p class="text-red-400 text-[10px] font-bold uppercase">⚠️ ማሳሰቢያ ⚠️</p><p class="text-white text-[9px]">በሞባይል አፕሊኬሽን ወይም በአጭር ቁጥር ብቻ ይጠቀሙ።<br>በአጭር ቁጥር ሄደው አያስገቡ።</p></div>
                 <div class="text-sm text-gray-300 mb-4 bg-black/30 p-3 rounded">1. ገንዘቡን ወደዚህ ያስገቡ:<br><strong id="dep-account-info" class="text-white text-xl tracking-wider text-blue-300"></strong><br><br>2. ከአጭር የፅሁፍ መልዕክት (SMS) ላይ የትራንዛክሽን ቁጥሩን (TXID) ኮፒ ያድርጉ።<br>3. ከታች ባለው ቦታ ላይ ያስገቡ።</div>
                 <input type="number" id="dep-amount" placeholder="የገንዘብ መጠን (Amount)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
                 <input type="text" id="dep-txid" placeholder="የትራንዛክሽን ቁጥር (TxID)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-6 text-white">
@@ -268,7 +274,15 @@
     </div>
 
     <script>
-        const tg = window.Telegram.WebApp; const uid = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : 0;
+        // FIX 6: Secure, defensive wrapper against uninitialized Telegram context
+        const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+        if (tg) {
+            // FIX 9: Proper WebApp frame viewport initialization
+            tg.ready();
+            tg.expand();
+        }
+
+        const uid = tg && tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : 0;
         document.getElementById('menu-id').innerText = "መለያ (ID): " + uid;
         
         let activeBet = parseInt(sessionStorage.getItem('activeBet')) || 10; 
@@ -277,12 +291,48 @@
         
         let historyData = {winners: [], my_bets: []}; let currentRoomTime = 0; let currentRoomStatus = 'LOBBY'; let myActiveGameId = null;
         let currentMethod = ""; let autoMode = false; let autoBingoFired = false; let globalCalledNumbers = [];
-        
+
         // WebSocket Globals & Fallback Variables
         let gameSocket = null;
         let cardsLoaded = false;
         let usePollingFallback = false;
         let pollingInterval = null;
+        let refreshRunning = false; // FIX 8: Overlapping loop mutex block
+
+        // FIX 5: High-stability universal async HTTP payload fetch container
+        async function safeFetch(url, options = {}) {
+            const r = await fetch(url, options);
+            if (!r.ok) {
+                const text = await r.text();
+                throw new Error(`HTTP ${r.status}: ${text || 'Server Error'}`);
+            }
+            return r.json();
+        }
+
+        // FIX 3 & 7: Added spectator board grid tracking generator
+        function buildTracker(containerId) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            container.innerHTML = '';
+            const letters = ['B','I','N','G','O'];
+            letters.forEach((letter, index) => {
+                let row = document.createElement('div');
+                row.className = 'tracker-row';
+                let label = document.createElement('div');
+                label.className = 'tracker-letter';
+                label.innerText = letter;
+                row.appendChild(label);
+                for(let i = 1; i <= 15; i++) {
+                    let num = index * 15 + i;
+                    let dot = document.createElement('div');
+                    dot.className = 'tracker-dot';
+                    dot.id = `${containerId}-dot-${num}`;
+                    dot.innerText = num;
+                    row.appendChild(dot);
+                }
+                container.appendChild(row);
+            });
+        }
 
         window.addEventListener('DOMContentLoaded', (event) => {
             const hash = window.location.hash.substring(1);
@@ -303,7 +353,6 @@
             } else {
                 timerBar.classList.remove('hidden');
             }
-
             if(id==='v-selector'){ updateBuyButton(); } 
         }
         
@@ -322,9 +371,23 @@
         function openSettings() { document.getElementById('m-settings').style.display = 'flex'; }
         
         function openReferral() { document.getElementById('m-referral').style.display = 'flex'; document.getElementById('my-promo-code').innerText = uid; }
-        function copyPromoMessage() { const shareText = `🎰 Play BIGEST BINGO BOT and win real money!\n\nUse my Promo Code [ ${uid} ] in the Wallet to get 10 ETB Free Bonus!\n\n1. Open: https://t.me/Bigestbingobot\n2. Go to Refer & Earn 🎟️\n3. Paste my code in the Promo box!\n\nGood luck! 🍀`; if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(shareText).then(() => { tg.showAlert("✅ Promo message copied! Paste it to your friends."); }).catch(err => { fallbackCopy(shareText); }); } else { fallbackCopy(shareText); } }
-        function fallbackCopy(text) { let textArea = document.createElement("textarea"); textArea.value = text; textArea.style.position = "fixed"; document.body.appendChild(textArea); textArea.focus(); textArea.select(); try { document.execCommand('copy'); tg.showAlert("✅ Promo message copied! Paste it to your friends."); } catch (err) { tg.showAlert("⚠️ Could not copy automatically. Your code is: " + uid); } document.body.removeChild(textArea); }
-        function redeemPromo() { const code = document.getElementById('promo-code').value; if(!code) return tg.showAlert("Please enter a promo code!"); if(code == uid) return tg.showAlert("You cannot use your own code!"); fetch('/api/redeem-promo/', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ tg_id: uid, promo_code: code }) }).then(r=>r.json()).then(d => { tg.showAlert(d.message); if(d.status === 'success') { document.getElementById('promo-code').value = ''; refreshLobby(); } }).catch(e => tg.showAlert("⚠️ Connection error.")); }
+        function copyPromoMessage() { const shareText = `🎰 Play BIGEST BINGO BOT and win real money!\n\nUse my Promo Code [ ${uid} ] in the Wallet to get 10 ETB Free Bonus!\n\n1. Open: https://t.me/Bigestbingobot\n2. Go to Refer & Earn 🎟️\n3. Paste my code in the Promo box!\n\nGood luck! 🍀`; if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(shareText).then(() => { if (tg) tg.showAlert("✅ Promo message copied! Paste it to your friends."); }).catch(err => { fallbackCopy(shareText); }); } else { fallbackCopy(shareText); } }
+        function fallbackCopy(text) { let textArea = document.createElement("textarea"); textArea.value = text; textArea.style.position = "fixed"; document.body.appendChild(textArea); textArea.focus(); textArea.select(); try { document.execCommand('copy'); if (tg) tg.showAlert("✅ Promo message copied! Paste it to your friends."); } catch (err) { if (tg) tg.showAlert("⚠️ Could not copy automatically. Your code is: " + uid); } document.body.removeChild(textArea); }
+        
+        function redeemPromo() { 
+            const code = document.getElementById('promo-code').value; 
+            if(!code) return tg ? tg.showAlert("Please enter a promo code!") : alert("Please enter a promo code!"); 
+            if(code == uid) return tg ? tg.showAlert("You cannot use your own code!") : alert("You cannot use your own code!"); 
+            
+            safeFetch('/api/redeem-promo/', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({ tg_id: uid, promo_code: code }) 
+            }).then(d => { 
+                if (tg) tg.showAlert(d.message); 
+                if(d.status === 'success') { document.getElementById('promo-code').value = ''; refreshLobby(); } 
+            }).catch(e => { if (tg) tg.showAlert("⚠️ Promo Error: " + e.message); }); 
+        }
 
         function showDepositForm(method) { currentMethod = method; document.getElementById('dep-step-1').classList.add('hidden'); document.getElementById('dep-step-2').classList.remove('hidden'); document.getElementById('dep-title').innerText = method + " Deposit"; const accInfo = document.getElementById('dep-account-info'); if (method === 'M-Pesa') accInfo.innerHTML = "0707659618<br><span class='text-sm text-gray-400'>ስም (Name): Biniyam Nigatu</span>"; else if (method === 'Telebirr') accInfo.innerHTML = "0977733630<br><span class='text-sm text-gray-400'>ስም (Name): Solomon</span>"; else if (method === 'CBE') accInfo.innerHTML = "1000379893698<br><span class='text-sm text-gray-400'>ስም (Name): Yeabkal</span>"; }
         function backToDepositMethods() { document.getElementById('dep-step-2').classList.add('hidden'); document.getElementById('dep-step-1').classList.remove('hidden'); document.getElementById('dep-amount').value = ''; document.getElementById('dep-txid').value = ''; }
@@ -335,24 +398,71 @@
             if(formType === 'password') { phoneNum = document.getElementById('set-phone').value; btnId = 'btn-set-otp'; }
             if(!phoneNum) return showToast("⚠️ ስልክ ቁጥር ያስገቡ! (Enter Phone)");
             showToast("⏳ ኮድ እየተላከ ነው... (Sending)");
-            fetch('/api/send-otp/', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ tg_id: uid, phone: phoneNum }) })
-            .then(r => { if(!r.ok) throw new Error("Server error " + r.status); return r.json(); }).then(d => { tg.showAlert(d.message); }).catch(err => { tg.showAlert("⚠️ Server Error: Make sure TELEGRAM_BOT_TOKEN is in your Web Service environment variables on Render!"); }); 
+            
+            safeFetch('/api/send-otp/', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({ tg_id: uid, phone: phoneNum }) 
+            }).then(d => { if (tg) tg.showAlert(d.message); })
+            .catch(err => { if (tg) tg.showAlert("⚠️ Gateway error: " + err.message); }); 
         }
         
-        function submitDeposit() { const amount = document.getElementById('dep-amount').value, txid = document.getElementById('dep-txid').value; if(!amount || !txid) return tg.showAlert("እባክዎትን ሁሉንም ቦታ ይሙሉ።"); fetch('/api/submit-deposit/', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ tg_id: uid, amount: amount, tx_id: txid, method: currentMethod }) }).then(r=>r.json()).then(d => { tg.showAlert(d.message); if(d.status === 'success') { document.getElementById('m-deposit').style.display = 'none'; backToDepositMethods(); } }).catch(e => tg.showAlert("⚠️ Error submitting deposit.")); }
+        function submitDeposit() { 
+            const amount = document.getElementById('dep-amount').value, txid = document.getElementById('dep-txid').value; 
+            if(!amount || !txid) return tg ? tg.showAlert("እባክዎትን ሁሉንም ቦታ ይሙሉ።") : alert("እባክዎትን ሁሉንም ቦታ ይሙሉ።"); 
+            
+            safeFetch('/api/submit-deposit/', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({ tg_id: uid, amount: amount, tx_id: txid, method: currentMethod }) 
+            }).then(d => { 
+                if (tg) tg.showAlert(d.message); 
+                if(d.status === 'success') { 
+                    // FIX 2: Corrected modal container ID targets
+                    document.getElementById('m-wallet').style.display = 'none'; 
+                    backToDepositMethods(); 
+                } 
+            }).catch(e => { if (tg) tg.showAlert("⚠️ Deposit failure: " + e.message); }); 
+        }
         
         function submitAction(url, payload) {
             if(!payload.otp) return showToast("⚠️ ኮድ ያስገቡ! (OTP required)");
             payload.tg_id = uid; showToast("⏳ በማረጋገጥ ላይ...");
-            fetch('/api/verify-otp/', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ tg_id: uid, otp: payload.otp }) }).then(r=>r.json()).then(d => { 
-                if(d.status === 'success') { fetch(url, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) }).then(r2=>r2.json()).then(d2 => { tg.showAlert(d2.message); if(d2.status==='success') location.reload(); }); } 
-                else tg.showAlert("❌ " + d.message); 
-            }).catch(e => tg.showAlert("⚠️ አጋጥሟል! እንደገና ይሞክሩ።"));
+            
+            safeFetch('/api/verify-otp/', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({ tg_id: uid, otp: payload.otp }) 
+            }).then(d => { 
+                if(d.status === 'success') { 
+                    safeFetch(url, { 
+                        method: 'POST', 
+                        headers: {'Content-Type': 'application/json'}, 
+                        body: JSON.stringify(payload) 
+                    }).then(d2 => { 
+                        if (tg) tg.showAlert(d2.message); 
+                        if(d2.status==='success') location.reload(); 
+                    }); 
+                } else {
+                    if (tg) tg.showAlert("❌ " + d.message); 
+                }
+            }).catch(e => { if (tg) tg.showAlert("⚠️ Transaction error: " + e.message); });
         }
-        function submitTransferAction(url, payload) { if(!payload.amount || !payload.account) return tg.showAlert("እባክዎትን ሁሉንም ቦታ ይሙሉ።"); payload.tg_id = uid; fetch(url, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) }).then(r=>r.json()).then(d => { tg.showAlert(d.message); if(d.status==='success') location.reload(); }); }
 
-        function showToast(msg) { const t = document.getElementById('toast-msg'); t.innerText = msg; t.classList.remove('opacity-0'); setTimeout(() => { t.classList.add('opacity-0'); }, 1500); }
-        
+        function submitTransferAction(url, payload) { 
+            if(!payload.amount || !payload.account) return tg ? tg.showAlert("እባክዎትን ሁሉንም ቦታ ይሙሉ።") : alert("እባክዎትን ሁሉንም ቦታ ይሙሉ።"); 
+            payload.tg_id = uid; 
+            
+            safeFetch(url, { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify(payload) 
+            }).then(d => { 
+                if (tg) tg.showAlert(d.message); 
+                if(d.status==='success') location.reload(); 
+            }).catch(e => { if (tg) tg.showAlert("⚠️ Transfer error: " + e.message); }); 
+        }
+
         // Single Unified Engine Update Receiver (Used by both WS and Polling)
         function handleGameUpdate(data) {
             if (data.action === 'new_ball') {
@@ -373,7 +483,7 @@
                 
                 // Format ball identifier letter safely
                 let letter = "B"; if(data.ball>15) letter="I"; if(data.ball>30) letter="N"; if(data.ball>45) letter="G"; if(data.ball>60) letter="O";
-                let ballHtml = `<div class="bg-slate-900 rounded-full px-2 py-0.5 text-[9px] font-bold text-slate-300 border border-slate-700 flex items-center gap-0.5"><span class="text-yellow-500">${letter}</span>{data.ball}</div>`;
+                let ballHtml = `<div class="bg-slate-900 rounded-full px-2 py-0.5 text-[9px] font-bold text-slate-300 border border-slate-700 flex items-center gap-0.5"><span class="text-yellow-500">${letter}</span>${data.ball}</div>`;
                 
                 const recentContainer = document.getElementById('recent-balls');
                 if (recentContainer && !recentContainer.innerHTML.includes(`>${data.ball}</div>`)) {
@@ -442,8 +552,7 @@
             
             pollingInterval = setInterval(() => {
                 if (myActiveGameId) {
-                    fetch(`/api/game-info/${myActiveGameId}/${uid}/`)
-                    .then(r => r.json())
+                    safeFetch(`/api/game-info/${myActiveGameId}/${uid}/`)
                     .then(d => {
                         if (d.status === 'ENDED' || d.status === 'ANNOUNCED') {
                             clearInterval(pollingInterval);
@@ -472,24 +581,35 @@
             }
         }
 
-        function appLoop() { 
-            if (myActiveGameId) { 
-                // Fetch board layout layouts once, then stream balls
-                if (!cardsLoaded) {
-                    updatePlayHall(); 
-                    cardsLoaded = true;
-                }
-                connectWebSocket(myActiveGameId);
-            } else { 
-                disconnectWebSocket();
-                if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
-                cardsLoaded = false;
-                refreshLobby(); 
-            } 
+        // FIX 8: Mutual-exclusion logic container wrapper to block overlapping stack execution
+        async function appLoop() { 
+            if (refreshRunning) return;
+            refreshRunning = true;
+            
+            try {
+                if (myActiveGameId) { 
+                    // Fetch board layout layouts once, then stream balls
+                    if (!cardsLoaded) {
+                        await updatePlayHall(); 
+                        cardsLoaded = true;
+                    }
+                    connectWebSocket(myActiveGameId);
+                } else { 
+                    disconnectWebSocket();
+                    if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
+                    cardsLoaded = false;
+                    await refreshLobby(); 
+                } 
+            } catch(e) {
+                console.error("Critical engine loop failure:", e);
+            } finally {
+                refreshRunning = false;
+            }
         }
 
-        function refreshLobby() { 
-            fetch('/api/lobby-info/'+uid+'/').then(r=>r.json()).then(d => { 
+        async function refreshLobby() { 
+            try {
+                const d = await safeFetch('/api/lobby-info/'+uid+'/');
                 document.getElementById('bal-header').innerText = d.balance.toFixed(2); 
                 
                 if (d.rooms) {
@@ -504,7 +624,7 @@
                 if(d.active_game_id) { 
                     myActiveGameId = d.active_game_id; 
                     showScreen('v-play'); 
-                    updatePlayHall(); 
+                    await updatePlayHall(); 
                     return; 
                 } 
                 
@@ -531,7 +651,9 @@
                     list.innerHTML += `<div onclick="selectRoom(${room.bet})" class="room-card ${isLive ? 'live' : ''} cursor-pointer"><div class="flex justify-between w-full"><div><div class="text-white font-black text-xl">Bingo ${room.bet}</div><div class="text-[11px] font-bold ${isLive ? 'text-red-400' : 'text-blue-400'} mt-1">${isLive ? 'እየተጠራ ነው: ' + room.called_count + '/75' : 'ሊጀምር ነው: ' + room.time_left + 's'}</div><div class="text-[10px] text-gray-400 mt-1">ሽልማት: <span class="text-white font-bold">${room.win.toFixed(0)} ETB</span></div></div><div class="flex flex-col items-end justify-center"><div class="${isLive ? 'text-red-500' : 'text-blue-500'} font-bold text-2xl">${isLive ? '⏳' : '▶'}</div><div class="text-[9px] text-gray-500 mt-2">${room.players} ካርዶች ተገዝተዋል</div></div></div></div>`; 
                     if(activeBet == room.bet) { currentRoomTime = room.time_left; currentRoomStatus = room.status; document.getElementById('nav-prize').innerText = room.win.toFixed(0); updateBanner(room.status, room.called_count, room.called_numbers); } 
                 }); 
-            }); 
+            } catch (err) {
+                console.error("Lobby refresh failed:", err);
+            }
         }
 
         function checkLocal1LineWin() { for (let s=1; s<=4; s++) { const pc = document.getElementById('play-card-' + s); if (!pc || pc.children.length === 0) continue; const cells = Array.from(pc.querySelectorAll('div')); if(cells.length < 25) continue; let grid = []; for(let i=0; i<5; i++) { grid.push(cells.slice(i*5, i*5+5).map(c => c.classList.contains('is-marked') || c.innerText === '⭐')); } for(let i=0; i<5; i++) { if(grid[i].every(v=>v)) return true; if(grid.every(row=>row[i])) return true; } if([0,1,2,3,4].every(i => grid[i][i])) return true; if([0,1,2,3,4].every(i => grid[i][4-i])) return true; if([grid[0][0], grid[0][4], grid[4][0], grid[4][4]].every(v=>v)) return true; } return false; }
@@ -555,9 +677,10 @@
             activateBingoButton();
         }
 
-        function updatePlayHall() {
+        async function updatePlayHall() {
             if(!myActiveGameId) return;
-            fetch(`/api/game-info/${myActiveGameId}/${uid}/`).then(r=>r.json()).then(d => {
+            try {
+                const d = await safeFetch(`/api/game-info/${myActiveGameId}/${uid}/`);
                 
                 if(d.status === 'ENDED' || d.status === 'ANNOUNCED') { 
                     document.getElementById('m-win').style.display = 'flex';
@@ -622,12 +745,13 @@
                         parentDiv.style.display = 'flex';
                         
                         if(pc.children.length === 0) {
-                            parentDiv.className = "bg-slate-800 p-1 rounded-xl border-2 border-yellow-500 relative shadow-[0_0_15px_rgba(234,179,8,0.2)]"; 
-                            parentDiv.innerHTML = `<div class="absolute -top-3 left-2 bg-yellow-500 text-black text-[9px] font-black px-2 py-0.5 rounded">#${boardObj.card_number}</div><div class="grid grid-cols-5 gap-0.5 mb-0.5 text-center mt-2"><div class="font-black text-[10px] text-blue-400">B</div><div class="font-black text-[10px] text-blue-400">I</div><div class="font-black text-[10px] text-blue-400">N</div><div class="font-black text-[10px] text-blue-400">G</div><div class="font-black text-[10px] text-blue-400">O</div></div><div id="play-card-${slotNum}" class="grid grid-cols-5 gap-0.5"></div>`;
+                            parentDiv.className = "bg-slate-800 p-2 rounded-xl border-2 border-yellow-500 relative shadow-[0_0_15px_rgba(234,179,8,0.2)] w-full max-w-[180px]"; 
+                            parentDiv.innerHTML = `<div class="absolute -top-3 left-2 bg-yellow-500 text-black text-[9px] font-black px-2 py-0.5 rounded">#${boardObj.card_number}</div><div class="grid grid-cols-5 gap-0.5 mb-1 text-center mt-2 whitespace-nowrap"><div class="font-black text-[11px] text-blue-400">B</div><div class="font-black text-[11px] text-blue-400">I</div><div class="font-black text-[11px] text-blue-400">N</div><div class="font-black text-[11px] text-blue-400">G</div><div class="font-black text-[11px] text-blue-400">O</div></div><div id="play-card-${slotNum}" class="grid grid-cols-5 gap-0.5"></div>`;
                             pc = document.getElementById('play-card-' + slotNum); 
                             
                             boardObj.board.forEach(row => row.forEach(val => { 
-                                let cell = document.createElement('div'); cell.className = 'w-[8vw] h-[8vw] max-w-[40px] max-h-[40px] flex items-center justify-center text-[10px] font-black rounded border border-blue-900/50 bg-slate-900 shadow-inner cursor-pointer transition-colors'; 
+                                let cell = document.createElement('div'); 
+                                cell.className = 'w-full aspect-square flex items-center justify-center text-[11px] font-black rounded border border-blue-900/50 bg-slate-900 shadow-inner cursor-pointer transition-colors'; 
                                 if (val === 'FREE') { cell.innerText = '⭐'; cell.classList.add('bg-blue-600', 'text-yellow-400', 'is-marked'); } 
                                 else { 
                                     cell.innerText = val; cell.classList.add('text-blue-200'); 
@@ -644,10 +768,25 @@
                     if (autoMode) markCardsInstantly();
                 }
                 activateBingoButton();
-            });
+            } catch (err) {
+                console.error("Playhall update failed:", err);
+            }
         }
+
         function activateBingoButton() { const btn = document.getElementById('bingo-btn'); if(checkLocal1LineWin()) { btn.className = "w-full py-4 bg-gradient-to-r from-red-500 to-red-700 rounded-2xl font-black text-xl shadow-[0_0_20px_rgba(239,68,68,0.4)] text-white active:scale-95 transition-all tracking-widest"; } else { btn.className = "w-full py-4 bg-slate-700 text-slate-400 rounded-2xl font-black text-xl border-2 border-slate-600 transition-all tracking-widest"; } }
-        function hitBingo() { if(!checkLocal1LineWin()) return tg.showAlert("⚠️ ትንሽ ይጠብቁ! ትክክለኛ መስመር አልሰሩም!"); fetch(`/api/check-win/${myActiveGameId}/${uid}/?marked=0`).then(r=>r.json()).then(d => { if (d.status === 'WINNER') { } else if (d.status === 'NOT_YET') { tg.showAlert("❌ እስካሁን አላሸነፉም! ሻጩ ቁጥር እስኪጠራ ይጠብቁ።"); autoBingoFired = false; } }); }
+        
+        function hitBingo() { 
+            if(!checkLocal1LineWin()) return tg ? tg.showAlert("⚠️ ትንሽ ይጠብቁ! ትክክለኛ መስመር አልሰሩም!") : alert("⚠️ ትንሽ ይጠብቁ! ትክክለኛ መስመር አልሰሩም!"); 
+            safeFetch(`/api/check-win/${myActiveGameId}/${uid}/?marked=0`)
+            .then(d => { 
+                if (d.status === 'WINNER') { 
+                    // Update layout
+                } else if (d.status === 'NOT_YET') { 
+                    if (tg) tg.showAlert("❌ እስካሁን አላሸነፉም! ሻጩ ቁጥር እስኪጠራ ይጠብቁ።"); 
+                    autoBingoFired = false; 
+                } 
+            }).catch(e => console.error("Bingo check failed:", e)); 
+        }
 
         function updateBanner(status, count, called_numbers) { const b = document.getElementById('active-call-banner'); const btn = document.getElementById('join-btn'); const gGrid = document.getElementById('grid-container'); const sTrack = document.getElementById('spectator-tracker'); if(status === 'ACTIVE') { b.classList.remove('hidden'); document.getElementById('call-count').innerText=count; btn.disabled=true; btn.style.opacity="0.3"; btn.innerText="WAITING..."; gGrid.classList.add('hidden'); sTrack.classList.remove('hidden'); buildTracker('spectator-tracker'); document.querySelectorAll('#spectator-tracker .tracker-dot').forEach(el=>el.classList.remove('called')); if(called_numbers) called_numbers.forEach(n => { let dot = document.getElementById('spectator-tracker-dot-'+n); if(dot) dot.classList.add('called'); }); } else { b.classList.add('hidden'); btn.disabled=false; updateBuyButton(); gGrid.classList.remove('hidden'); sTrack.classList.add('hidden'); } }
         function updateBuyButton() { const btn = document.getElementById('join-btn'); if (myCards.length === 0) { btn.innerText = "▶ ካርድ ይግዙ"; btn.style.opacity = "0.5"; } else { const totalCost = myCards.length * activeBet; btn.innerText = `▶ ${myCards.length} ካርድ ይግዙ (${totalCost} ETB)`; btn.style.opacity = "1"; } }
@@ -661,28 +800,47 @@
                 myCards = myCards.filter(id => id !== n); btn.classList.remove('active'); 
                 if(myCards.length > 0) previewCard(myCards[myCards.length-1]); else document.getElementById('mini-grid').innerHTML = ''; 
             } else { 
-                if(myCards.length >= 4) return tg.showAlert("በአንድ ጊዜ ከ 4 ካርድ በላይ መግዛት አይቻልም!"); 
+                if(myCards.length >= 4) return tg ? tg.showAlert("በአንድ ጊዜ ከ 4 ካርድ በላይ መግዛት አይቻልም!") : alert("በአንድ ጊዜ ከ 4 ካርድ በላይ መግዛት አይቻልም!"); 
                 myCards.push(n); btn.classList.add('active'); showToast("ካርድ #" + n + " ተመርጧል! (" + myCards.length + "/4)"); previewCard(n); 
             } 
             sessionStorage.setItem('myCards', JSON.stringify(myCards));
             updateBuyButton(); 
         }
         
-        function previewCard(n) { document.getElementById('prev-num').innerText="#"+n; fetch('/api/card-data/'+n+'/').then(r=>r.json()).then(d=>{ const mini = document.getElementById('mini-grid'); mini.innerHTML = ''; d.board.forEach(row=>row.forEach(v=>{ let c=document.createElement('div'); c.className='mini-cell'; c.innerText=v==='FREE'?'X':v; mini.appendChild(c); })); }); }
-        function pickRandom() { if(myCards.length >= 4) return tg.showAlert("በአንድ ጊዜ ከ 4 ካርድ በላይ መግዛት አይቻልም!"); let maxCards = getMaxCards(); let r = Math.floor(Math.random()*maxCards)+1; while(myCards.includes(r)) { r = Math.floor(Math.random()*maxCards)+1; } selectCard(r); }
+        function previewCard(n) { 
+            document.getElementById('prev-num').innerText="#"+n; 
+            safeFetch('/api/card-data/'+n+'/')
+            .then(d=>{ 
+                const mini = document.getElementById('mini-grid'); mini.innerHTML = ''; 
+                d.board.forEach(row=>row.forEach(v=>{ let c=document.createElement('div'); c.className='mini-cell'; c.innerText=v==='FREE'?'X':v; mini.appendChild(c); })); 
+            }).catch(e => console.error("Card preview failed:", e)); 
+        }
+
+        function pickRandom() { if(myCards.length >= 4) return tg ? tg.showAlert("በአንድ ጊዜ ከ 4 ካርድ በላይ መግዛት አይቻልም!") : alert("በአንድ ጊዜ ከ 4 ካርድ በላይ መግዛት አይቻልም!"); let maxCards = getMaxCards(); let r = Math.floor(Math.random()*maxCards)+1; while(myCards.includes(r)) { r = Math.floor(Math.random()*maxCards)+1; } selectCard(r); }
+        
         function joinGame() { 
-            if(myCards.length === 0) return tg.showAlert("ቢያንስ 1 ካርድ ይምረጡ!"); 
+            if(myCards.length === 0) return tg ? tg.showAlert("ቢያንስ 1 ካርድ ይምረጡ!") : alert("ቢያንስ 1 ካርድ ይምረጡ!"); 
             const cardsString = myCards.join(','); 
-            fetch(`/api/join-room/${uid}/${activeBet}/${cardsString}/`).then(r=>r.json()).then(d=>{ 
+            
+            safeFetch(`/api/join-room/${uid}/${activeBet}/${cardsString}/`)
+            .then(d=>{ 
                 if(d.status==='ok') {
                     sessionStorage.removeItem('currentScreen'); 
                     sessionStorage.removeItem('myCards');
                     location.reload(); 
-                } else tg.showAlert(d.error); 
-            }); 
+                } else {
+                    if (tg) tg.showAlert(d.error); 
+                }
+            }).catch(err => { if (tg) tg.showAlert("⚠️ Room Join Error: " + err.message); }); 
         }
         
-        function openHistory() { document.getElementById('m-history').style.display = 'flex'; fetch('/api/history/'+uid+'/').then(r=>r.json()).then(d => { historyData = d; switchTab('bets'); }); }
+        function openHistory() { 
+            document.getElementById('m-history').style.display = 'flex'; 
+            safeFetch('/api/history/'+uid+'/')
+            .then(d => { historyData = d; switchTab('bets'); })
+            .catch(e => console.error("History fetch failed:", e)); 
+        }
+
         function closeHistory() { document.getElementById('m-history').style.display = 'none'; }
         function switchTab(tab) { document.getElementById('tab-bets').className = "tab-btn " + (tab==='bets' ? 'active' : ''); document.getElementById('tab-win').className = "tab-btn " + (tab==='win' ? 'active' : ''); const content = document.getElementById('history-content'); content.innerHTML = ''; if(tab === 'bets') { if(historyData.my_bets.length===0) content.innerHTML="<div class='text-center text-gray-500 mt-10'>ምንም ታሪክ የለም (No bets yet)</div>"; historyData.my_bets.forEach(h => { content.innerHTML += `<div class="history-row border-l-2 ${h.status==='WON' ? 'border-green-500' : 'border-red-500'}"><div><div class="text-gray-400">Game</div><div class="font-bold">#${h.game_id}</div></div><div><div class="text-gray-400">Bet/Card</div><div class="text-blue-400">${h.bet}/[${h.card}]</div></div><div class="text-right"><div class="text-gray-400">Result</div><div class="font-black ${h.status==='WON' ? 'text-green-500' : 'text-red-500'}">${h.status==='WON' ? '+'+h.prize : '-'+(h.bet * (h.card ? h.card.toString().split(',').length : 1))}</div></div></div>`; }); } else { historyData.winners.forEach(h => { content.innerHTML += `<div class="history-row"><div><div class="text-gray-400">Game</div><div class="font-bold">#${h.game_id}</div></div><div><div class="text-gray-400">Winner</div><div class="text-blue-400">@${h.winner}</div></div><div class="text-right"><div class="text-gray-400">Prize</div><div class="text-green-400 font-black">${h.prize} ETB</div></div></div>`; }); } }
         
@@ -690,20 +848,7 @@
         appLoop(); 
         setInterval(appLoop, 3000); // Check room transitions every 3 seconds
         
-        setInterval(() => { 
-            if(!myActiveGameId) { 
-                const tEl = document.getElementById('timer'); 
-                const lbl = document.getElementById('timer-label'); 
-                if(currentRoomStatus === 'ACTIVE') { 
-                    lbl.innerText = "ጨዋታው ላይ ነው:"; tEl.innerText = "(PLAYING)"; tEl.classList.add('text-red-400'); 
-                } else { 
-                    lbl.innerText = "ጨዋታው ሊጀምር ነው: "; tEl.classList.remove('text-red-400'); 
-                    if(currentRoomTime > 0) currentRoomTime--; 
-                    let m = Math.floor(currentRoomTime / 60), s = currentRoomTime % 60; 
-                    tEl.innerText = m + ":" + (s < 10 ? "0" + s : s); 
-                } 
-            } 
-        }, 1000);
+        setInterval(() => { if(!myActiveGameId) { const tEl = document.getElementById('timer'); const lbl = document.getElementById('timer-label'); if(currentRoomStatus === 'ACTIVE') { lbl.innerText = "ጨዋታው ላይ ነው:"; tEl.innerText = "(PLAYING)"; tEl.classList.add('text-red-400'); } else { lbl.innerText = "ጨዋታው ሊጀምር ነው: "; tEl.classList.remove('text-red-400'); if(currentRoomTime > 0) currentRoomTime--; let m = Math.floor(currentRoomTime / 60), s = currentRoomTime % 60; tEl.innerText = m + ":" + (s < 10 ? "0" + s : s); } } }, 1000);
     </script>
 </body>
 </html>
