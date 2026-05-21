@@ -278,9 +278,11 @@
         let historyData = {winners: [], my_bets: []}; let currentRoomTime = 0; let currentRoomStatus = 'LOBBY'; let myActiveGameId = null;
         let currentMethod = ""; let autoMode = false; let autoBingoFired = false; let globalCalledNumbers = [];
         
-        // WebSocket Globals
+        // WebSocket Globals & Fallback Variables
         let gameSocket = null;
         let cardsLoaded = false;
+        let usePollingFallback = false;
+        let pollingInterval = null;
 
         window.addEventListener('DOMContentLoaded', (event) => {
             const hash = window.location.hash.substring(1);
@@ -293,6 +295,15 @@
         function showScreen(id) { 
             sessionStorage.setItem('currentScreen', id);
             document.getElementById('v-lobby').classList.add('hidden'); document.getElementById('v-selector').classList.add('hidden'); document.getElementById('v-play').classList.add('hidden'); document.getElementById(id).classList.remove('hidden'); 
+            
+            // Clean up: Hide the stuck lobby timer bar completely when playing!
+            const timerBar = document.getElementById('timer-bar');
+            if (id === 'v-play') {
+                timerBar.classList.add('hidden');
+            } else {
+                timerBar.classList.remove('hidden');
+            }
+
             if(id==='v-selector'){ updateBuyButton(); } 
         }
         
@@ -342,62 +353,116 @@
 
         function showToast(msg) { const t = document.getElementById('toast-msg'); t.innerText = msg; t.classList.remove('opacity-0'); setTimeout(() => { t.classList.add('opacity-0'); }, 1500); }
         
-        // WebSocket Connection Manager
+        // Single Unified Engine Update Receiver (Used by both WS and Polling)
+        function handleGameUpdate(data) {
+            if (data.action === 'new_ball') {
+                if (!data.ball || data.ball === '--') return;
+                
+                document.getElementById('latest-ball').innerText = data.ball;
+                document.getElementById('called-count-badge').innerText = data.called_count;
+                
+                const badge = document.getElementById('play-status-badge');
+                if (badge) {
+                    badge.innerText = "እየተጠራ ነው: " + data.called_count + "/75";
+                    badge.className = "text-[10px] bg-red-500/20 border border-red-500 text-red-500 px-3 py-1 rounded-full font-black animate-pulse";
+                }
+
+                if (!globalCalledNumbers.includes(data.ball) && typeof data.ball === 'number') {
+                    globalCalledNumbers.push(data.ball);
+                }
+                
+                // Format ball identifier letter safely
+                let letter = "B"; if(data.ball>15) letter="I"; if(data.ball>30) letter="N"; if(data.ball>45) letter="G"; if(data.ball>60) letter="O";
+                let ballHtml = `<div class="bg-slate-900 rounded-full px-2 py-0.5 text-[9px] font-bold text-slate-300 border border-slate-700 flex items-center gap-0.5"><span class="text-yellow-500">${letter}</span>{data.ball}</div>`;
+                
+                const recentContainer = document.getElementById('recent-balls');
+                if (recentContainer && !recentContainer.innerHTML.includes(`>${data.ball}</div>`)) {
+                    recentContainer.innerHTML = ballHtml + recentContainer.innerHTML;
+                    if (recentContainer.children.length > 5) {
+                        recentContainer.removeChild(recentContainer.lastChild);
+                    }
+                }
+                
+                if (autoMode) {
+                    markCardsInstantly();
+                }
+                activateBingoButton();
+            }
+        }
+
+        // Web Socket Manager with Auto Fallback to HTTP Polling
         function connectWebSocket(gameId) {
             if (gameSocket) return;
             const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
             const socketUrl = protocol + window.location.host + '/ws/game/' + gameId + '/';
             
-            gameSocket = new WebSocket(socketUrl);
-            
-            gameSocket.onmessage = function(e) {
-                const data = JSON.parse(e.data);
+            try {
+                gameSocket = new WebSocket(socketUrl);
                 
-                if (data.action === 'new_ball') {
-                    // Update latest ball drawn
-                    document.getElementById('latest-ball').innerText = data.ball;
-                    document.getElementById('called-count-badge').innerText = data.called_count;
+                gameSocket.onopen = function() {
+                    console.log("WebSocket connection established!");
+                    usePollingFallback = false;
+                    if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
+                };
+                
+                gameSocket.onmessage = function(e) {
+                    const data = JSON.parse(e.data);
                     
-                    const badge = document.getElementById('play-status-badge');
-                    if (badge) {
-                        badge.innerText = "እየተጠራ ነው: " + data.called_count + "/75";
-                        badge.className = "text-[10px] bg-red-500/20 border border-red-500 text-red-500 px-3 py-1 rounded-full font-black animate-pulse";
+                    if (data.action === 'game_ended') {
+                        cardsLoaded = false;
+                        disconnectWebSocket();
+                        if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
+                        updatePlayHall();
+                    } else {
+                        handleGameUpdate(data);
                     }
+                };
+                
+                gameSocket.onclose = function(e) {
+                    gameSocket = null;
+                    if (myActiveGameId && !usePollingFallback) {
+                        startPollingFallback();
+                    }
+                };
+                
+                gameSocket.onerror = function(e) {
+                    console.error("WS error encountered. Reverting to HTTP polling fallback.");
+                    startPollingFallback();
+                };
+            } catch (err) {
+                console.error("WS initiation failed. Launching HTTP polling fallback.");
+                startPollingFallback();
+            }
+        }
 
-                    if (!globalCalledNumbers.includes(data.ball)) {
-                        globalCalledNumbers.push(data.ball);
-                    }
-                    
-                    // Add dynamically to the recent balls queue
-                    let letter = "B"; if(data.ball>15) letter="I"; if(data.ball>30) letter="N"; if(data.ball>45) letter="G"; if(data.ball>60) letter="O";
-                    let ballHtml = `<div class="bg-slate-900 rounded-full px-2 py-0.5 text-[9px] font-bold text-slate-300 border border-slate-700 flex items-center gap-0.5"><span class="text-yellow-500">${letter}</span>${data.ball}</div>`;
-                    
-                    const recentContainer = document.getElementById('recent-balls');
-                    recentContainer.innerHTML = ballHtml + recentContainer.innerHTML;
-                    
-                    if (recentContainer.children.length > 5) {
-                        recentContainer.removeChild(recentContainer.lastChild);
-                    }
-                    
-                    if (autoMode) {
-                        markCardsInstantly();
-                    }
-                    activateBingoButton();
-                } 
-                else if (data.action === 'game_ended') {
-                    cardsLoaded = false;
-                    disconnectWebSocket();
-                    updatePlayHall();
+        function startPollingFallback() {
+            if (pollingInterval) return;
+            usePollingFallback = true;
+            console.log("⚠️ Automatic HTTP Polling Fallback activated.");
+            
+            pollingInterval = setInterval(() => {
+                if (myActiveGameId) {
+                    fetch(`/api/game-info/${myActiveGameId}/${uid}/`)
+                    .then(r => r.json())
+                    .then(d => {
+                        if (d.status === 'ENDED' || d.status === 'ANNOUNCED') {
+                            clearInterval(pollingInterval);
+                            pollingInterval = null;
+                            cardsLoaded = false;
+                            updatePlayHall();
+                        } else {
+                            globalCalledNumbers = d.called || [];
+                            if (d.called && d.called.length > 0) {
+                                handleGameUpdate({
+                                    action: 'new_ball',
+                                    ball: d.called[d.called.length - 1],
+                                    called_count: d.called.length
+                                });
+                            }
+                        }
+                    }).catch(err => console.error("Polling error:", err));
                 }
-            };
-            
-            gameSocket.onclose = function(e) {
-                gameSocket = null;
-            };
-            
-            gameSocket.onerror = function(e) {
-                console.error("WS error:", e);
-            };
+            }, 3000);
         }
 
         function disconnectWebSocket() {
@@ -409,7 +474,7 @@
 
         function appLoop() { 
             if (myActiveGameId) { 
-                // Fetch layouts once, then stream balls via WS
+                // Fetch board layout layouts once, then stream balls
                 if (!cardsLoaded) {
                     updatePlayHall(); 
                     cardsLoaded = true;
@@ -417,6 +482,7 @@
                 connectWebSocket(myActiveGameId);
             } else { 
                 disconnectWebSocket();
+                if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
                 cardsLoaded = false;
                 refreshLobby(); 
             } 
@@ -493,7 +559,7 @@
             if(!myActiveGameId) return;
             fetch(`/api/game-info/${myActiveGameId}/${uid}/`).then(r=>r.json()).then(d => {
                 
-                if(d.status === 'ENDED') { 
+                if(d.status === 'ENDED' || d.status === 'ANNOUNCED') { 
                     document.getElementById('m-win').style.display = 'flex';
                     document.getElementById('win-name-display').innerText = d.winner ? d.winner.replace('tg_', '').toUpperCase() : "PLAYER";
                     document.getElementById('win-prize-display').innerText = d.prize.toFixed(2);
