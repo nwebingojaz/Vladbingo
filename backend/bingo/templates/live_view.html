@@ -47,9 +47,6 @@
         .slider:before { position: absolute; content: "MANUAL"; height: 26px; width: 54px; left: 4px; bottom: 3px; background-color: #3b82f6; color: white; font-size: 10px; font-weight: bold; display: flex; align-items: center; justify-content: center; border-radius: 34px; transition: .4s; }
         input:checked + .slider { background-color: #0b0f19; }
         input:checked + .slider:before { transform: translateX(56px); background-color: #10b981; content: "AUTO"; }
-
-        .celebration { background: #3b82f6; border-radius: 24px; padding: 24px; text-align: center; max-width: 320px; width: 100%; border: 4px solid #93c5fd; box-shadow: 0 0 50px rgba(59, 130, 246, 0.8); }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
     </style>
 </head>
 <body class="antialiased select-none">
@@ -138,7 +135,6 @@
             </div>
             <div class="flex flex-col items-end gap-1">
                 <label class="switch scale-75 origin-right"><input type="checkbox" id="auto-toggle" onchange="toggleAutoMode(this)"><span class="slider"></span></label>
-                <!-- FIX 1: Added play-status-badge element directly to the container -->
                 <div id="play-status-badge" class="text-[9px] bg-blue-500/20 border border-blue-500 text-blue-500 px-3 py-1 rounded-full font-black uppercase">ይጠብቁ (WAITING)</div>
                 <div class="text-[9px] text-yellow-400 font-bold mt-1 tracking-widest"><span id="called-count-badge">0</span>/75</div>
             </div>
@@ -181,7 +177,7 @@
                     <button onclick="backToDepositMethods()" class="text-blue-400 font-bold text-sm flex items-center gap-1 active:scale-95 transition-transform"><span class="text-lg">←</span> ተመለስ</button>
                     <h3 id="dep-title" class="flex-1 text-center font-bold text-yellow-400 text-lg pr-8">ገንዘብ ያስገቡ</h3>
                 </div>
-                <div class="bg-red-900/40 border border-red-500 rounded p-2 mb-4 text-center"><p class="text-red-400 text-[10px] font-bold uppercase">⚠️ ማሳሰቢያ ⚠️</p><p class="text-white text-[9px]">በሞባይል አፕሊኬሽን ወይም በአጭር ቁጥር ብቻ ይጠቀሙ።<br>በአጭር ቁጥር ሄደው አያስገቡ።</p></div>
+                <div class="bg-red-900/40 border border-red-500 rounded p-2 mb-4 text-center"><p class="text-red-400 text-[10px] font-bold uppercase">⚠️ ማሳሰቢያ ⚠️</p><p class="text-white text-[9px]">በሞባይል አፕሊኬሽን ወይም በአጭር ቁጥር ብቻ ይጠቀሙ።<br>በአካል ባንክ ውስጥ ሄደው አያስገቡ።</p></div>
                 <div class="text-sm text-gray-300 mb-4 bg-black/30 p-3 rounded">1. ገንዘቡን ወደዚህ ያስገቡ:<br><strong id="dep-account-info" class="text-white text-xl tracking-wider text-blue-300"></strong><br><br>2. ከአጭር የፅሁፍ መልዕክት (SMS) ላይ የትራንዛክሽን ቁጥሩን (TXID) ኮፒ ያድርጉ።<br>3. ከታች ባለው ቦታ ላይ ያስገቡ።</div>
                 <input type="number" id="dep-amount" placeholder="የገንዘብ መጠን (Amount)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
                 <input type="text" id="dep-txid" placeholder="የትራንዛክሽን ቁጥር (TxID)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-6 text-white">
@@ -251,18 +247,32 @@
     </div>
 
     <!-- GRAND WINNER MODAL -->
-    <div id="m-win" class="modal" style="background: rgba(11, 15, 25, 0.98); justify-content:center; align-items:center; z-index: 9999;">
+    <div id="m-win" class="modal" style="background: repeating-conic-gradient(from 0deg, #0f172a 0deg 15deg, #1e293b 15deg 30deg); justify-content:center; align-items:center; z-index: 9999;">
         <div class="relative w-full max-w-sm flex flex-col items-center">
-            <div class="bg-yellow-500 text-black text-sm font-black px-6 py-2 rounded-full mb-4 shadow-[0_0_20px_rgba(234,179,8,0.6)] animate-pulse">GRAND WINNER</div>
-            <div class="text-6xl font-black text-yellow-400 italic tracking-tighter mb-8 drop-shadow-lg" style="-webkit-text-stroke: 2px white;">BINGO!</div>
-            <div class="bg-white p-4 rounded-2xl w-full mb-6 relative shadow-[0_0_40px_rgba(255,255,255,0.2)]">
-                <div class="flex justify-between items-center mb-2 pb-2 border-b border-gray-200"><span class="text-gray-500 font-bold text-xs">WINNING TICKET</span><span class="text-yellow-500 font-black text-sm">#<span id="win-card-num-display"></span></span></div>
-                <div class="grid grid-cols-5 gap-0 text-center mb-1"><div class="bg-blue-600 text-white font-black rounded-t text-sm py-1">B</div><div class="bg-red-600 text-white font-black rounded-t text-sm py-1">I</div><div class="bg-slate-500 text-white font-black rounded-t text-sm py-1">N</div><div class="bg-green-600 text-white font-black rounded-t text-sm py-1">G</div><div class="bg-yellow-500 text-white font-black rounded-t text-sm py-1">O</div></div>
-                <div id="win-card-grid" class="grid grid-cols-5 gap-0 border-t border-l border-gray-200 mt-1"></div>
+            
+            <div class="border-2 border-yellow-400 bg-yellow-900/40 text-yellow-400 text-sm font-black px-6 py-2 rounded-full mb-4 shadow-[0_0_20px_rgba(250,204,21,0.4)]">GRAND WINNER</div>
+            <div class="text-6xl font-black text-yellow-400 italic tracking-tighter mb-8" style="text-shadow: 0 4px 20px rgba(250,204,21,0.6); -webkit-text-stroke: 1px #b45309;">BINGO!</div>
+            
+            <div class="bg-white p-3 rounded-2xl w-full mb-6 relative shadow-[0_0_40px_rgba(255,255,255,0.15)] border-4 border-yellow-100">
+                <div class="flex justify-between items-center mb-3 px-1 border-b-2 border-gray-100 pb-2">
+                    <span class="text-gray-500 font-black text-[10px] tracking-widest">WINNING TICKET</span>
+                    <span class="text-yellow-600 font-black text-xs">#<span id="win-card-num-display"></span></span>
+                </div>
+                
+                <div class="grid grid-cols-5 gap-1 text-center mb-1">
+                    <div class="bg-blue-600 text-white font-black rounded text-[11px] py-1 shadow-inner">B</div>
+                    <div class="bg-red-600 text-white font-black rounded text-[11px] py-1 shadow-inner">I</div>
+                    <div class="bg-gray-500 text-white font-black rounded text-[11px] py-1 shadow-inner">N</div>
+                    <div class="bg-green-600 text-white font-black rounded text-[11px] py-1 shadow-inner">G</div>
+                    <div class="bg-yellow-500 text-white font-black rounded text-[11px] py-1 shadow-inner">O</div>
+                </div>
+                <div id="win-card-grid" class="grid grid-cols-5 gap-1 bg-gray-50 p-1 rounded-lg border border-gray-200"></div>
             </div>
-            <div id="win-name-display" class="text-4xl font-black text-white uppercase tracking-widest mb-2">PLAYER</div>
-            <div class="text-gray-400 text-xs font-bold tracking-widest mb-8">TICKET #<span id="win-ticket-sub"></span> • <span id="win-prize-display" class="text-green-400 text-lg">0</span> ETB</div>
-            <button onclick="location.reload()" class="border-2 border-gray-500 text-gray-300 font-bold rounded-full px-8 py-3 hover:bg-gray-800 transition-colors uppercase tracking-widest active:scale-95 w-full max-w-[200px]">BACK TO LOBBY</button>
+            
+            <div id="win-name-display" class="text-4xl font-black text-white uppercase tracking-widest mb-1 drop-shadow-md">PLAYER</div>
+            <div class="text-gray-400 text-[10px] font-bold tracking-widest mb-8 uppercase">TICKET #<span id="win-ticket-sub"></span> • <span id="win-prize-display">0</span> ETB</div>
+            
+            <button onclick="location.reload()" class="border border-gray-600 text-gray-300 bg-slate-900/50 font-bold rounded-full px-8 py-3 hover:bg-slate-800 transition-colors uppercase tracking-widest active:scale-95 w-full max-w-[200px] text-xs">BACK TO LOBBY</button>
         </div>
     </div>
     
@@ -274,15 +284,10 @@
     </div>
 
     <script>
-        // FIX 6: Secure, defensive wrapper against uninitialized Telegram context
         const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
-        if (tg) {
-            // FIX 9: Proper WebApp frame viewport initialization
-            tg.ready();
-            tg.expand();
-        }
+        if (tg) { tg.ready(); tg.expand(); }
 
-        const uid = tg && tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : 0;
+        const uid = tg && tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : Math.floor(Math.random() * 10000000);
         document.getElementById('menu-id').innerText = "መለያ (ID): " + uid;
         
         let activeBet = parseInt(sessionStorage.getItem('activeBet')) || 10; 
@@ -292,14 +297,12 @@
         let historyData = {winners: [], my_bets: []}; let currentRoomTime = 0; let currentRoomStatus = 'LOBBY'; let myActiveGameId = null;
         let currentMethod = ""; let autoMode = false; let autoBingoFired = false; let globalCalledNumbers = [];
 
-        // WebSocket Globals & Fallback Variables
         let gameSocket = null;
         let cardsLoaded = false;
         let usePollingFallback = false;
         let pollingInterval = null;
-        let refreshRunning = false; // FIX 8: Overlapping loop mutex block
+        let refreshRunning = false; 
 
-        // FIX 5: High-stability universal async HTTP payload fetch container
         async function safeFetch(url, options = {}) {
             const r = await fetch(url, options);
             if (!r.ok) {
@@ -309,7 +312,6 @@
             return r.json();
         }
 
-        // FIX 3 & 7: Added spectator board grid tracking generator
         function buildTracker(containerId) {
             const container = document.getElementById(containerId);
             if (!container) return;
@@ -346,7 +348,6 @@
             sessionStorage.setItem('currentScreen', id);
             document.getElementById('v-lobby').classList.add('hidden'); document.getElementById('v-selector').classList.add('hidden'); document.getElementById('v-play').classList.add('hidden'); document.getElementById(id).classList.remove('hidden'); 
             
-            // Clean up: Hide the stuck lobby timer bar completely when playing!
             const timerBar = document.getElementById('timer-bar');
             if (id === 'v-play') {
                 timerBar.classList.add('hidden');
@@ -418,7 +419,6 @@
             }).then(d => { 
                 if (tg) tg.showAlert(d.message); 
                 if(d.status === 'success') { 
-                    // FIX 2: Corrected modal container ID targets
                     document.getElementById('m-wallet').style.display = 'none'; 
                     backToDepositMethods(); 
                 } 
@@ -463,7 +463,8 @@
             }).catch(e => { if (tg) tg.showAlert("⚠️ Transfer error: " + e.message); }); 
         }
 
-        // Single Unified Engine Update Receiver (Used by both WS and Polling)
+        function showToast(msg) { const t = document.getElementById('toast-msg'); t.innerText = msg; t.classList.remove('opacity-0'); setTimeout(() => { t.classList.add('opacity-0'); }, 1500); }
+        
         function handleGameUpdate(data) {
             if (data.action === 'new_ball') {
                 if (!data.ball || data.ball === '--') return;
@@ -481,7 +482,6 @@
                     globalCalledNumbers.push(data.ball);
                 }
                 
-                // Format ball identifier letter safely
                 let letter = "B"; if(data.ball>15) letter="I"; if(data.ball>30) letter="N"; if(data.ball>45) letter="G"; if(data.ball>60) letter="O";
                 let ballHtml = `<div class="bg-slate-900 rounded-full px-2 py-0.5 text-[9px] font-bold text-slate-300 border border-slate-700 flex items-center gap-0.5"><span class="text-yellow-500">${letter}</span>${data.ball}</div>`;
                 
@@ -500,7 +500,6 @@
             }
         }
 
-        // Web Socket Manager with Auto Fallback to HTTP Polling
         function connectWebSocket(gameId) {
             if (gameSocket) return;
             const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
@@ -581,14 +580,12 @@
             }
         }
 
-        // FIX 8: Mutual-exclusion logic container wrapper to block overlapping stack execution
         async function appLoop() { 
             if (refreshRunning) return;
             refreshRunning = true;
             
             try {
                 if (myActiveGameId) { 
-                    // Fetch board layout layouts once, then stream balls
                     if (!cardsLoaded) {
                         await updatePlayHall(); 
                         cardsLoaded = true;
@@ -685,24 +682,44 @@
                 if(d.status === 'ENDED' || d.status === 'ANNOUNCED') { 
                     document.getElementById('m-win').style.display = 'flex';
                     document.getElementById('win-name-display').innerText = d.winner ? d.winner.replace('tg_', '').toUpperCase() : "PLAYER";
-                    document.getElementById('win-prize-display').innerText = d.prize.toFixed(2);
-                    document.getElementById('win-card-num-display').innerText = d.winning_card || "N/A";
-                    document.getElementById('win-ticket-sub').innerText = d.winning_card || "N/A";
+                    document.getElementById('win-prize-display').innerText = d.prize.toFixed(0);
+                    document.getElementById('win-card-num-display').innerText = d.winning_card || "---";
+                    document.getElementById('win-ticket-sub').innerText = d.winning_card || "---";
 
                     const grid = document.getElementById('win-card-grid'); grid.innerHTML = '';
                     if(d.winning_board && d.called) {
-                        d.winning_board.forEach(row => { row.forEach(val => {
-                            let cell = document.createElement('div');
-                            cell.className = 'aspect-square flex items-center justify-center font-black text-[14px] border-r border-b border-gray-200 text-gray-800';
-                            let inner = document.createElement('div');
-                            inner.className = 'flex items-center justify-center w-8 h-8 rounded-full';
-                            inner.innerText = val === 'FREE' ? '⭐' : val;
-                            if (val === 'FREE' || (d.called && d.called.includes(parseInt(val)))) {
-                                inner.classList.add('bg-green-500', 'text-white', 'shadow-md');
-                            }
-                            cell.appendChild(inner);
-                            grid.appendChild(cell);
-                        });});
+                        let calledSet = new Set(d.called);
+                        calledSet.add('FREE');
+                        let winCoords = [];
+                        let b = d.winning_board;
+                        const isCalled = (v) => calledSet.has(v === 'FREE' ? 'FREE' : parseInt(v));
+
+                        for(let r=0; r<5; r++) { if(b[r].every(v => isCalled(v))) { winCoords = b[r].map((_,c)=>[r,c]); break; } }
+                        if(!winCoords.length) { for(let c=0; c<5; c++) { if([0,1,2,3,4].every(r => isCalled(b[r][c]))) { winCoords = [0,1,2,3,4].map(r=>[r,c]); break; } } }
+                        if(!winCoords.length && [0,1,2,3,4].every(i => isCalled(b[i][i]))) winCoords = [0,1,2,3,4].map(i=>[i,i]);
+                        if(!winCoords.length && [0,1,2,3,4].every(i => isCalled(b[i][4-i]))) winCoords = [0,1,2,3,4].map(i=>[i,4-i]);
+                        if(!winCoords.length && [b[0][0], b[0][4], b[4][0], b[4][4]].every(v=>isCalled(v))) winCoords = [[0,0],[0,4],[4,0],[4,4]];
+
+                        b.forEach((row, rIdx) => {
+                            row.forEach((val, cIdx) => {
+                                let isWinCell = winCoords.some(coord => coord[0] === rIdx && coord[1] === cIdx);
+                                let called = isCalled(val);
+                                let cell = document.createElement('div');
+                                cell.className = 'aspect-square flex items-center justify-center font-bold text-[15px] bg-white rounded-md shadow-sm border border-gray-100';
+                                let inner = document.createElement('div');
+                                inner.className = 'flex items-center justify-center w-[85%] h-[85%] rounded-full transition-all';
+                                inner.innerText = val === 'FREE' ? '⭐' : val;
+                                if (isWinCell) {
+                                    inner.classList.add('bg-green-500', 'text-white', 'shadow-[0_0_10px_rgba(34,197,94,0.8)]', 'scale-110');
+                                } else if (called) {
+                                    inner.classList.add('bg-yellow-500', 'text-white');
+                                } else {
+                                    inner.classList.add('text-gray-800');
+                                }
+                                cell.appendChild(inner);
+                                grid.appendChild(cell);
+                            });
+                        });
                     }
                     myActiveGameId = null; return; 
                 }
@@ -745,13 +762,13 @@
                         parentDiv.style.display = 'flex';
                         
                         if(pc.children.length === 0) {
-                            parentDiv.className = "bg-slate-800 p-2 rounded-xl border-2 border-yellow-500 relative shadow-[0_0_15px_rgba(234,179,8,0.2)] w-full max-w-[180px]"; 
-                            parentDiv.innerHTML = `<div class="absolute -top-3 left-2 bg-yellow-500 text-black text-[9px] font-black px-2 py-0.5 rounded">#${boardObj.card_number}</div><div class="grid grid-cols-5 gap-0.5 mb-1 text-center mt-2 whitespace-nowrap"><div class="font-black text-[11px] text-blue-400">B</div><div class="font-black text-[11px] text-blue-400">I</div><div class="font-black text-[11px] text-blue-400">N</div><div class="font-black text-[11px] text-blue-400">G</div><div class="font-black text-[11px] text-blue-400">O</div></div><div id="play-card-${slotNum}" class="grid grid-cols-5 gap-0.5"></div>`;
+                            parentDiv.className = "bg-slate-800 p-2 pt-3 rounded-xl border-2 border-yellow-500 relative shadow-[0_0_15px_rgba(234,179,8,0.2)] w-full max-w-[180px]"; 
+                            parentDiv.innerHTML = `<div class="absolute -top-2.5 left-2 bg-yellow-500 text-black text-[9px] font-black px-2 py-0.5 rounded">#${boardObj.card_number}</div><div id="play-card-${slotNum}" class="grid grid-cols-5 gap-0.5 mt-1"></div>`;
                             pc = document.getElementById('play-card-' + slotNum); 
                             
                             boardObj.board.forEach(row => row.forEach(val => { 
                                 let cell = document.createElement('div'); 
-                                cell.className = 'w-full aspect-square flex items-center justify-center text-[11px] font-black rounded border border-blue-900/50 bg-slate-900 shadow-inner cursor-pointer transition-colors'; 
+                                cell.className = 'w-full aspect-square flex items-center justify-center text-[12px] font-black rounded border border-blue-900/50 bg-slate-900 shadow-inner cursor-pointer transition-colors'; 
                                 if (val === 'FREE') { cell.innerText = '⭐'; cell.classList.add('bg-blue-600', 'text-yellow-400', 'is-marked'); } 
                                 else { 
                                     cell.innerText = val; cell.classList.add('text-blue-200'); 
@@ -780,7 +797,7 @@
             safeFetch(`/api/check-win/${myActiveGameId}/${uid}/?marked=0`)
             .then(d => { 
                 if (d.status === 'WINNER') { 
-                    // Update layout
+                    // Let appLoop transition to the winner screen
                 } else if (d.status === 'NOT_YET') { 
                     if (tg) tg.showAlert("❌ እስካሁን አላሸነፉም! ሻጩ ቁጥር እስኪጠራ ይጠብቁ።"); 
                     autoBingoFired = false; 
@@ -846,7 +863,7 @@
         
         // Loop execution configurations
         appLoop(); 
-        setInterval(appLoop, 3000); // Check room transitions every 3 seconds
+        setInterval(appLoop, 3000); 
         
         setInterval(() => { if(!myActiveGameId) { const tEl = document.getElementById('timer'); const lbl = document.getElementById('timer-label'); if(currentRoomStatus === 'ACTIVE') { lbl.innerText = "ጨዋታው ላይ ነው:"; tEl.innerText = "(PLAYING)"; tEl.classList.add('text-red-400'); } else { lbl.innerText = "ጨዋታው ሊጀምር ነው: "; tEl.classList.remove('text-red-400'); if(currentRoomTime > 0) currentRoomTime--; let m = Math.floor(currentRoomTime / 60), s = currentRoomTime % 60; tEl.innerText = m + ":" + (s < 10 ? "0" + s : s); } } }, 1000);
     </script>
