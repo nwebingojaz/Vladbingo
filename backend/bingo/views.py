@@ -27,7 +27,9 @@ def get_card_data(request, num):
 
 def lobby_info(request, tg_id):
     user, _ = User.objects.get_or_create(username=f"tg_{tg_id}")
-    rooms = GameRound.objects.exclude(status="ENDED").order_by('bet_amount')
+    
+    # FIX: Exclude both ENDED and ANNOUNCED games from showing up as active lobby cards!
+    rooms = GameRound.objects.exclude(status__in=["ENDED", "ANNOUNCED"]).order_by('bet_amount')
     
     room_data = []
     now = timezone.now()
@@ -51,11 +53,17 @@ def lobby_info(request, tg_id):
             'time_left': time_left
         })
         
-    active_game = GameRound.objects.filter(players__has_key=str(tg_id)).exclude(status="ENDED").last()
-    return JsonResponse({'balance': float(user.operational_credit), 'rooms': room_data, 'active_game_id': active_game.id if active_game else None})
+    # FIX: Only treat games as "active" if they are currently in the LOBBY or ACTIVE state!
+    active_game = GameRound.objects.filter(players__has_key=str(tg_id), status__in=["LOBBY", "ACTIVE"]).last()
+    
+    return JsonResponse({
+        'balance': float(user.operational_credit), 
+        'rooms': room_data, 
+        'active_game_id': active_game.id if active_game else None
+    })
 
 def get_history(request, tg_id):
-    history = GameRound.objects.filter(status="ENDED").order_by('-id')[:15]
+    history = GameRound.objects.filter(status__in=["ENDED", "ANNOUNCED"]).order_by('-id')[:15]
     winners_data = [{'game_id': g.id, 'winner': g.winner_username or "None", 'called': f"{len(g.called_numbers)}/75", 'prize': float(g.winner_prize)} for g in history]
     my_games = GameRound.objects.filter(players__has_key=str(tg_id)).order_by('-id')[:15]
     
@@ -128,7 +136,7 @@ def get_game_info(request, game_id, tg_id):
             'prize': float(prize), 'status': game.status
         }
         
-        if game.status == 'ENDED':
+        if game.status in ['ENDED', 'ANNOUNCED']:
             winner_user = User.objects.filter(username=game.winner_username).first()
             if winner_user and winner_user.real_name: 
                 resp['winner'] = winner_user.real_name
