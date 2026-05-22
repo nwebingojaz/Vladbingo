@@ -122,13 +122,13 @@
     </div>
 
     <!-- LIVE PLAY HALL -->
-    <div id="v-play" class="hidden p-4 h-screen overflow-y-auto pb-32">
-        <div class="flex justify-between items-center mb-4 bg-slate-900 p-3 rounded-2xl border border-slate-700 shadow-lg relative">
-            <div class="flex items-center gap-3">
-                <div class="w-14 h-14 bg-gradient-to-br from-white to-slate-300 rounded-full flex items-center justify-center border-4 border-slate-400 shadow-[0_0_15px_rgba(255,255,255,0.3)]">
-                    <span id="latest-ball" class="text-2xl font-black text-slate-900">--</span>
+    <div id="v-play" class="hidden p-3 h-screen overflow-y-auto pb-32">
+        <div class="flex justify-between items-center mb-2 bg-slate-900 p-2 rounded-xl border border-slate-700 shadow-lg relative">
+            <div class="flex items-center gap-2">
+                <div class="w-12 h-12 bg-gradient-to-br from-white to-slate-300 rounded-full flex items-center justify-center border-4 border-slate-400 shadow-[0_0_15px_rgba(255,255,255,0.3)]">
+                    <span id="latest-ball" class="text-xl font-black text-slate-900">--</span>
                 </div>
-                <div id="recent-balls" class="flex gap-1 overflow-hidden w-[110px] whitespace-nowrap bg-slate-800 p-1.5 rounded-full border border-slate-700 shadow-inner">
+                <div id="recent-balls" class="flex gap-1 overflow-hidden w-[100px] whitespace-nowrap bg-slate-800 p-1 rounded-full border border-slate-700 shadow-inner">
                 </div>
             </div>
             <div class="flex flex-col items-end gap-1">
@@ -139,13 +139,13 @@
         </div>
 
         <div id="play-tracker" class="mb-4 p-2 bg-slate-900/80 rounded-xl border border-blue-900/50 hidden"></div>
-        <div id="multi-card-container" class="grid grid-cols-2 gap-2 mb-6">
-            <div class="bg-slate-900/50 p-1 rounded-xl border-2 border-slate-700 border-dashed flex items-center justify-center min-h-[120px]" id="slot-1"><div id="play-card-1" class="w-full"></div></div>
-            <div class="bg-slate-900/50 p-1 rounded-xl border-2 border-slate-700 border-dashed flex items-center justify-center min-h-[120px]" id="slot-2"><div id="play-card-2" class="w-full"></div></div>
-            <div class="bg-slate-900/50 p-1 rounded-xl border-2 border-slate-700 border-dashed flex items-center justify-center min-h-[120px]" id="slot-3"><div id="play-card-3" class="w-full"></div></div>
-            <div class="bg-slate-900/50 p-1 rounded-xl border-2 border-slate-700 border-dashed flex items-center justify-center min-h-[120px]" id="slot-4"><div id="play-card-4" class="w-full"></div></div>
+        <div id="multi-card-container" class="grid grid-cols-2 gap-1.5 mb-3">
+            <div class="bg-slate-900/50 p-1 rounded-lg border-2 border-slate-700 border-dashed flex items-center justify-center min-h-[120px]" id="slot-1"><div id="play-card-1" class="w-full"></div></div>
+            <div class="bg-slate-900/50 p-1 rounded-lg border-2 border-slate-700 border-dashed flex items-center justify-center min-h-[120px]" id="slot-2"><div id="play-card-2" class="w-full"></div></div>
+            <div class="bg-slate-900/50 p-1 rounded-lg border-2 border-slate-700 border-dashed flex items-center justify-center min-h-[120px]" id="slot-3"><div id="play-card-3" class="w-full"></div></div>
+            <div class="bg-slate-900/50 p-1 rounded-lg border-2 border-slate-700 border-dashed flex items-center justify-center min-h-[120px]" id="slot-4"><div id="play-card-4" class="w-full"></div></div>
         </div>
-        <button onclick="hitBingo()" id="bingo-btn" class="w-full py-4 bg-slate-700 text-slate-400 rounded-2xl font-black text-xl border-2 border-slate-600 transition-all tracking-widest shadow-lg">BINGO!</button>
+        <button onclick="hitBingo()" id="bingo-btn" class="w-full py-3 bg-slate-700 text-slate-400 rounded-xl font-black text-lg border-2 border-slate-600 transition-all tracking-widest shadow-lg">BINGO!</button>
     </div>
 
     <!-- WALLET MODAL -->
@@ -265,7 +265,9 @@
             </div>
             <div id="win-name-display" class="text-4xl font-black text-white uppercase tracking-widest mb-1 drop-shadow-md">PLAYER</div>
             <div class="text-gray-400 text-[10px] font-bold tracking-widest mb-8 uppercase">TICKET #<span id="win-ticket-sub"></span> • <span id="win-prize-display">0</span> ETB</div>
-            <button onclick="location.reload()" class="border border-gray-600 text-gray-300 bg-slate-900/50 font-bold rounded-full px-8 py-3 hover:bg-slate-800 transition-colors uppercase tracking-widest active:scale-95 w-full max-w-[200px] text-xs">BACK TO LOBBY</button>
+            
+            <!-- FIX: Back to lobby now clears the volatile state so it doesn't infinitely loop on broken playhalls! -->
+            <button onclick="sessionStorage.setItem('currentScreen', 'v-lobby'); location.reload();" class="border border-gray-600 text-gray-300 bg-slate-900/50 font-bold rounded-full px-8 py-3 hover:bg-slate-800 transition-colors uppercase tracking-widest active:scale-95 w-full max-w-[200px] text-xs">BACK TO LOBBY</button>
         </div>
     </div>
     
@@ -285,7 +287,7 @@
         
         let activeBet = parseInt(sessionStorage.getItem('activeBet')) || 10; 
         let myCards = []; 
-        let myLobbyCardsMap = {}; // Tracks purchases from DB instantly
+        let myLobbyCardsMap = {}; 
         let isFirstLoad = true;
         
         let historyData = {winners: [], my_bets: []}; let currentRoomTime = 0; let currentRoomStatus = 'LOBBY'; let myActiveGameId = null;
@@ -307,7 +309,6 @@
             return r.json();
         }
 
-        // --- WINNER MODAL DISPLAY ---
         async function showWinnerModalFromGameId(gameId) {
             try {
                 const d = await safeFetch(`/api/game-info/${gameId}/${uid}/`);
@@ -485,14 +486,8 @@
             refreshRunning=true; 
             try{ 
                 if(myActiveGameId){ 
-                    // ONLY connect WS if game is LIVE. Wait in lobby if still countdown.
-                    if(currentRoomStatus === 'ACTIVE') {
-                        if(!cardsLoaded){ await updatePlayHall(); cardsLoaded=true; } 
-                        connectWebSocket(myActiveGameId); 
-                    } else {
-                        disconnectWebSocket();
-                        await refreshLobby();
-                    }
+                    if(!cardsLoaded){ await updatePlayHall(); cardsLoaded=true; } 
+                    connectWebSocket(myActiveGameId); 
                 } else { 
                     disconnectWebSocket(); 
                     if(pollingInterval) clearInterval(pollingInterval); 
@@ -519,9 +514,9 @@
                     }
                 }
                 
+                // FIX: Prevents auto-pulling into v-play if there is NO active game ID for the user
                 if(d.active_game_id){ 
                     myActiveGameId=d.active_game_id; 
-                    // NEW: Automatically pull ONLY if the game has started (timer hits 0)
                     if (currentRoomStatus === 'ACTIVE' && sessionStorage.getItem('currentScreen') !== 'v-play') {
                         showScreen('v-play');
                     }
@@ -536,11 +531,19 @@
                         activeBet = parseInt(sessionStorage.getItem('activeBet')) || 10;
                         myCards = myLobbyCardsMap[activeBet.toString()] || [];
                         document.getElementById('nav-room').innerText=activeBet;
-                        showScreen(saved);
-                        initGrid();
-                        myCards.forEach(c=>{ let btn=document.getElementById('c-'+c); if(btn) btn.classList.add('active');});
-                        if(myCards.length) previewCard(myCards[myCards.length-1]);
-                        if(saved==='v-selector') updateStatusIndicator();
+                        
+                        // FIX: Safely route to lobby if there is no active game but v-play was saved
+                        if (saved === 'v-play' && !myActiveGameId) {
+                            showScreen('v-lobby');
+                        } else {
+                            showScreen(saved);
+                            if(saved==='v-selector') {
+                                initGrid();
+                                myCards.forEach(c=>{ let btn=document.getElementById('c-'+c); if(btn) btn.classList.add('active');});
+                                if(myCards.length) previewCard(myCards[myCards.length-1]);
+                                updateStatusIndicator();
+                            }
+                        }
                     }
                 }
 
@@ -585,12 +588,14 @@
                         let slot=i+1, pc=document.getElementById('play-card-'+slot), parent=pc.parentElement;
                         parent.style.display='flex';
                         if(pc.children.length===0){
-                            parent.className="bg-slate-800 p-2 pt-3.5 rounded-xl border-2 border-yellow-500 relative shadow-[0_0_15px_rgba(234,179,8,0.2)] w-fit mx-auto";
-                            parent.innerHTML=`<div class="absolute -top-2.5 left-2 bg-yellow-500 text-black text-[9px] font-black px-2 py-0.5 rounded">#${boardObj.card_number}</div><div id="play-card-${slot}" class="grid grid-cols-5 gap-1 mt-1"></div>`;
+                            // FIX: Small padding and max-w-[145px] ensures the yellow border shrink-wraps and columns fit tightly
+                            parent.className="bg-slate-800 p-1 pt-2.5 rounded-lg border-2 border-yellow-500 relative shadow-sm w-full max-w-[145px] mx-auto";
+                            parent.innerHTML=`<div class="absolute -top-2 left-2 bg-yellow-500 text-black text-[8px] font-black px-1.5 py-0.5 rounded">#${boardObj.card_number}</div><div id="play-card-${slotNum}" class="grid grid-cols-5 gap-[1px] mt-1 w-full"></div>`;
                             pc=document.getElementById('play-card-'+slot);
                             boardObj.board.forEach(row=>row.forEach(val=>{
                                 let cell=document.createElement('div');
-                                cell.className='w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center text-[13px] font-black rounded border border-blue-900/50 bg-slate-900 shadow-inner cursor-pointer transition-colors';
+                                // FIX: w-full aspect-square lets the CSS Grid handle perfect sizing automatically!
+                                cell.className='w-full aspect-square flex items-center justify-center text-[10px] sm:text-[11px] font-black rounded-[2px] border border-blue-900/50 bg-slate-900 shadow-inner cursor-pointer transition-colors';
                                 if(val==='FREE'){ cell.innerText='⭐'; cell.classList.add('bg-blue-600','text-yellow-400','is-marked');}
                                 else{ cell.innerText=val; cell.classList.add('text-blue-200');
                                     cell.onclick=function(){ if(autoMode) return; this.classList.toggle('bg-red-500'); this.classList.toggle('text-white'); this.classList.toggle('border-red-400'); this.classList.toggle('text-blue-200'); this.classList.toggle('is-marked'); activateBingoButton(); }; }
@@ -607,7 +612,14 @@
         function checkLocal1LineWin(){ for(let s=1;s<=4;s++){ const pc=document.getElementById('play-card-'+s); if(!pc||!pc.children.length) continue; const cells=Array.from(pc.querySelectorAll('div')); if(cells.length<25) continue; let grid=[]; for(let i=0;i<5;i++) grid.push(cells.slice(i*5,i*5+5).map(c=>c.classList.contains('is-marked')||c.innerText==='⭐')); for(let i=0;i<5;i++) if(grid[i].every(v=>v)||grid.every(row=>row[i])) return true; if([0,1,2,3,4].every(i=>grid[i][i])) return true; if([0,1,2,3,4].every(i=>grid[i][4-i])) return true; if([grid[0][0],grid[0][4],grid[4][0],grid[4][4]].every(v=>v)) return true; } return false; }
         function toggleAutoMode(el){ autoMode=el.checked; if(autoMode) markCardsInstantly(); }
         function markCardsInstantly(){ if(!globalCalledNumbers.length) return; for(let s=1;s<=4;s++) document.querySelectorAll(`#play-card-${s} div`).forEach(cell=>{ let val=cell.innerText; if(val!=='⭐' && globalCalledNumbers.includes(parseInt(val)) && !cell.classList.contains('is-marked')) cell.classList.add('bg-red-500','text-white','border-red-400','is-marked'); }); if(checkLocal1LineWin() && !autoBingoFired){ autoBingoFired=true; hitBingo(); } activateBingoButton(); }
-        function activateBingoButton(){ const btn=document.getElementById('bingo-btn'); if(checkLocal1LineWin()) btn.className="w-full py-4 bg-gradient-to-r from-red-500 to-red-700 rounded-2xl font-black text-xl shadow-[0_0_20px_rgba(239,68,68,0.4)] text-white active:scale-95 transition-all tracking-widest"; else btn.className="w-full py-4 bg-slate-700 text-slate-400 rounded-2xl font-black text-xl border-2 border-slate-600 transition-all tracking-widest"; }
+        
+        function activateBingoButton(){ 
+            const btn=document.getElementById('bingo-btn'); 
+            if(checkLocal1LineWin()) 
+                btn.className="w-full py-3 bg-gradient-to-r from-red-500 to-red-700 rounded-xl font-black text-lg shadow-[0_0_20px_rgba(239,68,68,0.4)] text-white active:scale-95 transition-all tracking-widest"; 
+            else 
+                btn.className="w-full py-3 bg-slate-700 text-slate-400 rounded-xl font-black text-lg border-2 border-slate-600 transition-all tracking-widest"; 
+        }
         
         async function hitBingo(){ 
             if(!checkLocal1LineWin()) return tg?tg.showAlert("⚠️ ትንሽ ይጠብቁ! ትክክለኛ መስመር አልሰሩም!"):alert("⚠️ ትንሽ ይጠብቁ! ትክክለኛ መስመር አልሰሩም!");
