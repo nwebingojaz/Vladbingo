@@ -312,29 +312,92 @@
             return r.json();
         }
 
-        function buildTracker(containerId) {
-            const container = document.getElementById(containerId);
-            if (!container) return;
-            container.innerHTML = '';
-            const letters = ['B','I','N','G','O'];
-            letters.forEach((letter, index) => {
-                let row = document.createElement('div');
-                row.className = 'tracker-row';
-                let label = document.createElement('div');
-                label.className = 'tracker-letter';
-                label.innerText = letter;
-                row.appendChild(label);
-                for(let i = 1; i <= 15; i++) {
-                    let num = index * 15 + i;
-                    let dot = document.createElement('div');
-                    dot.className = 'tracker-dot';
-                    dot.id = `${containerId}-dot-${num}`;
-                    dot.innerText = num;
-                    row.appendChild(dot);
+        // --- WINNER MODAL DISPLAY ---
+        async function showWinnerModalFromGameId(gameId) {
+            try {
+                const d = await safeFetch(`/api/game-info/${gameId}/${uid}/`);
+                if (d.status === 'ENDED' || d.status === 'ANNOUNCED') {
+                    document.getElementById('win-name-display').innerText = d.winner ? d.winner.replace('tg_', '').toUpperCase() : "PLAYER";
+                    document.getElementById('win-prize-display').innerText = d.prize.toFixed(0);
+                    document.getElementById('win-card-num-display').innerText = d.winning_card || "---";
+                    document.getElementById('win-ticket-sub').innerText = d.winning_card || "---";
+                    const grid = document.getElementById('win-card-grid'); grid.innerHTML = '';
+                    if(d.winning_board && d.called) {
+                        let calledSet = new Set(d.called); calledSet.add('FREE');
+                        let winCoords = []; let b = d.winning_board;
+                        const isCalled = (v) => calledSet.has(v === 'FREE' ? 'FREE' : parseInt(v));
+                        for(let r=0; r<5; r++) if(b[r].every(v => isCalled(v))) { winCoords = b[r].map((_,c)=>[r,c]); break; }
+                        if(!winCoords.length) for(let c=0;c<5;c++) if([0,1,2,3,4].every(r=>isCalled(b[r][c]))) { winCoords=[0,1,2,3,4].map(r=>[r,c]); break; }
+                        if(!winCoords.length && [0,1,2,3,4].every(i=>isCalled(b[i][i]))) winCoords=[0,1,2,3,4].map(i=>[i,i]);
+                        if(!winCoords.length && [0,1,2,3,4].every(i=>isCalled(b[i][4-i]))) winCoords=[0,1,2,3,4].map(i=>[i,4-i]);
+                        b.forEach((row, rIdx) => row.forEach((val, cIdx) => {
+                            let isWin = winCoords.some(coord=>coord[0]===rIdx && coord[1]===cIdx);
+                            let called = isCalled(val);
+                            let cell = document.createElement('div'); cell.className='aspect-square flex items-center justify-center font-bold text-[15px] bg-white rounded-md shadow-sm border border-gray-100';
+                            let inner = document.createElement('div'); inner.className='flex items-center justify-center w-[85%] h-[85%] rounded-full transition-all';
+                            inner.innerText = val === 'FREE' ? '⭐' : val;
+                            if(isWin) inner.classList.add('bg-green-500','text-white','shadow-[0_0_10px_rgba(34,197,94,0.8)]','scale-110');
+                            else if(called) inner.classList.add('bg-yellow-500','text-white');
+                            else inner.classList.add('text-gray-800');
+                            cell.appendChild(inner); grid.appendChild(cell);
+                        }));
+                    }
+                    document.getElementById('m-win').style.display = 'flex';
+                    myActiveGameId = null;
+                    if(pollingInterval) clearInterval(pollingInterval);
+                    disconnectWebSocket();
                 }
-                container.appendChild(row);
-            });
+            } catch(e) { console.error("Winner modal fetch failed", e); }
         }
+
+        function handleGameUpdate(data) {
+            if (data.action === 'new_ball' && data.ball) {
+                document.getElementById('latest-ball').innerText = data.ball;
+                document.getElementById('called-count-badge').innerText = data.called_count;
+                const badge = document.getElementById('play-status-badge');
+                if(badge) { badge.innerText = "እየተጠራ ነው: "+data.called_count+"/75"; badge.className = "text-[10px] bg-red-500/20 border border-red-500 text-red-500 px-3 py-1 rounded-full font-black animate-pulse"; }
+                if (!globalCalledNumbers.includes(data.ball) && typeof data.ball === 'number') globalCalledNumbers.push(data.ball);
+                let letter = "B"; if(data.ball>15) letter="I"; if(data.ball>30) letter="N"; if(data.ball>45) letter="G"; if(data.ball>60) letter="O";
+                let ballHtml = `<div class="bg-slate-900 rounded-full px-2 py-0.5 text-[9px] font-bold text-slate-300 border border-slate-700 flex items-center gap-0.5"><span class="text-yellow-500">${letter}</span>${data.ball}</div>`;
+                const recent = document.getElementById('recent-balls');
+                if(recent && !recent.innerHTML.includes(`>${data.ball}</div>`)) { recent.innerHTML = ballHtml + recent.innerHTML; if(recent.children.length>5) recent.removeChild(recent.lastChild); }
+                if(autoMode) markCardsInstantly();
+                activateBingoButton();
+            } else if (data.action === 'game_ended') {
+                if(myActiveGameId) showWinnerModalFromGameId(myActiveGameId);
+            }
+        }
+
+        function connectWebSocket(gameId) {
+            if(gameSocket) return;
+            const protocol = location.protocol === 'https:' ? 'wss://' : 'ws://';
+            const socketUrl = protocol + location.host + '/ws/game/' + gameId + '/';
+            try {
+                gameSocket = new WebSocket(socketUrl);
+                gameSocket.onopen = () => { if(pollingInterval) clearInterval(pollingInterval); usePollingFallback=false; };
+                gameSocket.onmessage = e => { const data = JSON.parse(e.data); handleGameUpdate(data); };
+                gameSocket.onclose = () => { gameSocket=null; if(myActiveGameId && !usePollingFallback) startPollingFallback(); };
+                gameSocket.onerror = () => startPollingFallback();
+            } catch(err) { startPollingFallback(); }
+        }
+
+        function startPollingFallback() {
+            if(pollingInterval) return;
+            usePollingFallback = true;
+            pollingInterval = setInterval(() => {
+                if(myActiveGameId) safeFetch(`/api/game-info/${myActiveGameId}/${uid}/`).then(d => {
+                    if(d.status === 'ENDED' || d.status === 'ANNOUNCED') { clearInterval(pollingInterval); pollingInterval=null; cardsLoaded=false; showWinnerModalFromGameId(myActiveGameId); }
+                    else {
+                        globalCalledNumbers = d.called || [];
+                        if(d.called && d.called.length) handleGameUpdate({action:'new_ball', ball:d.called[d.called.length-1], called_count:d.called.length});
+                    }
+                }).catch(e=>console.error);
+            },3000);
+        }
+
+        function disconnectWebSocket() { if(gameSocket){gameSocket.close(); gameSocket=null;} }
+
+        function buildTracker(containerId){ const cont=document.getElementById(containerId); if(!cont) return; cont.innerHTML=''; ['B','I','N','G','O'].forEach((letter,idx)=>{ let row=document.createElement('div'); row.className='tracker-row'; let label=document.createElement('div'); label.className='tracker-letter'; label.innerText=letter; row.appendChild(label); for(let i=1;i<=15;i++){ let num=idx*15+i; let dot=document.createElement('div'); dot.className='tracker-dot'; dot.id=`${containerId}-dot-${num}`; dot.innerText=num; row.appendChild(dot); } cont.appendChild(row); }); }
 
         window.addEventListener('DOMContentLoaded', (event) => {
             const hash = window.location.hash.substring(1);
@@ -342,530 +405,217 @@
             else if (hash === 'history') { openHistory(); history.replaceState(null, null, ' '); }
         });
 
-        function toggleMenu() { const sb = document.getElementById('sidebar'); const ov = document.getElementById('sidebar-overlay'); if(sb.classList.contains('open')) { sb.classList.remove('open'); ov.style.display='none'; } else { sb.classList.add('open'); ov.style.display='block'; } }
+        function toggleMenu() { const sb = document.getElementById('sidebar'), ov = document.getElementById('sidebar-overlay'); if(sb.classList.contains('open')) { sb.classList.remove('open'); ov.style.display='none'; } else { sb.classList.add('open'); ov.style.display='block'; } }
         
         function showScreen(id) { 
-            sessionStorage.setItem('currentScreen', id);
-            document.getElementById('v-lobby').classList.add('hidden'); document.getElementById('v-selector').classList.add('hidden'); document.getElementById('v-play').classList.add('hidden'); document.getElementById(id).classList.remove('hidden'); 
-            
-            const timerBar = document.getElementById('timer-bar');
-            if (id === 'v-play') {
-                timerBar.classList.add('hidden');
-            } else {
-                timerBar.classList.remove('hidden');
-            }
-            if(id==='v-selector'){ updateBuyButton(); } 
+            sessionStorage.setItem('currentScreen', id); 
+            ['v-lobby','v-selector','v-play'].forEach(s=>document.getElementById(s).classList.add('hidden')); 
+            document.getElementById(id).classList.remove('hidden'); 
+            if(id==='v-selector') updateBuyButton(); 
+            const timerBar = document.getElementById('timer-bar'); 
+            if(id==='v-play') timerBar.classList.add('hidden'); 
+            else timerBar.classList.remove('hidden'); 
         }
+
+        function showLobby() { sessionStorage.setItem('currentScreen','v-lobby'); myCards=[]; sessionStorage.removeItem('myCards'); showScreen('v-lobby'); document.getElementById('m-win').style.display='none'; updateBuyButton(); }
+        function openWallet(tab){ document.getElementById('m-wallet').style.display='flex'; document.getElementById('wallet-bal').innerText=document.getElementById('bal-header').innerText; openWalletTab(tab); }
+        function openWalletTab(tab){ ['deposit','withdraw','transfer'].forEach(t=>{document.getElementById('w-tab-'+t).classList.remove('active'); document.getElementById('w-sec-'+t).classList.add('hidden');}); document.getElementById('w-tab-'+tab).classList.add('active'); document.getElementById('w-sec-'+tab).classList.remove('hidden'); }
+        function openSettings(){ document.getElementById('m-settings').style.display='flex'; }
+        function openReferral(){ document.getElementById('m-referral').style.display='flex'; document.getElementById('my-promo-code').innerText=uid; }
+        function copyPromoMessage(){ const shareText=`🎰 Play BIGEST BINGO BOT and win real money!\n\nUse my Promo Code [ ${uid} ] in the Wallet to get 10 ETB Free Bonus!\n\n1. Open: https://t.me/Bigestbingobot\n2. Go to Refer & Earn 🎟️\n3. Paste my code in the Promo box!\n\nGood luck! 🍀`; if(navigator.clipboard&&window.isSecureContext) navigator.clipboard.writeText(shareText).then(()=>{if(tg) tg.showAlert("✅ Promo message copied!");}).catch(()=>fallbackCopy(shareText)); else fallbackCopy(shareText); }
+        function fallbackCopy(text){ let ta=document.createElement("textarea"); ta.value=text; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy'); if(tg) tg.showAlert("✅ Copied!");}catch(e){} document.body.removeChild(ta); }
         
-        function showLobby() {
-            sessionStorage.setItem('currentScreen', 'v-lobby');
-            myCards = [];
-            sessionStorage.removeItem('myCards');
-            document.getElementById('v-selector').classList.add('hidden');
-            document.getElementById('m-win').style.display='none';
-            document.getElementById('v-lobby').classList.remove('hidden');
-            updateBuyButton();
+        function redeemPromo(){ 
+            const code=document.getElementById('promo-code').value; 
+            if(!code||code==uid) return; 
+            safeFetch('/api/redeem-promo/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tg_id:uid,promo_code:code})})
+            .then(d=>{if(tg) tg.showAlert(d.message); if(d.status==='success'){ document.getElementById('promo-code').value=''; refreshLobby();}})
+            .catch(e=>{if(tg) tg.showAlert("Error");}); 
         }
 
-        function openWallet(tab) { document.getElementById('m-wallet').style.display = 'flex'; document.getElementById('wallet-bal').innerText = document.getElementById('bal-header').innerText; openWalletTab(tab); }
-        function openWalletTab(tab) { ['deposit', 'withdraw', 'transfer'].forEach(t => { document.getElementById('w-tab-'+t).classList.remove('active'); document.getElementById('w-sec-'+t).classList.add('hidden'); }); document.getElementById('w-tab-'+tab).classList.add('active'); document.getElementById('w-sec-'+tab).classList.remove('hidden'); }
-        function openSettings() { document.getElementById('m-settings').style.display = 'flex'; }
+        function showDepositForm(method){ currentMethod=method; document.getElementById('dep-step-1').classList.add('hidden'); document.getElementById('dep-step-2').classList.remove('hidden'); document.getElementById('dep-title').innerText=method+" Deposit"; const acc=document.getElementById('dep-account-info'); if(method==='M-Pesa') acc.innerHTML="0707659618<br><span class='text-sm text-gray-400'>ስም: Biniyam</span>"; else if(method==='Telebirr') acc.innerHTML="0977733630<br><span class='text-sm text-gray-400'>ስም: Solomon</span>"; else acc.innerHTML="1000379893698<br><span class='text-sm text-gray-400'>ስም: Yeabkal</span>"; }
+        function backToDepositMethods(){ document.getElementById('dep-step-2').classList.add('hidden'); document.getElementById('dep-step-1').classList.remove('hidden'); document.getElementById('dep-amount').value=''; document.getElementById('dep-txid').value=''; }
         
-        function openReferral() { document.getElementById('m-referral').style.display = 'flex'; document.getElementById('my-promo-code').innerText = uid; }
-        function copyPromoMessage() { const shareText = `🎰 Play BIGEST BINGO BOT and win real money!\n\nUse my Promo Code [ ${uid} ] in the Wallet to get 10 ETB Free Bonus!\n\n1. Open: https://t.me/Bigestbingobot\n2. Go to Refer & Earn 🎟️\n3. Paste my code in the Promo box!\n\nGood luck! 🍀`; if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(shareText).then(() => { if (tg) tg.showAlert("✅ Promo message copied! Paste it to your friends."); }).catch(err => { fallbackCopy(shareText); }); } else { fallbackCopy(shareText); } }
-        function fallbackCopy(text) { let textArea = document.createElement("textarea"); textArea.value = text; textArea.style.position = "fixed"; document.body.appendChild(textArea); textArea.focus(); textArea.select(); try { document.execCommand('copy'); if (tg) tg.showAlert("✅ Promo message copied! Paste it to your friends."); } catch (err) { if (tg) tg.showAlert("⚠️ Could not copy automatically. Your code is: " + uid); } document.body.removeChild(textArea); }
+        function requestOTP(formType){ 
+            let phone=""; 
+            if(formType==='withdraw') phone=document.getElementById('with-phone').value; 
+            if(formType==='password') phone=document.getElementById('set-phone').value; 
+            if(!phone) return; 
+            showToast("⏳ ኮድ እየተላከ..."); 
+            safeFetch('/api/send-otp/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tg_id:uid,phone:phone})})
+            .then(d=>{if(tg) tg.showAlert(d.message);})
+            .catch(e=>{if(tg) tg.showAlert("⚠️ Gateway error");}); 
+        }
+
+        function submitDeposit(){ 
+            const amt=document.getElementById('dep-amount').value, txid=document.getElementById('dep-txid').value; 
+            if(!amt||!txid) return; 
+            safeFetch('/api/submit-deposit/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tg_id:uid,amount:amt,tx_id:txid,method:currentMethod})})
+            .then(d=>{
+                if(tg) tg.showAlert(d.message); 
+                if(d.status==='success'){ document.getElementById('m-wallet').style.display='none'; backToDepositMethods();}
+            }).catch(e=>{if(tg) tg.showAlert("⚠️ Deposit failure");}); 
+        }
+
+        function submitAction(url,payload){ 
+            if(!payload.otp) return; 
+            payload.tg_id=uid; 
+            showToast("⏳ በማረጋገጥ..."); 
+            safeFetch('/api/verify-otp/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tg_id:uid,otp:payload.otp})})
+            .then(d=>{
+                if(d.status==='success'){ 
+                    safeFetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(d2=>{if(tg) tg.showAlert(d2.message); if(d2.status==='success') location.reload();}); 
+                } else if(tg) tg.showAlert("❌ "+d.message); 
+            }).catch(e=>{if(tg) tg.showAlert("⚠️ Transaction error");}); 
+        }
+
+        function submitTransferAction(url,payload){ 
+            if(!payload.amount||!payload.account) return; 
+            payload.tg_id=uid; 
+            safeFetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+            .then(d=>{if(tg) tg.showAlert(d.message); if(d.status==='success') location.reload();})
+            .catch(e=>{if(tg) tg.showAlert("⚠️ Transfer error");}); 
+        }
+
+        function openHistory(){ document.getElementById('m-history').style.display='flex'; safeFetch('/api/history/'+uid+'/').then(d=>{historyData=d; switchTab('bets');}).catch(e=>console.error); }
+        function switchTab(tab){ const content=document.getElementById('history-content'); content.innerHTML=''; if(tab==='bets') historyData.my_bets.forEach(h=>{content.innerHTML+=`<div class="history-row border-l-2 ${h.status==='WON'?'border-green-500':'border-red-500'}"><div><div class="text-gray-400">Game</div><div class="font-bold">#${h.game_id}</div></div><div><div class="text-gray-400">Bet/Card</div><div class="text-blue-400">${h.bet}/[${h.card}]</div></div><div class="text-right"><div class="text-gray-400">Result</div><div class="font-black ${h.status==='WON'?'text-green-500':'text-red-500'}">${h.status==='WON'?'+'+h.prize:'-'+(h.bet * (h.card?h.card.toString().split(',').length:1))}</div></div></div>`;}); else historyData.winners.forEach(h=>{content.innerHTML+=`<div class="history-row"><div><div class="text-gray-400">Game</div><div class="font-bold">#${h.game_id}</div></div><div><div class="text-gray-400">Winner</div><div class="text-blue-400">@${h.winner}</div></div><div class="text-right"><div class="text-gray-400">Prize</div><div class="text-green-400 font-black">${h.prize} ETB</div></div></div>`;}); }
+
+        function showToast(msg){ const t=document.getElementById('toast-msg'); t.innerText=msg; t.classList.remove('opacity-0'); setTimeout(()=>t.classList.add('opacity-0'),1500); }
         
-        function redeemPromo() { 
-            const code = document.getElementById('promo-code').value; 
-            if(!code) return tg ? tg.showAlert("Please enter a promo code!") : alert("Please enter a promo code!"); 
-            if(code == uid) return tg ? tg.showAlert("You cannot use your own code!") : alert("You cannot use your own code!"); 
-            
-            safeFetch('/api/redeem-promo/', { 
-                method: 'POST', 
-                headers: {'Content-Type': 'application/json'}, 
-                body: JSON.stringify({ tg_id: uid, promo_code: code }) 
-            }).then(d => { 
-                if (tg) tg.showAlert(d.message); 
-                if(d.status === 'success') { document.getElementById('promo-code').value = ''; refreshLobby(); } 
-            }).catch(e => { if (tg) tg.showAlert("⚠️ Promo Error: " + e.message); }); 
-        }
-
-        function showDepositForm(method) { currentMethod = method; document.getElementById('dep-step-1').classList.add('hidden'); document.getElementById('dep-step-2').classList.remove('hidden'); document.getElementById('dep-title').innerText = method + " Deposit"; const accInfo = document.getElementById('dep-account-info'); if (method === 'M-Pesa') accInfo.innerHTML = "0707659618<br><span class='text-sm text-gray-400'>ስም (Name): Biniyam Nigatu</span>"; else if (method === 'Telebirr') accInfo.innerHTML = "0977733630<br><span class='text-sm text-gray-400'>ስም (Name): Solomon</span>"; else if (method === 'CBE') accInfo.innerHTML = "1000379893698<br><span class='text-sm text-gray-400'>ስም (Name): Yeabkal</span>"; }
-        function backToDepositMethods() { document.getElementById('dep-step-2').classList.add('hidden'); document.getElementById('dep-step-1').classList.remove('hidden'); document.getElementById('dep-amount').value = ''; document.getElementById('dep-txid').value = ''; }
-        
-        function requestOTP(formType) { 
-            let phoneNum = ""; let btnId = "";
-            if(formType === 'withdraw') { phoneNum = document.getElementById('with-phone').value; btnId = 'btn-with-otp'; }
-            if(formType === 'password') { phoneNum = document.getElementById('set-phone').value; btnId = 'btn-set-otp'; }
-            if(!phoneNum) return showToast("⚠️ ስልክ ቁጥር ያስገቡ! (Enter Phone)");
-            showToast("⏳ ኮድ እየተላከ ነው... (Sending)");
-            
-            safeFetch('/api/send-otp/', { 
-                method: 'POST', 
-                headers: {'Content-Type': 'application/json'}, 
-                body: JSON.stringify({ tg_id: uid, phone: phoneNum }) 
-            }).then(d => { if (tg) tg.showAlert(d.message); })
-            .catch(err => { if (tg) tg.showAlert("⚠️ Gateway error: " + err.message); }); 
-        }
-        
-        function submitDeposit() { 
-            const amount = document.getElementById('dep-amount').value, txid = document.getElementById('dep-txid').value; 
-            if(!amount || !txid) return tg ? tg.showAlert("እባክዎትን ሁሉንም ቦታ ይሙሉ።") : alert("እባክዎትን ሁሉንም ቦታ ይሙሉ።"); 
-            
-            safeFetch('/api/submit-deposit/', { 
-                method: 'POST', 
-                headers: {'Content-Type': 'application/json'}, 
-                body: JSON.stringify({ tg_id: uid, amount: amount, tx_id: txid, method: currentMethod }) 
-            }).then(d => { 
-                if (tg) tg.showAlert(d.message); 
-                if(d.status === 'success') { 
-                    document.getElementById('m-wallet').style.display = 'none'; 
-                    backToDepositMethods(); 
-                } 
-            }).catch(e => { if (tg) tg.showAlert("⚠️ Deposit failure: " + e.message); }); 
-        }
-        
-        function submitAction(url, payload) {
-            if(!payload.otp) return showToast("⚠️ ኮድ ያስገቡ! (OTP required)");
-            payload.tg_id = uid; showToast("⏳ በማረጋገጥ ላይ...");
-            
-            safeFetch('/api/verify-otp/', { 
-                method: 'POST', 
-                headers: {'Content-Type': 'application/json'}, 
-                body: JSON.stringify({ tg_id: uid, otp: payload.otp }) 
-            }).then(d => { 
-                if(d.status === 'success') { 
-                    safeFetch(url, { 
-                        method: 'POST', 
-                        headers: {'Content-Type': 'application/json'}, 
-                        body: JSON.stringify(payload) 
-                    }).then(d2 => { 
-                        if (tg) tg.showAlert(d2.message); 
-                        if(d2.status==='success') location.reload(); 
-                    }); 
-                } else {
-                    if (tg) tg.showAlert("❌ " + d.message); 
-                }
-            }).catch(e => { if (tg) tg.showAlert("⚠️ Transaction error: " + e.message); });
-        }
-
-        function submitTransferAction(url, payload) { 
-            if(!payload.amount || !payload.account) return tg ? tg.showAlert("እባክዎትን ሁሉንም ቦታ ይሙሉ።") : alert("እባክዎትን ሁሉንም ቦታ ይሙሉ።"); 
-            payload.tg_id = uid; 
-            
-            safeFetch(url, { 
-                method: 'POST', 
-                headers: {'Content-Type': 'application/json'}, 
-                body: JSON.stringify(payload) 
-            }).then(d => { 
-                if (tg) tg.showAlert(d.message); 
-                if(d.status==='success') location.reload(); 
-            }).catch(e => { if (tg) tg.showAlert("⚠️ Transfer error: " + e.message); }); 
-        }
-
-        function showToast(msg) { const t = document.getElementById('toast-msg'); t.innerText = msg; t.classList.remove('opacity-0'); setTimeout(() => { t.classList.add('opacity-0'); }, 1500); }
-        
-        function handleGameUpdate(data) {
-            if (data.action === 'new_ball') {
-                if (!data.ball || data.ball === '--') return;
-                
-                document.getElementById('latest-ball').innerText = data.ball;
-                document.getElementById('called-count-badge').innerText = data.called_count;
-                
-                const badge = document.getElementById('play-status-badge');
-                if (badge) {
-                    badge.innerText = "እየተጠራ ነው: " + data.called_count + "/75";
-                    badge.className = "text-[10px] bg-red-500/20 border border-red-500 text-red-500 px-3 py-1 rounded-full font-black animate-pulse";
-                }
-
-                if (!globalCalledNumbers.includes(data.ball) && typeof data.ball === 'number') {
-                    globalCalledNumbers.push(data.ball);
-                }
-                
-                let letter = "B"; if(data.ball>15) letter="I"; if(data.ball>30) letter="N"; if(data.ball>45) letter="G"; if(data.ball>60) letter="O";
-                let ballHtml = `<div class="bg-slate-900 rounded-full px-2 py-0.5 text-[9px] font-bold text-slate-300 border border-slate-700 flex items-center gap-0.5"><span class="text-yellow-500">${letter}</span>${data.ball}</div>`;
-                
-                const recentContainer = document.getElementById('recent-balls');
-                if (recentContainer && !recentContainer.innerHTML.includes(`>${data.ball}</div>`)) {
-                    recentContainer.innerHTML = ballHtml + recentContainer.innerHTML;
-                    if (recentContainer.children.length > 5) {
-                        recentContainer.removeChild(recentContainer.lastChild);
-                    }
-                }
-                
-                if (autoMode) {
-                    markCardsInstantly();
-                }
-                activateBingoButton();
-            }
-        }
-
-        function connectWebSocket(gameId) {
-            if (gameSocket) return;
-            const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-            const socketUrl = protocol + window.location.host + '/ws/game/' + gameId + '/';
-            
-            try {
-                gameSocket = new WebSocket(socketUrl);
-                
-                gameSocket.onopen = function() {
-                    console.log("WebSocket connection established!");
-                    usePollingFallback = false;
-                    if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
-                };
-                
-                gameSocket.onmessage = function(e) {
-                    const data = JSON.parse(e.data);
-                    
-                    if (data.action === 'game_ended') {
-                        cardsLoaded = false;
-                        disconnectWebSocket();
-                        if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
-                        updatePlayHall();
-                    } else {
-                        handleGameUpdate(data);
-                    }
-                };
-                
-                gameSocket.onclose = function(e) {
-                    gameSocket = null;
-                    if (myActiveGameId && !usePollingFallback) {
-                        startPollingFallback();
-                    }
-                };
-                
-                gameSocket.onerror = function(e) {
-                    console.error("WS error encountered. Reverting to HTTP polling fallback.");
-                    startPollingFallback();
-                };
-            } catch (err) {
-                console.error("WS initiation failed. Launching HTTP polling fallback.");
-                startPollingFallback();
-            }
-        }
-
-        function startPollingFallback() {
-            if (pollingInterval) return;
-            usePollingFallback = true;
-            console.log("⚠️ Automatic HTTP Polling Fallback activated.");
-            
-            pollingInterval = setInterval(() => {
-                if (myActiveGameId) {
-                    safeFetch(`/api/game-info/${myActiveGameId}/${uid}/`)
-                    .then(d => {
-                        if (d.status === 'ENDED' || d.status === 'ANNOUNCED') {
-                            clearInterval(pollingInterval);
-                            pollingInterval = null;
-                            cardsLoaded = false;
-                            updatePlayHall();
-                        } else {
-                            globalCalledNumbers = d.called || [];
-                            if (d.called && d.called.length > 0) {
-                                handleGameUpdate({
-                                    action: 'new_ball',
-                                    ball: d.called[d.called.length - 1],
-                                    called_count: d.called.length
-                                });
-                            }
-                        }
-                    }).catch(err => console.error("Polling error:", err));
-                }
-            }, 3000);
-        }
-
-        function disconnectWebSocket() {
-            if (gameSocket) {
-                gameSocket.close();
-                gameSocket = null;
-            }
-        }
-
-        async function appLoop() { 
-            if (refreshRunning) return;
-            refreshRunning = true;
-            
-            try {
-                if (myActiveGameId) { 
-                    if (!cardsLoaded) {
-                        await updatePlayHall(); 
-                        cardsLoaded = true;
-                    }
-                    connectWebSocket(myActiveGameId);
+        async function appLoop(){ 
+            if(refreshRunning) return; 
+            refreshRunning=true; 
+            try{ 
+                if(myActiveGameId){ 
+                    if(!cardsLoaded){ await updatePlayHall(); cardsLoaded=true; } 
+                    connectWebSocket(myActiveGameId); 
                 } else { 
-                    disconnectWebSocket();
-                    if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
-                    cardsLoaded = false;
+                    disconnectWebSocket(); 
+                    if(pollingInterval) clearInterval(pollingInterval); 
+                    cardsLoaded=false; 
                     await refreshLobby(); 
                 } 
-            } catch(e) {
-                console.error("Critical engine loop failure:", e);
-            } finally {
-                refreshRunning = false;
-            }
+            } catch(e){ console.error(e); } 
+            finally { refreshRunning=false; } 
         }
 
         async function refreshLobby() { 
             try {
                 const d = await safeFetch('/api/lobby-info/'+uid+'/');
-                document.getElementById('bal-header').innerText = d.balance.toFixed(2); 
-                
-                if (d.rooms) {
-                    let activeR = d.rooms.find(r => r.id === d.active_game_id);
-                    if (activeR) {
-                        currentRoomTime = activeR.time_left;
-                        currentRoomStatus = activeR.status;
-                        document.getElementById('nav-prize').innerText = activeR.win.toFixed(0);
-                    }
+                document.getElementById('bal-header').innerText = d.balance.toFixed(2);
+                if(d.rooms){
+                    let activeR = d.rooms.find(r=>r.id===d.active_game_id);
+                    if(activeR){ currentRoomTime=activeR.time_left; currentRoomStatus=activeR.status; document.getElementById('nav-prize').innerText=activeR.win.toFixed(0);}
                 }
-                
-                if(d.active_game_id) { 
-                    myActiveGameId = d.active_game_id; 
-                    showScreen('v-play'); 
-                    await updatePlayHall(); 
-                    return; 
-                } 
-                
-                if(isFirstLoad) {
-                    isFirstLoad = false;
-                    const savedScreen = sessionStorage.getItem('currentScreen');
-                    if(savedScreen === 'v-selector') {
-                        document.getElementById('nav-room').innerText = activeBet;
-                        document.getElementById('v-lobby').classList.add('hidden');
-                        document.getElementById('v-selector').classList.remove('hidden');
+                if(d.active_game_id){ myActiveGameId=d.active_game_id; showScreen('v-play'); await updatePlayHall(); return; }
+                if(isFirstLoad){
+                    isFirstLoad=false;
+                    const saved=sessionStorage.getItem('currentScreen');
+                    if(saved==='v-selector'){
+                        document.getElementById('nav-room').innerText=activeBet;
+                        showScreen('v-selector');
                         initGrid();
-                        myCards.forEach(c => {
-                            let btn = document.getElementById('c-'+c);
-                            if(btn) btn.classList.add('active');
-                        });
-                        if(myCards.length > 0) previewCard(myCards[myCards.length-1]);
+                        myCards.forEach(c=>{ let btn=document.getElementById('c-'+c); if(btn) btn.classList.add('active');});
+                        if(myCards.length) previewCard(myCards[myCards.length-1]);
                         updateBuyButton();
                     }
                 }
-
-                const list = document.getElementById('room-list'); list.innerHTML = ''; d.rooms.sort((a,b) => a.bet - b.bet); 
-                d.rooms.forEach(room => { 
-                    const isLive = room.status === 'ACTIVE'; 
-                    list.innerHTML += `<div onclick="selectRoom(${room.bet})" class="room-card ${isLive ? 'live' : ''} cursor-pointer"><div class="flex justify-between w-full"><div><div class="text-white font-black text-xl">Bingo ${room.bet}</div><div class="text-[11px] font-bold ${isLive ? 'text-red-400' : 'text-blue-400'} mt-1">${isLive ? 'እየተጠራ ነው: ' + room.called_count + '/75' : 'ሊጀምር ነው: ' + room.time_left + 's'}</div><div class="text-[10px] text-gray-400 mt-1">ሽልማት: <span class="text-white font-bold">${room.win.toFixed(0)} ETB</span></div></div><div class="flex flex-col items-end justify-center"><div class="${isLive ? 'text-red-500' : 'text-blue-500'} font-bold text-2xl">${isLive ? '⏳' : '▶'}</div><div class="text-[9px] text-gray-500 mt-2">${room.players} ካርዶች ተገዝተዋል</div></div></div></div>`; 
-                    if(activeBet == room.bet) { currentRoomTime = room.time_left; currentRoomStatus = room.status; document.getElementById('nav-prize').innerText = room.win.toFixed(0); updateBanner(room.status, room.called_count, room.called_numbers); } 
-                }); 
-            } catch (err) {
-                console.error("Lobby refresh failed:", err);
-            }
-        }
-
-        function checkLocal1LineWin() { for (let s=1; s<=4; s++) { const pc = document.getElementById('play-card-' + s); if (!pc || pc.children.length === 0) continue; const cells = Array.from(pc.querySelectorAll('div')); if(cells.length < 25) continue; let grid = []; for(let i=0; i<5; i++) { grid.push(cells.slice(i*5, i*5+5).map(c => c.classList.contains('is-marked') || c.innerText === '⭐')); } for(let i=0; i<5; i++) { if(grid[i].every(v=>v)) return true; if(grid.every(row=>row[i])) return true; } if([0,1,2,3,4].every(i => grid[i][i])) return true; if([0,1,2,3,4].every(i => grid[i][4-i])) return true; if([grid[0][0], grid[0][4], grid[4][0], grid[4][4]].every(v=>v)) return true; } return false; }
-        
-        function toggleAutoMode(el) { autoMode = el.checked; if(autoMode) markCardsInstantly(); }
-
-        function markCardsInstantly() {
-            if(!globalCalledNumbers.length) return;
-            for(let s=1; s<=4; s++) {
-                document.querySelectorAll(`#play-card-${s} div`).forEach(cell => {
-                    let val = cell.innerText;
-                    if(val !== '⭐' && globalCalledNumbers.includes(parseInt(val))) {
-                        if(!cell.classList.contains('is-marked')) {
-                            cell.classList.add('bg-red-500', 'text-white', 'border-red-400', 'is-marked');
-                            cell.classList.remove('text-blue-200');
-                        }
-                    }
+                const list=document.getElementById('room-list'); list.innerHTML='';
+                d.rooms.sort((a,b)=>a.bet-b.bet).forEach(room=>{
+                    const isLive=room.status==='ACTIVE';
+                    list.innerHTML+=`<div onclick="selectRoom(${room.bet})" class="room-card ${isLive?'live':''} cursor-pointer"><div class="flex justify-between w-full"><div><div class="text-white font-black text-xl">Bingo ${room.bet}</div><div class="text-[11px] font-bold ${isLive?'text-red-400':'text-blue-400'} mt-1">${isLive?'እየተጠራ ነው: '+room.called_count+'/75':'ሊጀምር ነው: '+room.time_left+'s'}</div><div class="text-[10px] text-gray-400 mt-1">ሽልማት: <span class="text-white font-bold">${room.win.toFixed(0)} ETB</span></div></div><div class="flex flex-col items-end justify-center"><div class="${isLive?'text-red-500':'text-blue-500'} font-bold text-2xl">${isLive?'⏳':'▶'}</div><div class="text-[9px] text-gray-500 mt-2">${room.players} ካርዶች ተገዝተዋል</div></div></div></div>`;
+                    if(activeBet==room.bet){ currentRoomTime=room.time_left; currentRoomStatus=room.status; document.getElementById('nav-prize').innerText=room.win.toFixed(0); updateBanner(room.status,room.called_count,room.called_numbers);}
                 });
-            }
-            if(checkLocal1LineWin() && !autoBingoFired) { autoBingoFired = true; hitBingo(); }
-            activateBingoButton();
+            } catch(e){}
         }
 
-        async function updatePlayHall() {
+        async function updatePlayHall() { 
             if(!myActiveGameId) return;
-            try {
-                const d = await safeFetch(`/api/game-info/${myActiveGameId}/${uid}/`);
-                
-                if(d.status === 'ENDED' || d.status === 'ANNOUNCED') { 
-                    document.getElementById('m-win').style.display = 'flex';
-                    document.getElementById('win-name-display').innerText = d.winner ? d.winner.replace('tg_', '').toUpperCase() : "PLAYER";
-                    document.getElementById('win-prize-display').innerText = d.prize.toFixed(0);
-                    document.getElementById('win-card-num-display').innerText = d.winning_card || "---";
-                    document.getElementById('win-ticket-sub').innerText = d.winning_card || "---";
-
-                    const grid = document.getElementById('win-card-grid'); grid.innerHTML = '';
-                    if(d.winning_board && d.called) {
-                        let calledSet = new Set(d.called);
-                        calledSet.add('FREE');
-                        let winCoords = [];
-                        let b = d.winning_board;
-                        const isCalled = (v) => calledSet.has(v === 'FREE' ? 'FREE' : parseInt(v));
-
-                        for(let r=0; r<5; r++) { if(b[r].every(v => isCalled(v))) { winCoords = b[r].map((_,c)=>[r,c]); break; } }
-                        if(!winCoords.length) { for(let c=0; c<5; c++) { if([0,1,2,3,4].every(r => isCalled(b[r][c]))) { winCoords = [0,1,2,3,4].map(r=>[r,c]); break; } } }
-                        if(!winCoords.length && [0,1,2,3,4].every(i => isCalled(b[i][i]))) winCoords = [0,1,2,3,4].map(i=>[i,i]);
-                        if(!winCoords.length && [0,1,2,3,4].every(i => isCalled(b[i][4-i]))) winCoords = [0,1,2,3,4].map(i=>[i,4-i]);
-                        if(!winCoords.length && [b[0][0], b[0][4], b[4][0], b[4][4]].every(v=>isCalled(v))) winCoords = [[0,0],[0,4],[4,0],[4,4]];
-
-                        b.forEach((row, rIdx) => {
-                            row.forEach((val, cIdx) => {
-                                let isWinCell = winCoords.some(coord => coord[0] === rIdx && coord[1] === cIdx);
-                                let called = isCalled(val);
-                                let cell = document.createElement('div');
-                                cell.className = 'aspect-square flex items-center justify-center font-bold text-[15px] bg-white rounded-md shadow-sm border border-gray-100';
-                                let inner = document.createElement('div');
-                                inner.className = 'flex items-center justify-center w-[85%] h-[85%] rounded-full transition-all';
-                                inner.innerText = val === 'FREE' ? '⭐' : val;
-                                if (isWinCell) {
-                                    inner.classList.add('bg-green-500', 'text-white', 'shadow-[0_0_10px_rgba(34,197,94,0.8)]', 'scale-110');
-                                } else if (called) {
-                                    inner.classList.add('bg-yellow-500', 'text-white');
-                                } else {
-                                    inner.classList.add('text-gray-800');
-                                }
-                                cell.appendChild(inner);
-                                grid.appendChild(cell);
-                            });
-                        });
-                    }
-                    myActiveGameId = null; return; 
-                }
-                
-                const badge = document.getElementById('play-status-badge'); 
-                if (badge) {
-                    if(d.status === 'ACTIVE') { 
-                        badge.innerText = "እየተጠራ ነው: " + d.called.length + "/75"; 
-                        badge.className = "text-[10px] bg-red-500/20 border border-red-500 text-red-500 px-3 py-1 rounded-full font-black animate-pulse"; 
-                    } else {
-                        badge.innerText = "ይጠብቁ (WAITING)"; 
-                        badge.className = "text-[10px] bg-blue-500/20 border border-blue-500 text-blue-500 px-3 py-1 rounded-full font-black"; 
-                    }
-                }
-                
-                document.getElementById('nav-prize').innerText = d.prize.toFixed(0);
-                
-                globalCalledNumbers = d.called || [];
-                if(d.called && d.called.length > 0) {
-                    let latest = d.called[d.called.length - 1];
-                    document.getElementById('latest-ball').innerText = latest;
-                    document.getElementById('called-count-badge').innerText = d.called.length;
-                    
-                    let recentHtml = '';
-                    let recentArr = [...d.called].reverse().slice(1, 6); 
-                    recentArr.forEach(n => {
-                        let letter = "B"; if(n>15) letter="I"; if(n>30) letter="N"; if(n>45) letter="G"; if(n>60) letter="O";
-                        recentHtml += `<div class="bg-slate-900 rounded-full px-2 py-0.5 text-[9px] font-bold text-slate-300 border border-slate-700 flex items-center gap-0.5"><span class="text-yellow-500">${letter}</span>${n}</div>`;
+            try{
+                const d=await safeFetch(`/api/game-info/${myActiveGameId}/${uid}/`);
+                if(d.status==='ENDED'||d.status==='ANNOUNCED'){ await showWinnerModalFromGameId(myActiveGameId); return; }
+                document.getElementById('nav-prize').innerText=d.prize.toFixed(0);
+                globalCalledNumbers=d.called||[];
+                if(d.called && d.called.length){
+                    let latest=d.called[d.called.length-1];
+                    document.getElementById('latest-ball').innerText=latest;
+                    document.getElementById('called-count-badge').innerText=d.called.length;
+                    let recentHtml='';
+                    [...d.called].reverse().slice(1,6).forEach(n=>{
+                        let l="B"; if(n>15) l="I"; if(n>30) l="N"; if(n>45) l="G"; if(n>60) l="O";
+                        recentHtml+=`<div class="bg-slate-900 rounded-full px-2 py-0.5 text-[9px] font-bold text-slate-300 border border-slate-700 flex items-center gap-0.5"><span class="text-yellow-500">${l}</span>${n}</div>`;
                     });
-                    document.getElementById('recent-balls').innerHTML = recentHtml;
+                    document.getElementById('recent-balls').innerHTML=recentHtml;
                 }
-
-                if(d.boards_data && d.boards_data.length > 0) {
-                    for(let x=1; x<=4; x++) { document.getElementById('slot-'+x).style.display = 'none'; }
-                    
-                    d.boards_data.forEach((boardObj, i) => {
-                        let slotNum = i + 1; 
-                        let pc = document.getElementById('play-card-' + slotNum);
-                        let parentDiv = pc.parentElement;
-                        parentDiv.style.display = 'flex';
-                        
-                        if(pc.children.length === 0) {
-                            parentDiv.className = "bg-slate-800 p-2 pt-3 rounded-xl border-2 border-yellow-500 relative shadow-[0_0_15px_rgba(234,179,8,0.2)] w-full max-w-[180px]"; 
-                            parentDiv.innerHTML = `<div class="absolute -top-2.5 left-2 bg-yellow-500 text-black text-[9px] font-black px-2 py-0.5 rounded">#${boardObj.card_number}</div><div id="play-card-${slotNum}" class="grid grid-cols-5 gap-0.5 mt-1"></div>`;
-                            pc = document.getElementById('play-card-' + slotNum); 
-                            
-                            boardObj.board.forEach(row => row.forEach(val => { 
-                                let cell = document.createElement('div'); 
-                                cell.className = 'w-full aspect-square flex items-center justify-center text-[12px] font-black rounded border border-blue-900/50 bg-slate-900 shadow-inner cursor-pointer transition-colors'; 
-                                if (val === 'FREE') { cell.innerText = '⭐'; cell.classList.add('bg-blue-600', 'text-yellow-400', 'is-marked'); } 
-                                else { 
-                                    cell.innerText = val; cell.classList.add('text-blue-200'); 
-                                    cell.onclick = function() { 
-                                        if(autoMode) return; 
-                                        this.classList.toggle('bg-red-500'); this.classList.toggle('text-white'); this.classList.toggle('border-red-400'); this.classList.toggle('text-blue-200'); this.classList.toggle('is-marked'); 
-                                        activateBingoButton(); 
-                                    }; 
-                                } 
-                                pc.appendChild(cell); 
+                if(d.boards_data && d.boards_data.length){
+                    for(let x=1;x<=4;x++) document.getElementById('slot-'+x).style.display='none';
+                    d.boards_data.forEach((boardObj,i)=>{
+                        let slot=i+1, pc=document.getElementById('play-card-'+slot), parent=pc.parentElement;
+                        parent.style.display='flex';
+                        if(pc.children.length===0){
+                            parent.className="bg-slate-800 p-2 pt-3 rounded-xl border-2 border-yellow-500 relative shadow-[0_0_15px_rgba(234,179,8,0.2)] w-full max-w-[180px]";
+                            parent.innerHTML=`<div class="absolute -top-2.5 left-2 bg-yellow-500 text-black text-[9px] font-black px-2 py-0.5 rounded">#${boardObj.card_number}</div><div id="play-card-${slot}" class="grid grid-cols-5 gap-0.5 mt-1"></div>`;
+                            pc=document.getElementById('play-card-'+slot);
+                            boardObj.board.forEach(row=>row.forEach(val=>{
+                                let cell=document.createElement('div');
+                                cell.className='w-full aspect-square flex items-center justify-center text-[12px] font-black rounded border border-blue-900/50 bg-slate-900 shadow-inner cursor-pointer transition-colors';
+                                if(val==='FREE'){ cell.innerText='⭐'; cell.classList.add('bg-blue-600','text-yellow-400','is-marked');}
+                                else{ cell.innerText=val; cell.classList.add('text-blue-200');
+                                    cell.onclick=function(){ if(autoMode) return; this.classList.toggle('bg-red-500'); this.classList.toggle('text-white'); this.classList.toggle('border-red-400'); this.classList.toggle('is-marked'); activateBingoButton(); }; }
+                                pc.appendChild(cell);
                             }));
                         }
                     });
-                    if (autoMode) markCardsInstantly();
+                    if(autoMode) markCardsInstantly();
                 }
                 activateBingoButton();
-            } catch (err) {
-                console.error("Playhall update failed:", err);
-            }
+            } catch(e){}
         }
 
-        function activateBingoButton() { const btn = document.getElementById('bingo-btn'); if(checkLocal1LineWin()) { btn.className = "w-full py-4 bg-gradient-to-r from-red-500 to-red-700 rounded-2xl font-black text-xl shadow-[0_0_20px_rgba(239,68,68,0.4)] text-white active:scale-95 transition-all tracking-widest"; } else { btn.className = "w-full py-4 bg-slate-700 text-slate-400 rounded-2xl font-black text-xl border-2 border-slate-600 transition-all tracking-widest"; } }
+        function checkLocal1LineWin(){ for(let s=1;s<=4;s++){ const pc=document.getElementById('play-card-'+s); if(!pc||!pc.children.length) continue; const cells=Array.from(pc.querySelectorAll('div')); if(cells.length<25) continue; let grid=[]; for(let i=0;i<5;i++) grid.push(cells.slice(i*5,i*5+5).map(c=>c.classList.contains('is-marked')||c.innerText==='⭐')); for(let i=0;i<5;i++) if(grid[i].every(v=>v)||grid.every(row=>row[i])) return true; if([0,1,2,3,4].every(i=>grid[i][i])) return true; if([0,1,2,3,4].every(i=>grid[i][4-i])) return true; if([grid[0][0],grid[0][4],grid[4][0],grid[4][4]].every(v=>v)) return true; } return false; }
+        function toggleAutoMode(el){ autoMode=el.checked; if(autoMode) markCardsInstantly(); }
+        function markCardsInstantly(){ if(!globalCalledNumbers.length) return; for(let s=1;s<=4;s++) document.querySelectorAll(`#play-card-${s} div`).forEach(cell=>{ let val=cell.innerText; if(val!=='⭐' && globalCalledNumbers.includes(parseInt(val)) && !cell.classList.contains('is-marked')) cell.classList.add('bg-red-500','text-white','border-red-400','is-marked'); }); if(checkLocal1LineWin() && !autoBingoFired){ autoBingoFired=true; hitBingo(); } activateBingoButton(); }
+        function activateBingoButton(){ const btn=document.getElementById('bingo-btn'); if(checkLocal1LineWin()) btn.className="w-full py-4 bg-gradient-to-r from-red-500 to-red-700 rounded-2xl font-black text-xl shadow-[0_0_20px_rgba(239,68,68,0.4)] text-white active:scale-95 transition-all tracking-widest"; else btn.className="w-full py-4 bg-slate-700 text-slate-400 rounded-2xl font-black text-xl border-2 border-slate-600 transition-all tracking-widest"; }
         
-        function hitBingo() { 
-            if(!checkLocal1LineWin()) return tg ? tg.showAlert("⚠️ ትንሽ ይጠብቁ! ትክክለኛ መስመር አልሰሩም!") : alert("⚠️ ትንሽ ይጠብቁ! ትክክለኛ መስመር አልሰሩም!"); 
-            safeFetch(`/api/check-win/${myActiveGameId}/${uid}/?marked=0`)
-            .then(d => { 
-                if (d.status === 'WINNER') { 
-                    // Let appLoop transition to the winner screen
-                } else if (d.status === 'NOT_YET') { 
-                    if (tg) tg.showAlert("❌ እስካሁን አላሸነፉም! ሻጩ ቁጥር እስኪጠራ ይጠብቁ።"); 
-                    autoBingoFired = false; 
+        async function hitBingo(){ 
+            if(!checkLocal1LineWin()) return tg?tg.showAlert("⚠️ ትክክለኛ መስመር አልሰሩም!"):alert("⚠️ ትክክለኛ መስመር አልሰሩም!");
+            try{
+                const d = await safeFetch(`/api/check-win/${myActiveGameId}/${uid}/?marked=0`);
+                if(d.status === 'WINNER'){ autoBingoFired=false; await showWinnerModalFromGameId(myActiveGameId); }
+                else if(d.status === 'NOT_YET'){ if(tg) tg.showAlert("❌ እስካሁን አላሸነፉም! ሻጩ ቁጥር እስኪጠራ ይጠብቁ።"); autoBingoFired=false; }
+            } catch(e){ console.error(e); }
+        }
+
+        function updateBuyButton() { const btn=document.getElementById('join-btn'); if(myCards.length===0){ btn.innerText="▶ ካርድ ይግዙ"; btn.style.opacity="0.5"; } else{ const total=myCards.length*activeBet; btn.innerText=`▶ ${myCards.length} ካርድ ይግዙ (${total} ETB)`; btn.style.opacity="1"; } }
+        function getMaxCards(){ return activeBet==10?1000:500; }
+        function initGrid(){ const g=document.getElementById('grid-container'); g.innerHTML=''; let max=getMaxCards(); for(let i=1;i<=max;i++){ let b=document.createElement('button'); b.className="card-num"; b.id="c-"+i; b.innerText=i; b.onclick=()=>selectCard(i); g.appendChild(b); } }
+        function selectCard(n){ const btn=document.getElementById('c-'+n); if(myCards.includes(n)){ myCards=myCards.filter(id=>id!==n); btn.classList.remove('active'); if(myCards.length) previewCard(myCards[myCards.length-1]); else document.getElementById('mini-grid').innerHTML=''; } else{ if(myCards.length>=4) return tg?tg.showAlert("በአንድ ጊዜ ከ 4 ካርድ በላይ መግዛት አይቻልም!"):alert("በአንድ ጊዜ ከ 4 ካርድ በላይ መግዛት አይቻልም!"); myCards.push(n); btn.classList.add('active'); showToast("ካርድ #"+n+" ተመርጧል! ("+myCards.length+"/4)"); previewCard(n); } sessionStorage.setItem('myCards',JSON.stringify(myCards)); updateBuyButton(); }
+        function previewCard(n){ document.getElementById('prev-num').innerText="#"+n; safeFetch('/api/card-data/'+n+'/').then(d=>{ const mini=document.getElementById('mini-grid'); mini.innerHTML=''; d.board.forEach(row=>row.forEach(v=>{ let c=document.createElement('div'); c.className='mini-cell'; c.innerText=v==='FREE'?'X':v; mini.appendChild(c); })); }).catch(e=>console.error); }
+        function pickRandom(){ if(myCards.length>=4) return; let max=getMaxCards(); let r=Math.floor(Math.random()*max)+1; while(myCards.includes(r)) r=Math.floor(Math.random()*max)+1; selectCard(r); }
+        function joinGame(){ if(myCards.length===0) return; const cardsString=myCards.join(','); safeFetch(`/api/join-room/${uid}/${activeBet}/${cardsString}/`).then(d=>{ if(d.status==='ok'){ sessionStorage.removeItem('currentScreen'); sessionStorage.removeItem('myCards'); location.reload(); } else if(tg) tg.showAlert(d.error); }).catch(e=>{if(tg) tg.showAlert("⚠️ Room Join Error");}); }
+        function selectRoom(t){ activeBet=t; sessionStorage.setItem('activeBet',activeBet); sessionStorage.setItem('currentScreen','v-selector'); document.getElementById('nav-room').innerText=t; showScreen('v-selector'); myCards=[]; sessionStorage.setItem('myCards',JSON.stringify(myCards)); initGrid(); appLoop(); updateBuyButton(); }
+        
+        function updateBanner(status,count,called_numbers){ const b=document.getElementById('active-call-banner'); const btn=document.getElementById('join-btn'); const gGrid=document.getElementById('grid-container'); const sTrack=document.getElementById('spectator-tracker'); if(status==='ACTIVE'){ b.classList.remove('hidden'); document.getElementById('call-count').innerText=count; btn.disabled=true; btn.style.opacity="0.3"; btn.innerText="WAITING..."; gGrid.classList.add('hidden'); sTrack.classList.remove('hidden'); buildTracker('spectator-tracker'); document.querySelectorAll('#spectator-tracker .tracker-dot').forEach(el=>el.classList.remove('called')); if(called_numbers) called_numbers.forEach(n=>{ let dot=document.getElementById('spectator-tracker-dot-'+n); if(dot) dot.classList.add('called');}); } else{ b.classList.add('hidden'); btn.disabled=false; updateBuyButton(); gGrid.classList.remove('hidden'); sTrack.classList.add('hidden');} }
+
+        // Start engine
+        setInterval(appLoop, 3000);
+        
+        setInterval(() => { 
+            if(!myActiveGameId) { 
+                const tEl = document.getElementById('timer'); 
+                const lbl = document.getElementById('timer-label'); 
+                if(currentRoomStatus === 'ACTIVE') { 
+                    lbl.innerText = "ጨዋታው ላይ ነው:"; tEl.innerText = "(PLAYING)"; tEl.classList.add('text-red-400'); 
+                } else { 
+                    lbl.innerText = "ጨዋታው ሊጀምር ነው: "; tEl.classList.remove('text-red-400'); 
+                    if(currentRoomTime > 0) currentRoomTime--; 
+                    let m = Math.floor(currentRoomTime / 60), s = currentRoomTime % 60; 
+                    tEl.innerText = m + ":" + (s < 10 ? "0" + s : s); 
                 } 
-            }).catch(e => console.error("Bingo check failed:", e)); 
-        }
-
-        function updateBanner(status, count, called_numbers) { const b = document.getElementById('active-call-banner'); const btn = document.getElementById('join-btn'); const gGrid = document.getElementById('grid-container'); const sTrack = document.getElementById('spectator-tracker'); if(status === 'ACTIVE') { b.classList.remove('hidden'); document.getElementById('call-count').innerText=count; btn.disabled=true; btn.style.opacity="0.3"; btn.innerText="WAITING..."; gGrid.classList.add('hidden'); sTrack.classList.remove('hidden'); buildTracker('spectator-tracker'); document.querySelectorAll('#spectator-tracker .tracker-dot').forEach(el=>el.classList.remove('called')); if(called_numbers) called_numbers.forEach(n => { let dot = document.getElementById('spectator-tracker-dot-'+n); if(dot) dot.classList.add('called'); }); } else { b.classList.add('hidden'); btn.disabled=false; updateBuyButton(); gGrid.classList.remove('hidden'); sTrack.classList.add('hidden'); } }
-        function updateBuyButton() { const btn = document.getElementById('join-btn'); if (myCards.length === 0) { btn.innerText = "▶ ካርድ ይግዙ"; btn.style.opacity = "0.5"; } else { const totalCost = myCards.length * activeBet; btn.innerText = `▶ ${myCards.length} ካርድ ይግዙ (${totalCost} ETB)`; btn.style.opacity = "1"; } }
-        function getMaxCards() { return (activeBet == 10) ? 1000 : 500; }
-        function selectRoom(t) { activeBet=t; sessionStorage.setItem('activeBet', activeBet); sessionStorage.setItem('currentScreen', 'v-selector'); document.getElementById('nav-room').innerText=t; showScreen('v-selector'); myCards = []; sessionStorage.setItem('myCards', JSON.stringify(myCards)); initGrid(); appLoop(); updateBuyButton(); }
-        function initGrid() { const g = document.getElementById('grid-container'); g.innerHTML = ''; let maxCards = getMaxCards(); for(let i=1; i<=maxCards; i++) { let b = document.createElement('button'); b.className="card-num"; b.id="c-"+i; b.innerText=i; b.onclick=()=>selectCard(i); g.appendChild(b); } }
-        
-        function selectCard(n) { 
-            const btn = document.getElementById('c-'+n); 
-            if (myCards.includes(n)) { 
-                myCards = myCards.filter(id => id !== n); btn.classList.remove('active'); 
-                if(myCards.length > 0) previewCard(myCards[myCards.length-1]); else document.getElementById('mini-grid').innerHTML = ''; 
-            } else { 
-                if(myCards.length >= 4) return tg ? tg.showAlert("በአንድ ጊዜ ከ 4 ካርድ በላይ መግዛት አይቻልም!") : alert("በአንድ ጊዜ ከ 4 ካርድ በላይ መግዛት አይቻልም!"); 
-                myCards.push(n); btn.classList.add('active'); showToast("ካርድ #" + n + " ተመርጧል! (" + myCards.length + "/4)"); previewCard(n); 
             } 
-            sessionStorage.setItem('myCards', JSON.stringify(myCards));
-            updateBuyButton(); 
-        }
+        }, 1000);
         
-        function previewCard(n) { 
-            document.getElementById('prev-num').innerText="#"+n; 
-            safeFetch('/api/card-data/'+n+'/')
-            .then(d=>{ 
-                const mini = document.getElementById('mini-grid'); mini.innerHTML = ''; 
-                d.board.forEach(row=>row.forEach(v=>{ let c=document.createElement('div'); c.className='mini-cell'; c.innerText=v==='FREE'?'X':v; mini.appendChild(c); })); 
-            }).catch(e => console.error("Card preview failed:", e)); 
-        }
-
-        function pickRandom() { if(myCards.length >= 4) return tg ? tg.showAlert("በአንድ ጊዜ ከ 4 ካርድ በላይ መግዛት አይቻልም!") : alert("በአንድ ጊዜ ከ 4 ካርድ በላይ መግዛት አይቻልም!"); let maxCards = getMaxCards(); let r = Math.floor(Math.random()*maxCards)+1; while(myCards.includes(r)) { r = Math.floor(Math.random()*maxCards)+1; } selectCard(r); }
-        
-        function joinGame() { 
-            if(myCards.length === 0) return tg ? tg.showAlert("ቢያንስ 1 ካርድ ይምረጡ!") : alert("ቢያንስ 1 ካርድ ይምረጡ!"); 
-            const cardsString = myCards.join(','); 
-            
-            safeFetch(`/api/join-room/${uid}/${activeBet}/${cardsString}/`)
-            .then(d=>{ 
-                if(d.status==='ok') {
-                    sessionStorage.removeItem('currentScreen'); 
-                    sessionStorage.removeItem('myCards');
-                    location.reload(); 
-                } else {
-                    if (tg) tg.showAlert(d.error); 
-                }
-            }).catch(err => { if (tg) tg.showAlert("⚠️ Room Join Error: " + err.message); }); 
-        }
-        
-        function openHistory() { 
-            document.getElementById('m-history').style.display = 'flex'; 
-            safeFetch('/api/history/'+uid+'/')
-            .then(d => { historyData = d; switchTab('bets'); })
-            .catch(e => console.error("History fetch failed:", e)); 
-        }
-
-        function closeHistory() { document.getElementById('m-history').style.display = 'none'; }
-        function switchTab(tab) { document.getElementById('tab-bets').className = "tab-btn " + (tab==='bets' ? 'active' : ''); document.getElementById('tab-win').className = "tab-btn " + (tab==='win' ? 'active' : ''); const content = document.getElementById('history-content'); content.innerHTML = ''; if(tab === 'bets') { if(historyData.my_bets.length===0) content.innerHTML="<div class='text-center text-gray-500 mt-10'>ምንም ታሪክ የለም (No bets yet)</div>"; historyData.my_bets.forEach(h => { content.innerHTML += `<div class="history-row border-l-2 ${h.status==='WON' ? 'border-green-500' : 'border-red-500'}"><div><div class="text-gray-400">Game</div><div class="font-bold">#${h.game_id}</div></div><div><div class="text-gray-400">Bet/Card</div><div class="text-blue-400">${h.bet}/[${h.card}]</div></div><div class="text-right"><div class="text-gray-400">Result</div><div class="font-black ${h.status==='WON' ? 'text-green-500' : 'text-red-500'}">${h.status==='WON' ? '+'+h.prize : '-'+(h.bet * (h.card ? h.card.toString().split(',').length : 1))}</div></div></div>`; }); } else { historyData.winners.forEach(h => { content.innerHTML += `<div class="history-row"><div><div class="text-gray-400">Game</div><div class="font-bold">#${h.game_id}</div></div><div><div class="text-gray-400">Winner</div><div class="text-blue-400">@${h.winner}</div></div><div class="text-right"><div class="text-gray-400">Prize</div><div class="text-green-400 font-black">${h.prize} ETB</div></div></div>`; }); } }
-        
-        // Loop execution configurations
-        appLoop(); 
-        setInterval(appLoop, 3000); 
-        
-        setInterval(() => { if(!myActiveGameId) { const tEl = document.getElementById('timer'); const lbl = document.getElementById('timer-label'); if(currentRoomStatus === 'ACTIVE') { lbl.innerText = "ጨዋታው ላይ ነው:"; tEl.innerText = "(PLAYING)"; tEl.classList.add('text-red-400'); } else { lbl.innerText = "ጨዋታው ሊጀምር ነው: "; tEl.classList.remove('text-red-400'); if(currentRoomTime > 0) currentRoomTime--; let m = Math.floor(currentRoomTime / 60), s = currentRoomTime % 60; tEl.innerText = m + ":" + (s < 10 ? "0" + s : s); } } }, 1000);
+        appLoop();
     </script>
 </body>
 </html>
