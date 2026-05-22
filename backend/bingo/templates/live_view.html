@@ -585,18 +585,26 @@
                 if(d.boards_data && d.boards_data.length){
                     for(let x=1;x<=4;x++) document.getElementById('slot-'+x).style.display='none';
                     d.boards_data.forEach((boardObj,i)=>{
-                        let slot=i+1, pc=document.getElementById('play-card-'+slot), parent=pc.parentElement;
-                        parent.style.display='flex';
+                        let slotNum=i+1, pc=document.getElementById('play-card-'+slotNum), parentDiv=pc.parentElement;
+                        parentDiv.style.display='flex';
                         if(pc.children.length===0){
-                            parent.className="bg-slate-800 p-2 pt-3 rounded-xl border-2 border-yellow-500 relative shadow-[0_0_15px_rgba(234,179,8,0.2)] w-full max-w-[180px]";
-                            parent.innerHTML=`<div class="absolute -top-2.5 left-2 bg-yellow-500 text-black text-[9px] font-black px-2 py-0.5 rounded">#${boardObj.card_number}</div><div id="play-card-${slot}" class="grid grid-cols-5 gap-0.5 mt-1"></div>`;
-                            pc=document.getElementById('play-card-'+slot);
-                            boardObj.board.forEach(row=>row.forEach(val=>{
-                                let cell=document.createElement('div');
-                                cell.className='w-full aspect-square flex items-center justify-center text-[12px] font-black rounded border border-blue-900/50 bg-slate-900 shadow-inner cursor-pointer transition-colors';
-                                if(val==='FREE'){ cell.innerText='⭐'; cell.classList.add('bg-blue-600','text-yellow-400','is-marked');}
-                                else{ cell.innerText=val; cell.classList.add('text-blue-200');
-                                    cell.onclick=function(){ if(autoMode) return; this.classList.toggle('bg-red-500'); this.classList.toggle('text-white'); this.classList.toggle('border-red-400'); this.classList.toggle('is-marked'); activateBingoButton(); }; }
+                            // FIX: 'w-fit mx-auto' makes yellow border tightly wrap the grid. Fixed pixel cell sizes eliminate right-side empty space.
+                            parentDiv.className = "bg-slate-800 p-2 pt-3.5 rounded-xl border-2 border-yellow-500 relative shadow-[0_0_15px_rgba(234,179,8,0.2)] w-fit mx-auto";
+                            parentDiv.innerHTML = `<div class="absolute -top-2.5 left-2 bg-yellow-500 text-black text-[9px] font-black px-2 py-0.5 rounded">#${boardObj.card_number}</div><div id="play-card-${slotNum}" class="grid grid-cols-5 gap-1 mt-1"></div>`;
+                            pc = document.getElementById('play-card-'+slotNum);
+                            boardObj.board.forEach(row => row.forEach(val => {
+                                let cell = document.createElement('div');
+                                // Fixed pixel size ensures perfect squares and no extra space.
+                                cell.className = 'w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center text-[13px] font-black rounded border border-blue-900/50 bg-slate-900 shadow-inner cursor-pointer transition-colors';
+                                if (val === 'FREE') { cell.innerText = '⭐'; cell.classList.add('bg-blue-600', 'text-yellow-400', 'is-marked'); }
+                                else {
+                                    cell.innerText = val; cell.classList.add('text-blue-200');
+                                    cell.onclick = function() {
+                                        if(autoMode) return;
+                                        this.classList.toggle('bg-red-500'); this.classList.toggle('text-white'); this.classList.toggle('border-red-400'); this.classList.toggle('text-blue-200'); this.classList.toggle('is-marked');
+                                        activateBingoButton();
+                                    };
+                                }
                                 pc.appendChild(cell);
                             }));
                         }
