@@ -94,9 +94,9 @@
     
     <!-- ROOM NAV BAR -->
     <div class="bg-slate-900/80 p-1.5 flex justify-around items-center text-[9px] font-bold text-blue-400 uppercase border-b border-blue-900/50">
-        <div>🎲 ክፍል: <span id="nav-room" class="text-white">10</span></div>
-        <div>🎁 ሽልማት: <span id="nav-prize" class="text-white">0</span></div>
-        <div onclick="location.reload()" class="cursor-pointer active:scale-95 bg-blue-900/30 px-2 py-0.5 rounded">🔄 አድስ</div>
+        <div>🎲 ክፍል (ROOM): <span id="nav-room" class="text-white">10</span></div>
+        <div>🎁 ሽልማት (WIN): <span id="nav-prize" class="text-white">0</span></div>
+        <div onclick="location.reload()" class="cursor-pointer active:scale-95 bg-blue-900/30 px-2 py-0.5 rounded">🔄 አድስ (REFRESH)</div>
     </div>
     
     <div id="timer-bar" class="bg-black/60 p-1 text-center border-b border-white/5">
@@ -265,7 +265,9 @@
             </div>
             <div id="win-name-display" class="text-4xl font-black text-white uppercase tracking-widest mb-1 drop-shadow-md">PLAYER</div>
             <div class="text-gray-400 text-[10px] font-bold tracking-widest mb-8 uppercase">TICKET #<span id="win-ticket-sub"></span> • <span id="win-prize-display">0</span> ETB</div>
-            <button onclick="exitToLobby()" class="border border-gray-600 text-gray-300 bg-slate-900/50 font-bold rounded-full px-8 py-3 hover:bg-slate-800 transition-colors uppercase tracking-widest active:scale-95 w-full max-w-[200px] text-xs">BACK TO LOBBY</button>
+            
+            <!-- AUTO EXIT BUTTON -->
+            <button id="auto-exit-btn" onclick="exitToLobby()" class="border border-gray-600 text-gray-300 bg-slate-900/50 font-bold rounded-full px-8 py-3 hover:bg-slate-800 transition-colors uppercase tracking-widest active:scale-95 w-full max-w-[200px] text-xs">BACK TO LOBBY (5s)</button>
         </div>
     </div>
     
@@ -343,10 +345,25 @@
                             cell.appendChild(inner); grid.appendChild(cell);
                         }));
                     }
+                    
                     document.getElementById('m-win').style.display = 'flex';
                     myActiveGameId = null;
                     if(pollingInterval) clearInterval(pollingInterval);
                     disconnectWebSocket();
+
+                    // 5-SECOND AUTO EXIT LOGIC
+                    let exitCountdown = 5;
+                    const exitBtn = document.getElementById('auto-exit-btn');
+                    if(exitBtn) exitBtn.innerText = `BACK TO LOBBY (${exitCountdown}s)`;
+                    const exitTimer = setInterval(() => {
+                        exitCountdown--;
+                        if(exitBtn) exitBtn.innerText = `BACK TO LOBBY (${exitCountdown}s)`;
+                        if(exitCountdown <= 0) {
+                            clearInterval(exitTimer);
+                            exitToLobby();
+                        }
+                    }, 1000);
+
                 }
             } catch(e) { console.error("Winner modal fetch failed", e); }
         }
@@ -679,17 +696,15 @@
 
         setInterval(appLoop, 3000);
         setInterval(() => { 
-            if(!myActiveGameId) { 
-                const tEl = document.getElementById('timer'); 
-                const lbl = document.getElementById('timer-label'); 
-                if(currentRoomStatus === 'ACTIVE') { 
-                    lbl.innerText = "ጨዋታው ላይ ነው:"; tEl.innerText = "(PLAYING)"; tEl.classList.add('text-red-400'); 
-                } else { 
-                    lbl.innerText = "ጨዋታው ሊጀምር ነው: "; tEl.classList.remove('text-red-400'); 
-                    if(currentRoomTime > 0) currentRoomTime--; 
-                    let m = Math.floor(currentRoomTime / 60), s = currentRoomTime % 60; 
-                    tEl.innerText = m + ":" + (s < 10 ? "0" + s : s); 
-                } 
+            const tEl = document.getElementById('timer'); 
+            const lbl = document.getElementById('timer-label'); 
+            if(currentRoomStatus === 'ACTIVE') { 
+                lbl.innerText = "ጨዋታው ላይ ነው:"; tEl.innerText = "(PLAYING)"; tEl.classList.add('text-red-400'); 
+            } else { 
+                lbl.innerText = "ጨዋታው ሊጀምር ነው: "; tEl.classList.remove('text-red-400'); 
+                if(currentRoomTime > 0) currentRoomTime--; 
+                let m = Math.floor(currentRoomTime / 60), s = currentRoomTime % 60; 
+                tEl.innerText = m + ":" + (s < 10 ? "0" + s : s); 
             } 
         }, 1000);
         
