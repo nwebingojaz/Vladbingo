@@ -10,6 +10,11 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from django.db import transaction
+
+# WebSocket Imports added here!
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+
 from .models import User, PermanentCard, GameRound, Transaction, GameControl
 
 def home(request): 
@@ -28,7 +33,7 @@ def get_card_data(request, num):
 def lobby_info(request, tg_id):
     user, _ = User.objects.get_or_create(username=f"tg_{tg_id}")
     
-    # FIX: Exclude both ENDED and ANNOUNCED games from showing up as active lobby cards!
+    # Exclude both ENDED and ANNOUNCED games from showing up as active lobby cards!
     rooms = GameRound.objects.exclude(status__in=["ENDED", "ANNOUNCED"]).order_by('bet_amount')
     
     room_data = []
@@ -53,7 +58,7 @@ def lobby_info(request, tg_id):
             'time_left': time_left
         })
         
-    # FIX: Only treat games as "active" if they are currently in the LOBBY or ACTIVE state!
+    # Only treat games as "active" if they are currently in the LOBBY or ACTIVE state!
     active_game = GameRound.objects.filter(players__has_key=str(tg_id), status__in=["LOBBY", "ACTIVE"]).last()
     
     return JsonResponse({
@@ -230,6 +235,20 @@ def check_win(request, game_id, tg_id):
             game.winner_prize = prize
             game.finished_at = timezone.now()
             game.save(update_fields=['status', 'winner_username', 'winner_prize', 'finished_at'])
+            
+            # 🚀 NEW WEBSOCKET BROADCAST INJECTION
+            # The millisecond someone successfully calls Bingo, this freezes the game 
+            # for EVERYONE in the room and instantly triggers the Winner Modal!
+            try:
+                channel_layer = get_channel_layer()
+                async_to_sync(channel_layer.group_send)(
+                    f'game_{game.id}',
+                    {'type': 'bingo_message', 'message': {'action': 'game_ended'}}
+                )
+            except Exception as ws_e: 
+                print(f"WebSocket Broadcast Failed on Win: {ws_e}")
+                pass # Game still successfully saved to DB even if WS drops
+
             return JsonResponse({'status': 'WINNER', 'prize': float(prize), 'winning_card': winning_card})
             
         return JsonResponse({'status': 'NOT_YET'})
