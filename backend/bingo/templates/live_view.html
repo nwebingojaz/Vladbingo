@@ -14,7 +14,7 @@
         .active-banner { background: #0b0f19; border: 2px solid #ef4444; color: #ef4444; border-radius: 8px; padding: 6px; text-align: center; font-weight: 900; margin-bottom: 10px; animation: pulse 2s infinite; }
         .card-num { height: 32px; background: #1e293b; border: 1px solid #3b82f6; border-radius: 4px; font-size: 0.65rem; font-weight: bold; color: #93c5fd; transition: transform 0.1s; }
         .card-num:active { transform: scale(0.9); }
-        .card-num.active { background: #3b82f6 !important; color: white; border-color: white; transform: scale(1.1); box-shadow: 0 0 10px #3b82f6; }
+        .card-num.active { background: #10b981 !important; color: white; border-color: white; transform: scale(1.1); box-shadow: 0 0 10px #10b981; }
         .preview-container { border: 2px solid #3b82f6; border-radius: 12px; padding: 10px; background: rgba(0,0,0,0.4); width: 135px; }
         .mini-cell { aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; border: 0.1px solid #1e3a8a; color: #93c5fd;}
         
@@ -23,7 +23,7 @@
         .tracker-dot { font-size: 7px; font-weight: bold; text-align: center; padding: 4px 0; border-radius: 3px; background-color: #1e293b; color: #64748b; transition: 0.2s;}
         .tracker-dot.called { background-color: #ef4444 !important; color: white !important; transform: scale(1.15); box-shadow: 0 0 5px #ef4444;}
         
-        .btn-random { background: #1e293b; border: 1px solid #3b82f6; border-radius: 12px; width: 100%; padding: 10px; font-size: 0.8rem; font-weight: bold; color: #3b82f6; margin-bottom: 8px; }
+        .btn-random { background: #1e293b; border: 1px solid #3b82f6; border-radius: 12px; width: 100%; padding: 10px; font-size: 0.8rem; font-weight: bold; color: #3b82f6; }
         
         .modal { background: rgba(11, 15, 25, 1); position: fixed; inset: 0; z-index: 50; padding: 20px; display: none; flex-direction: column; overflow-y:auto; }
         .history-row { background: #1e293b; margin-bottom: 4px; padding: 10px; border-radius: 6px; font-size: 10px; display: flex; justify-content: space-between; }
@@ -46,7 +46,6 @@
         .slider:before { position: absolute; content: "MANUAL"; height: 26px; width: 54px; left: 4px; bottom: 3px; background-color: #3b82f6; color: white; font-size: 10px; font-weight: bold; display: flex; align-items: center; justify-content: center; border-radius: 34px; transition: .4s; }
         input:checked + .slider { background-color: #0b0f19; }
         input:checked + .slider:before { transform: translateX(56px); background-color: #10b981; content: "AUTO"; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
     </style>
 </head>
 <body class="antialiased select-none">
@@ -116,11 +115,8 @@
         <div id="spectator-tracker" class="hidden mb-6 p-2 bg-slate-900/80 rounded-xl border border-blue-900/50"></div>
         <div class="flex gap-4 items-center bg-slate-800/50 p-3 rounded-2xl border border-white/5">
             <div class="preview-container"><div id="mini-grid" class="grid grid-cols-5 gap-0.5"></div><div class="text-[9px] text-center mt-2 text-blue-400 font-bold uppercase">ካርድ <span id="prev-num">#---</span></div></div>
-            <div class="flex-1 flex flex-col items-center">
-                <button onclick="pickRandom()" class="btn-random mb-4">🎲 በዕድል (RANDOM)</button>
-                <div id="status-indicator" class="text-center font-bold text-gray-500 text-xs">
-                    0 ካርድ ተገዝቷል<br>(0 Cards Bought)
-                </div>
+            <div class="flex-1 flex flex-col justify-center" id="action-button-container">
+                <!-- Instant Buy UX Area -->
             </div>
         </div>
     </div>
@@ -251,16 +247,13 @@
     <!-- GRAND WINNER MODAL -->
     <div id="m-win" class="modal" style="background: repeating-conic-gradient(from 0deg, #0f172a 0deg 15deg, #1e293b 15deg 30deg); justify-content:center; align-items:center; z-index: 9999;">
         <div class="relative w-full max-w-sm flex flex-col items-center">
-            
             <div class="border-2 border-yellow-400 bg-yellow-900/40 text-yellow-400 text-sm font-black px-6 py-2 rounded-full mb-4 shadow-[0_0_20px_rgba(250,204,21,0.4)]">GRAND WINNER</div>
             <div class="text-6xl font-black text-yellow-400 italic tracking-tighter mb-8" style="text-shadow: 0 4px 20px rgba(250,204,21,0.6); -webkit-text-stroke: 1px #b45309;">BINGO!</div>
-            
             <div class="bg-white p-3 rounded-2xl w-full mb-6 relative shadow-[0_0_40px_rgba(255,255,255,0.15)] border-4 border-yellow-100">
                 <div class="flex justify-between items-center mb-3 px-1 border-b-2 border-gray-100 pb-2">
                     <span class="text-gray-500 font-black text-[10px] tracking-widest">WINNING TICKET</span>
                     <span class="text-yellow-600 font-black text-xs">#<span id="win-card-num-display"></span></span>
                 </div>
-                
                 <div class="grid grid-cols-5 gap-1 text-center mb-1">
                     <div class="bg-blue-600 text-white font-black rounded text-[11px] py-1 shadow-inner">B</div>
                     <div class="bg-red-600 text-white font-black rounded text-[11px] py-1 shadow-inner">I</div>
@@ -270,10 +263,8 @@
                 </div>
                 <div id="win-card-grid" class="grid grid-cols-5 gap-1 bg-gray-50 p-1 rounded-lg border border-gray-200"></div>
             </div>
-            
             <div id="win-name-display" class="text-4xl font-black text-white uppercase tracking-widest mb-1 drop-shadow-md">PLAYER</div>
             <div class="text-gray-400 text-[10px] font-bold tracking-widest mb-8 uppercase">TICKET #<span id="win-ticket-sub"></span> • <span id="win-prize-display">0</span> ETB</div>
-            
             <button onclick="location.reload()" class="border border-gray-600 text-gray-300 bg-slate-900/50 font-bold rounded-full px-8 py-3 hover:bg-slate-800 transition-colors uppercase tracking-widest active:scale-95 w-full max-w-[200px] text-xs">BACK TO LOBBY</button>
         </div>
     </div>
@@ -292,7 +283,7 @@
         const uid = tg && tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : Math.floor(Math.random() * 10000000);
         document.getElementById('menu-id').innerText = "መለያ (ID): " + uid;
         
-        let activeBet = 10; 
+        let activeBet = parseInt(sessionStorage.getItem('activeBet')) || 10; 
         let myCards = []; 
         let myLobbyCardsMap = {}; // Tracks purchases from DB instantly
         let isFirstLoad = true;
@@ -388,6 +379,7 @@
         function startPollingFallback() {
             if(pollingInterval) return;
             usePollingFallback = true;
+            console.log("⚠️ Automatic HTTP Polling Fallback activated.");
             pollingInterval = setInterval(() => {
                 if(myActiveGameId) safeFetch(`/api/game-info/${myActiveGameId}/${uid}/`).then(d => {
                     if(d.status === 'ENDED' || d.status === 'ANNOUNCED') { clearInterval(pollingInterval); pollingInterval=null; cardsLoaded=false; showWinnerModalFromGameId(myActiveGameId); }
@@ -416,9 +408,7 @@
             ['v-lobby','v-selector','v-play'].forEach(s=>document.getElementById(s).classList.add('hidden')); 
             document.getElementById(id).classList.remove('hidden'); 
             
-            // FIX: Always ensure nav-room text matches activeBet when entering the selector
             document.getElementById('nav-room').innerText = activeBet;
-
             if(id==='v-selector') updateStatusIndicator(); 
             const timerBar = document.getElementById('timer-bar'); 
             if(id==='v-play') timerBar.classList.add('hidden'); 
@@ -534,10 +524,8 @@
                     isFirstLoad=false;
                     const saved=sessionStorage.getItem('currentScreen');
                     if(saved==='v-selector'){
-                        // Restore from DB via map!
                         activeBet = parseInt(sessionStorage.getItem('activeBet')) || 10;
                         myCards = myLobbyCardsMap[activeBet.toString()] || [];
-                        
                         document.getElementById('nav-room').innerText=activeBet;
                         showScreen('v-selector');
                         initGrid();
@@ -585,26 +573,18 @@
                 if(d.boards_data && d.boards_data.length){
                     for(let x=1;x<=4;x++) document.getElementById('slot-'+x).style.display='none';
                     d.boards_data.forEach((boardObj,i)=>{
-                        let slotNum=i+1, pc=document.getElementById('play-card-'+slotNum), parentDiv=pc.parentElement;
-                        parentDiv.style.display='flex';
+                        let slot=i+1, pc=document.getElementById('play-card-'+slot), parent=pc.parentElement;
+                        parent.style.display='flex';
                         if(pc.children.length===0){
-                            // FIX: 'w-fit mx-auto' makes yellow border tightly wrap the grid. Fixed pixel cell sizes eliminate right-side empty space.
-                            parentDiv.className = "bg-slate-800 p-2 pt-3.5 rounded-xl border-2 border-yellow-500 relative shadow-[0_0_15px_rgba(234,179,8,0.2)] w-fit mx-auto";
-                            parentDiv.innerHTML = `<div class="absolute -top-2.5 left-2 bg-yellow-500 text-black text-[9px] font-black px-2 py-0.5 rounded">#${boardObj.card_number}</div><div id="play-card-${slotNum}" class="grid grid-cols-5 gap-1 mt-1"></div>`;
-                            pc = document.getElementById('play-card-'+slotNum);
-                            boardObj.board.forEach(row => row.forEach(val => {
-                                let cell = document.createElement('div');
-                                // Fixed pixel size ensures perfect squares and no extra space.
-                                cell.className = 'w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center text-[13px] font-black rounded border border-blue-900/50 bg-slate-900 shadow-inner cursor-pointer transition-colors';
-                                if (val === 'FREE') { cell.innerText = '⭐'; cell.classList.add('bg-blue-600', 'text-yellow-400', 'is-marked'); }
-                                else {
-                                    cell.innerText = val; cell.classList.add('text-blue-200');
-                                    cell.onclick = function() {
-                                        if(autoMode) return;
-                                        this.classList.toggle('bg-red-500'); this.classList.toggle('text-white'); this.classList.toggle('border-red-400'); this.classList.toggle('text-blue-200'); this.classList.toggle('is-marked');
-                                        activateBingoButton();
-                                    };
-                                }
+                            parent.className="bg-slate-800 p-2 pt-3.5 rounded-xl border-2 border-yellow-500 relative shadow-[0_0_15px_rgba(234,179,8,0.2)] w-fit mx-auto";
+                            parent.innerHTML=`<div class="absolute -top-2.5 left-2 bg-yellow-500 text-black text-[9px] font-black px-2 py-0.5 rounded">#${boardObj.card_number}</div><div id="play-card-${slot}" class="grid grid-cols-5 gap-1 mt-1"></div>`;
+                            pc=document.getElementById('play-card-'+slot);
+                            boardObj.board.forEach(row=>row.forEach(val=>{
+                                let cell=document.createElement('div');
+                                cell.className='w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center text-[13px] font-black rounded border border-blue-900/50 bg-slate-900 shadow-inner cursor-pointer transition-colors';
+                                if(val==='FREE'){ cell.innerText='⭐'; cell.classList.add('bg-blue-600','text-yellow-400','is-marked');}
+                                else{ cell.innerText=val; cell.classList.add('text-blue-200');
+                                    cell.onclick=function(){ if(autoMode) return; this.classList.toggle('bg-red-500'); this.classList.toggle('text-white'); this.classList.toggle('border-red-400'); this.classList.toggle('text-blue-200'); this.classList.toggle('is-marked'); activateBingoButton(); }; }
                                 pc.appendChild(cell);
                             }));
                         }
@@ -621,7 +601,7 @@
         function activateBingoButton(){ const btn=document.getElementById('bingo-btn'); if(checkLocal1LineWin()) btn.className="w-full py-4 bg-gradient-to-r from-red-500 to-red-700 rounded-2xl font-black text-xl shadow-[0_0_20px_rgba(239,68,68,0.4)] text-white active:scale-95 transition-all tracking-widest"; else btn.className="w-full py-4 bg-slate-700 text-slate-400 rounded-2xl font-black text-xl border-2 border-slate-600 transition-all tracking-widest"; }
         
         async function hitBingo(){ 
-            if(!checkLocal1LineWin()) return tg?tg.showAlert("⚠️ ትክክለኛ መስመር አልሰሩም!"):alert("⚠️ ትክክለኛ መስመር አልሰሩም!");
+            if(!checkLocal1LineWin()) return tg?tg.showAlert("⚠️ ትንሽ ይጠብቁ! ትክክለኛ መስመር አልሰሩም!"):alert("⚠️ ትንሽ ይጠብቁ! ትክክለኛ መስመር አልሰሩም!");
             try{
                 const d = await safeFetch(`/api/check-win/${myActiveGameId}/${uid}/?marked=0`);
                 if(d.status === 'WINNER'){ autoBingoFired=false; await showWinnerModalFromGameId(myActiveGameId); }
@@ -630,13 +610,11 @@
         }
 
         function updateStatusIndicator() { 
-            const indicator=document.getElementById('status-indicator'); 
+            const indicator=document.getElementById('action-button-container'); 
             if(myCards.length===0){ 
-                indicator.innerHTML="0 ካርድ ተገዝቷል<br>(0 Cards Bought)";
-                indicator.className="text-center font-bold text-gray-500 text-xs"; 
+                indicator.innerHTML=`<button onclick="pickRandom()" class="btn-random mb-2">🎲 በዕድል (RANDOM)</button><div class="text-center font-bold text-gray-500 text-xs">0 ካርድ ተገዝቷል<br>(Tap numbers to buy)</div>`;
             } else{ 
-                indicator.innerHTML=`<span class="text-green-400 text-lg">✅ ተገዝቷል (${myCards.length}/4)</span><br><span class="text-white animate-pulse">ጨዋታ እስኪጀምር ይጠብቁ...</span>`;
-                indicator.className="text-center font-bold text-xs bg-slate-900 p-2 rounded-xl border border-green-500 w-full"; 
+                indicator.innerHTML=`<button onclick="pickRandom()" class="btn-random mb-2">🎲 በዕድል (RANDOM)</button><div class="text-center font-bold text-xs bg-slate-900 p-2 rounded-xl border border-green-500 w-full mb-2"><span class="text-green-400 text-lg">✅ ${myCards.length}/4 ተገዝቷል</span><br><span class="text-white animate-pulse">ጨዋታ እስኪጀምር ይጠብቁ...</span></div>`;
             } 
         }
 
@@ -648,14 +626,10 @@
             sessionStorage.setItem('currentScreen','v-selector'); 
             document.getElementById('nav-room').innerText=t; 
             showScreen('v-selector'); 
-            
-            // Load purchased cards from the DB mapping instead of volatile storage
             myCards=myLobbyCardsMap[activeBet.toString()] || []; 
-            
             initGrid(); 
             myCards.forEach(c=>{ let btn=document.getElementById('c-'+c); if(btn) btn.classList.add('active');});
             if(myCards.length) previewCard(myCards[myCards.length-1]); else document.getElementById('mini-grid').innerHTML='';
-            
             updateStatusIndicator();
         }
 
@@ -664,7 +638,7 @@
         function selectCard(n) { 
             if(isProcessingCard) return;
             isProcessingCard = true;
-            
+            showToast("⏳...");
             safeFetch(`/api/join-room/${uid}/${activeBet}/${n}/`)
             .then(d => {
                 isProcessingCard = false;
@@ -672,26 +646,13 @@
                     myCards = d.my_cards;
                     document.getElementById('bal-header').innerText = d.balance.toFixed(2);
                     document.getElementById('nav-prize').innerText = d.prize.toFixed(0);
-                    
                     const btn = document.getElementById('c-'+n);
-                    if(d.action === 'added') {
-                        btn.classList.add('active');
-                        showToast(`ካርድ #${n} ተገዝቷል!`);
-                    } else {
-                        btn.classList.remove('active');
-                        showToast(`ካርድ #${n} ተመልሷል!`);
-                    }
-                    if(myCards.length > 0) previewCard(myCards[myCards.length-1]);
-                    else document.getElementById('mini-grid').innerHTML = '';
+                    if(d.action === 'added') { btn.classList.add('active'); showToast(`✅ ካርድ #${n} ተገዝቷል!`); } 
+                    else { btn.classList.remove('active'); showToast(`🔄 ካርድ #${n} ተመልሷል!`); }
+                    if(myCards.length > 0) previewCard(myCards[myCards.length-1]); else document.getElementById('mini-grid').innerHTML = '';
                     updateStatusIndicator();
-                } else {
-                    if (tg) tg.showAlert(d.error); else alert(d.error);
-                }
-            })
-            .catch(e => {
-                isProcessingCard = false;
-                console.error(e);
-            });
+                } else { if (tg) tg.showAlert(d.error); else alert(d.error); }
+            }).catch(e => { isProcessingCard = false; console.error(e); });
         }
         
         function previewCard(n){ document.getElementById('prev-num').innerText="#"+n; safeFetch('/api/card-data/'+n+'/').then(d=>{ const mini=document.getElementById('mini-grid'); mini.innerHTML=''; d.board.forEach(row=>row.forEach(v=>{ let c=document.createElement('div'); c.className='mini-cell'; c.innerText=v==='FREE'?'X':v; mini.appendChild(c); })); }).catch(e=>console.error); }
@@ -701,7 +662,6 @@
 
         // Start engine
         setInterval(appLoop, 3000);
-        
         setInterval(() => { 
             if(!myActiveGameId) { 
                 const tEl = document.getElementById('timer'); 
@@ -716,7 +676,6 @@
                 } 
             } 
         }, 1000);
-        
         appLoop();
     </script>
 </body>
