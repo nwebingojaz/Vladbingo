@@ -40,12 +40,12 @@
         .tab-btn { flex: 1; text-align: center; padding: 10px 0; font-size: 12px; font-weight: bold; color: #64748b; border-bottom: 2px solid transparent; cursor: pointer; transition: 0.2s; }
         .tab-btn.active { color: #3b82f6; border-bottom-color: #3b82f6; }
 
-        .switch { position: relative; display: inline-block; width: 120px; height: 34px; background-color: #1e293b; border-radius: 34px; border: 1px solid #3b82f6; cursor: pointer; }
+        .switch { position: relative; display: inline-block; width: 100px; height: 28px; background-color: #1e293b; border-radius: 34px; border: 1px solid #3b82f6; cursor: pointer; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider { position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: 34px; transition: .4s; }
-        .slider:before { position: absolute; content: "MANUAL"; height: 26px; width: 54px; left: 4px; bottom: 3px; background-color: #3b82f6; color: white; font-size: 10px; font-weight: bold; display: flex; align-items: center; justify-content: center; border-radius: 34px; transition: .4s; }
+        .slider:before { position: absolute; content: "MANUAL"; height: 22px; width: 46px; left: 3px; bottom: 2px; background-color: #3b82f6; color: white; font-size: 9px; font-weight: bold; display: flex; align-items: center; justify-content: center; border-radius: 34px; transition: .4s; }
         input:checked + .slider { background-color: #0b0f19; }
-        input:checked + .slider:before { transform: translateX(56px); background-color: #10b981; content: "AUTO"; }
+        input:checked + .slider:before { transform: translateX(46px); background-color: #10b981; content: "AUTO"; }
     </style>
 </head>
 <body class="antialiased select-none">
@@ -79,42 +79,42 @@
     </div>
     
     <!-- HEADER -->
-    <div class="header-bg p-3 flex justify-between items-center shadow-lg relative z-40">
+    <div class="header-bg p-2.5 flex justify-between items-center shadow-lg relative z-40">
         <div class="flex items-center gap-3">
-            <button onclick="toggleMenu()" class="text-white text-2xl px-2">☰</button>
-            <div class="flex items-center gap-1"><div class="bg-blue-600 p-1 rounded font-black text-[10px] text-white italic">BIGEST</div><div class="font-black text-xs uppercase text-white">BINGO BOT</div></div>
+            <button onclick="toggleMenu()" class="text-white text-xl px-2">☰</button>
+            <div class="flex items-center gap-1"><div class="bg-blue-600 p-1 rounded font-black text-[9px] text-white italic">BIGEST</div><div class="font-black text-[10px] uppercase text-white">BINGO BOT</div></div>
         </div>
         <div class="flex items-center gap-2">
-            <div class="bg-slate-800 px-3 py-1.5 rounded-full flex items-center gap-2 border border-blue-900" onclick="openWallet('deposit')">
-                <span class="text-yellow-400 text-sm">👛</span><span id="bal-header" class="font-bold text-sm">0.00</span>
+            <div class="bg-slate-800 px-3 py-1 rounded-full flex items-center gap-2 border border-blue-900" onclick="openWallet('deposit')">
+                <span class="text-yellow-400 text-sm">👛</span><span id="bal-header" class="font-bold text-xs">0.00</span>
             </div>
-            <button onclick="openWallet('deposit')" class="bg-green-500 hover:bg-green-600 text-white font-black w-8 h-8 rounded-full shadow-[0_0_10px_rgba(34,197,94,0.6)] flex items-center justify-center text-xl transition-transform active:scale-90 pb-1">+</button>
+            <button onclick="openWallet('deposit')" class="bg-green-500 hover:bg-green-600 text-white font-black w-7 h-7 rounded-full shadow-[0_0_10px_rgba(34,197,94,0.6)] flex items-center justify-center text-lg transition-transform active:scale-90 pb-1">+</button>
         </div>
     </div>
     
     <!-- ROOM NAV BAR -->
-    <div class="bg-slate-900/80 p-2 flex justify-around items-center text-[10px] font-bold text-blue-400 uppercase border-b border-blue-900/50">
-        <div>🎲 ክፍል (Room): <span id="nav-room" class="text-white">10</span></div>
-        <div>🎁 ሽልማት (Win): <span id="nav-prize" class="text-white">0</span></div>
-        <div onclick="location.reload()" class="cursor-pointer active:scale-95">🔄 አድስ (REFRESH)</div>
+    <div class="bg-slate-900/80 p-1.5 flex justify-around items-center text-[9px] font-bold text-blue-400 uppercase border-b border-blue-900/50">
+        <div>🎲 ክፍል: <span id="nav-room" class="text-white">10</span></div>
+        <div>🎁 ሽልማት: <span id="nav-prize" class="text-white">0</span></div>
+        <div onclick="location.reload()" class="cursor-pointer active:scale-95 bg-blue-900/30 px-2 py-0.5 rounded">🔄 አድስ</div>
     </div>
     
     <div id="timer-bar" class="bg-black/60 p-1 text-center border-b border-white/5">
-        <span id="timer-label" class="text-[10px] text-blue-400 font-bold uppercase">ጨዋታው ሊጀምር ነው: </span>
+        <span id="timer-label" class="text-[9px] text-blue-400 font-bold uppercase">ጨዋታው ሊጀምር ነው: </span>
         <span id="timer" class="text-[10px] font-mono font-black text-white ml-1">00:00</span>
     </div>
     
     <!-- LOBBY -->
-    <div id="v-lobby" class="p-4 h-screen overflow-y-auto pb-32"><div id="room-list"></div></div>
+    <div id="v-lobby" class="p-3 h-screen overflow-y-auto pb-32"><div id="room-list"></div></div>
 
     <!-- SELECTOR -->
-    <div id="v-selector" class="hidden p-4 h-screen overflow-y-auto pb-32 relative">
-        <button onclick="showLobby()" class="text-blue-400 text-[10px] font-bold mb-3 flex items-center gap-1">← ተመለስ (Back)</button>
+    <div id="v-selector" class="hidden p-3 h-screen overflow-y-auto pb-32 relative">
+        <button onclick="showLobby()" class="text-blue-400 text-[10px] font-bold mb-2 flex items-center gap-1">← ተመለስ (Back)</button>
         <div id="active-call-banner" class="active-banner hidden">እየተጠራ ነው <span id="call-count">0</span>/75</div>
-        <div id="grid-container" class="grid grid-cols-10 gap-1 h-64 overflow-y-auto mb-6 p-2 bg-black/30 rounded-xl"></div>
-        <div id="spectator-tracker" class="hidden mb-6 p-2 bg-slate-900/80 rounded-xl border border-blue-900/50"></div>
-        <div class="flex gap-4 items-center bg-slate-800/50 p-3 rounded-2xl border border-white/5">
-            <div class="preview-container"><div id="mini-grid" class="grid grid-cols-5 gap-0.5"></div><div class="text-[9px] text-center mt-2 text-blue-400 font-bold uppercase">ካርድ <span id="prev-num">#---</span></div></div>
+        <div id="grid-container" class="grid grid-cols-10 gap-1 h-56 overflow-y-auto mb-4 p-2 bg-black/30 rounded-xl"></div>
+        <div id="spectator-tracker" class="hidden mb-4 p-2 bg-slate-900/80 rounded-xl border border-blue-900/50"></div>
+        <div class="flex gap-3 items-center bg-slate-800/50 p-3 rounded-2xl border border-white/5">
+            <div class="preview-container w-[110px] p-2"><div id="mini-grid" class="grid grid-cols-5 gap-0.5"></div><div class="text-[8px] text-center mt-2 text-blue-400 font-bold uppercase">ካርድ <span id="prev-num">#---</span></div></div>
             <div class="flex-1 flex flex-col justify-center" id="action-button-container">
                 <!-- Instant Buy UX Area -->
             </div>
@@ -122,34 +122,35 @@
     </div>
 
     <!-- LIVE PLAY HALL -->
-    <div id="v-play" class="hidden p-3 h-screen overflow-y-auto pb-32">
+    <div id="v-play" class="hidden p-2 h-screen overflow-y-auto pb-32">
         <div class="flex justify-between items-center mb-2 bg-slate-900 p-2 rounded-xl border border-slate-700 shadow-lg relative">
             <div class="flex items-center gap-2">
-                <div class="w-12 h-12 bg-gradient-to-br from-white to-slate-300 rounded-full flex items-center justify-center border-4 border-slate-400 shadow-[0_0_15px_rgba(255,255,255,0.3)]">
-                    <span id="latest-ball" class="text-xl font-black text-slate-900">--</span>
+                <div class="w-10 h-10 bg-gradient-to-br from-white to-slate-300 rounded-full flex items-center justify-center border-2 border-slate-400 shadow-[0_0_10px_rgba(255,255,255,0.2)]">
+                    <span id="latest-ball" class="text-lg font-black text-slate-900">--</span>
                 </div>
-                <div id="recent-balls" class="flex gap-1 overflow-hidden w-[100px] whitespace-nowrap bg-slate-800 p-1 rounded-full border border-slate-700 shadow-inner">
+                <div id="recent-balls" class="flex gap-1 overflow-hidden w-[90px] whitespace-nowrap bg-slate-800 p-1 rounded-full border border-slate-700 shadow-inner">
                 </div>
             </div>
             <div class="flex flex-col items-end gap-1">
-                <label class="switch scale-75 origin-right"><input type="checkbox" id="auto-toggle" onchange="toggleAutoMode(this)"><span class="slider"></span></label>
-                <div id="play-status-badge" class="text-[9px] bg-blue-500/20 border border-blue-500 text-blue-500 px-3 py-1 rounded-full font-black uppercase">ይጠብቁ (WAITING)</div>
-                <div class="text-[9px] text-yellow-400 font-bold mt-1 tracking-widest"><span id="called-count-badge">0</span>/75</div>
+                <label class="switch origin-right"><input type="checkbox" id="auto-toggle" onchange="toggleAutoMode(this)"><span class="slider"></span></label>
+                <div id="play-status-badge" class="text-[8px] bg-blue-500/20 border border-blue-500 text-blue-500 px-2 py-0.5 rounded-full font-black uppercase">ይጠብቁ (WAITING)</div>
+                <div class="text-[8px] text-yellow-400 font-bold tracking-widest"><span id="called-count-badge">0</span>/75</div>
             </div>
         </div>
 
-        <div id="play-tracker" class="mb-4 p-2 bg-slate-900/80 rounded-xl border border-blue-900/50 hidden"></div>
-        <div id="multi-card-container" class="grid grid-cols-2 gap-1.5 mb-3">
-            <div class="bg-slate-900/50 p-1 rounded-lg border-2 border-slate-700 border-dashed flex items-center justify-center min-h-[120px]" id="slot-1"><div id="play-card-1" class="w-full"></div></div>
-            <div class="bg-slate-900/50 p-1 rounded-lg border-2 border-slate-700 border-dashed flex items-center justify-center min-h-[120px]" id="slot-2"><div id="play-card-2" class="w-full"></div></div>
-            <div class="bg-slate-900/50 p-1 rounded-lg border-2 border-slate-700 border-dashed flex items-center justify-center min-h-[120px]" id="slot-3"><div id="play-card-3" class="w-full"></div></div>
-            <div class="bg-slate-900/50 p-1 rounded-lg border-2 border-slate-700 border-dashed flex items-center justify-center min-h-[120px]" id="slot-4"><div id="play-card-4" class="w-full"></div></div>
+        <div id="play-tracker" class="mb-2 p-1 bg-slate-900/80 rounded-xl border border-blue-900/50 hidden"></div>
+        <div id="multi-card-container" class="grid grid-cols-2 gap-1 mb-3">
+            <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-1"><div id="play-card-1" class="w-full"></div></div>
+            <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-2"><div id="play-card-2" class="w-full"></div></div>
+            <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-3"><div id="play-card-3" class="w-full"></div></div>
+            <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-4"><div id="play-card-4" class="w-full"></div></div>
         </div>
         <button onclick="hitBingo()" id="bingo-btn" class="w-full py-3 bg-slate-700 text-slate-400 rounded-xl font-black text-lg border-2 border-slate-600 transition-all tracking-widest shadow-lg">BINGO!</button>
     </div>
 
     <!-- WALLET MODAL -->
     <div id="m-wallet" class="modal">
+        <!-- Kept original wallet modal code untouched -->
         <div class="flex justify-between items-center mb-4">
             <h2 class="text-white font-black text-2xl">ዋሌት (Wallet)</h2>
             <button onclick="document.getElementById('m-wallet').style.display='none'" class="text-2xl text-gray-400">✕</button>
@@ -266,8 +267,8 @@
             <div id="win-name-display" class="text-4xl font-black text-white uppercase tracking-widest mb-1 drop-shadow-md">PLAYER</div>
             <div class="text-gray-400 text-[10px] font-bold tracking-widest mb-8 uppercase">TICKET #<span id="win-ticket-sub"></span> • <span id="win-prize-display">0</span> ETB</div>
             
-            <!-- FIX: Back to lobby now clears the volatile state so it doesn't infinitely loop on broken playhalls! -->
-            <button onclick="sessionStorage.setItem('currentScreen', 'v-lobby'); location.reload();" class="border border-gray-600 text-gray-300 bg-slate-900/50 font-bold rounded-full px-8 py-3 hover:bg-slate-800 transition-colors uppercase tracking-widest active:scale-95 w-full max-w-[200px] text-xs">BACK TO LOBBY</button>
+            <!-- FIX 2: CLEAN EXIT TO LOBBY BUTTON -->
+            <button onclick="exitToLobby()" class="border border-gray-600 text-gray-300 bg-slate-900/50 font-bold rounded-full px-8 py-3 hover:bg-slate-800 transition-colors uppercase tracking-widest active:scale-95 w-full max-w-[200px] text-xs">BACK TO LOBBY</button>
         </div>
     </div>
     
@@ -299,6 +300,14 @@
         let usePollingFallback = false;
         let pollingInterval = null;
         let refreshRunning = false; 
+
+        // CLEAN EXIT FUNCTION TO PREVENT BROKEN PAGE
+        function exitToLobby() {
+            document.getElementById('m-win').style.display = 'none';
+            sessionStorage.setItem('currentScreen', 'v-lobby');
+            sessionStorage.removeItem('myCards');
+            window.location.href = window.location.pathname; // Strips broken hash mapping and restarts cleanly
+        }
 
         async function safeFetch(url, options = {}) {
             const r = await fetch(url, options);
@@ -351,10 +360,10 @@
                 document.getElementById('latest-ball').innerText = data.ball;
                 document.getElementById('called-count-badge').innerText = data.called_count;
                 const badge = document.getElementById('play-status-badge');
-                if(badge) { badge.innerText = "እየተጠራ ነው: "+data.called_count+"/75"; badge.className = "text-[10px] bg-red-500/20 border border-red-500 text-red-500 px-3 py-1 rounded-full font-black animate-pulse"; }
+                if(badge) { badge.innerText = "እየተጠራ ነው: "+data.called_count+"/75"; badge.className = "text-[8px] bg-red-500/20 border border-red-500 text-red-500 px-2 py-0.5 rounded-full font-black animate-pulse"; }
                 if (!globalCalledNumbers.includes(data.ball) && typeof data.ball === 'number') globalCalledNumbers.push(data.ball);
                 let letter = "B"; if(data.ball>15) letter="I"; if(data.ball>30) letter="N"; if(data.ball>45) letter="G"; if(data.ball>60) letter="O";
-                let ballHtml = `<div class="bg-slate-900 rounded-full px-2 py-0.5 text-[9px] font-bold text-slate-300 border border-slate-700 flex items-center gap-0.5"><span class="text-yellow-500">${letter}</span>${data.ball}</div>`;
+                let ballHtml = `<div class="bg-slate-900 rounded-full px-2 py-0.5 text-[8px] font-bold text-slate-300 border border-slate-700 flex items-center gap-0.5"><span class="text-yellow-500">${letter}</span>${data.ball}</div>`;
                 const recent = document.getElementById('recent-balls');
                 if(recent && !recent.innerHTML.includes(`>${data.ball}</div>`)) { recent.innerHTML = ballHtml + recent.innerHTML; if(recent.children.length>5) recent.removeChild(recent.lastChild); }
                 if(autoMode) markCardsInstantly();
@@ -380,7 +389,6 @@
         function startPollingFallback() {
             if(pollingInterval) return;
             usePollingFallback = true;
-            console.log("⚠️ Automatic HTTP Polling Fallback activated.");
             pollingInterval = setInterval(() => {
                 if(myActiveGameId) safeFetch(`/api/game-info/${myActiveGameId}/${uid}/`).then(d => {
                     if(d.status === 'ENDED' || d.status === 'ANNOUNCED') { clearInterval(pollingInterval); pollingInterval=null; cardsLoaded=false; showWinnerModalFromGameId(myActiveGameId); }
@@ -393,8 +401,6 @@
         }
 
         function disconnectWebSocket() { if(gameSocket){gameSocket.close(); gameSocket=null;} }
-
-        function buildTracker(containerId){ const cont=document.getElementById(containerId); if(!cont) return; cont.innerHTML=''; ['B','I','N','G','O'].forEach((letter,idx)=>{ let row=document.createElement('div'); row.className='tracker-row'; let label=document.createElement('div'); label.className='tracker-letter'; label.innerText=letter; row.appendChild(label); for(let i=1;i<=15;i++){ let num=idx*15+i; let dot=document.createElement('div'); dot.className='tracker-dot'; dot.id=`${containerId}-dot-${num}`; dot.innerText=num; row.appendChild(dot); } cont.appendChild(row); }); }
 
         window.addEventListener('DOMContentLoaded', (event) => {
             const hash = window.location.hash.substring(1);
@@ -476,18 +482,22 @@
             .catch(e=>{if(tg) tg.showAlert("⚠️ Transfer error");}); 
         }
 
+        function showToast(msg){ const t=document.getElementById('toast-msg'); t.innerText=msg; t.classList.remove('opacity-0'); setTimeout(()=>t.classList.add('opacity-0'),1500); }
         function openHistory(){ document.getElementById('m-history').style.display='flex'; safeFetch('/api/history/'+uid+'/').then(d=>{historyData=d; switchTab('bets');}).catch(e=>console.error); }
         function switchTab(tab){ const content=document.getElementById('history-content'); content.innerHTML=''; if(tab==='bets') { if(historyData.my_bets.length===0) content.innerHTML="<div class='text-center text-gray-500 mt-10'>ምንም ታሪክ የለም (No bets yet)</div>"; historyData.my_bets.forEach(h=>{content.innerHTML+=`<div class="history-row border-l-2 ${h.status==='WON'?'border-green-500':'border-red-500'}"><div><div class="text-gray-400">Game</div><div class="font-bold">#${h.game_id}</div></div><div><div class="text-gray-400">Bet/Card</div><div class="text-blue-400">${h.bet}/[${h.card}]</div></div><div class="text-right"><div class="text-gray-400">Result</div><div class="font-black ${h.status==='WON'?'text-green-500':'text-red-500'}">${h.status==='WON'?'+'+h.prize:'-'+(h.bet * (h.card?h.card.toString().split(',').length:1))}</div></div></div>`;});} else historyData.winners.forEach(h=>{content.innerHTML+=`<div class="history-row"><div><div class="text-gray-400">Game</div><div class="font-bold">#${h.game_id}</div></div><div><div class="text-gray-400">Winner</div><div class="text-blue-400">@${h.winner}</div></div><div class="text-right"><div class="text-gray-400">Prize</div><div class="text-green-400 font-black">${h.prize} ETB</div></div></div>`;}); }
 
-        function showToast(msg){ const t=document.getElementById('toast-msg'); t.innerText=msg; t.classList.remove('opacity-0'); setTimeout(()=>t.classList.add('opacity-0'),1500); }
-        
         async function appLoop(){ 
             if(refreshRunning) return; 
             refreshRunning=true; 
             try{ 
                 if(myActiveGameId){ 
-                    if(!cardsLoaded){ await updatePlayHall(); cardsLoaded=true; } 
-                    connectWebSocket(myActiveGameId); 
+                    if(currentRoomStatus === 'ACTIVE') {
+                        if(!cardsLoaded){ await updatePlayHall(); cardsLoaded=true; } 
+                        connectWebSocket(myActiveGameId); 
+                    } else {
+                        disconnectWebSocket();
+                        await refreshLobby();
+                    }
                 } else { 
                     disconnectWebSocket(); 
                     if(pollingInterval) clearInterval(pollingInterval); 
@@ -502,7 +512,6 @@
             try {
                 const d = await safeFetch('/api/lobby-info/'+uid+'/');
                 document.getElementById('bal-header').innerText = d.balance.toFixed(2);
-                
                 myLobbyCardsMap = d.my_lobby_cards || {};
                 
                 if (d.rooms) {
@@ -514,7 +523,6 @@
                     }
                 }
                 
-                // FIX: Prevents auto-pulling into v-play if there is NO active game ID for the user
                 if(d.active_game_id){ 
                     myActiveGameId=d.active_game_id; 
                     if (currentRoomStatus === 'ACTIVE' && sessionStorage.getItem('currentScreen') !== 'v-play') {
@@ -531,19 +539,11 @@
                         activeBet = parseInt(sessionStorage.getItem('activeBet')) || 10;
                         myCards = myLobbyCardsMap[activeBet.toString()] || [];
                         document.getElementById('nav-room').innerText=activeBet;
-                        
-                        // FIX: Safely route to lobby if there is no active game but v-play was saved
-                        if (saved === 'v-play' && !myActiveGameId) {
-                            showScreen('v-lobby');
-                        } else {
-                            showScreen(saved);
-                            if(saved==='v-selector') {
-                                initGrid();
-                                myCards.forEach(c=>{ let btn=document.getElementById('c-'+c); if(btn) btn.classList.add('active');});
-                                if(myCards.length) previewCard(myCards[myCards.length-1]);
-                                updateStatusIndicator();
-                            }
-                        }
+                        showScreen(saved);
+                        initGrid();
+                        myCards.forEach(c=>{ let btn=document.getElementById('c-'+c); if(btn) btn.classList.add('active');});
+                        if(myCards.length) previewCard(myCards[myCards.length-1]);
+                        if(saved==='v-selector') updateStatusIndicator();
                     }
                 }
 
@@ -552,14 +552,7 @@
                     const isLive=room.status==='ACTIVE';
                     const numCardsOwned = (myLobbyCardsMap[room.bet.toString()] || []).length;
                     
-                    list.innerHTML+=`<div onclick="selectRoom(${room.bet})" class="room-card ${isLive?'live':''} cursor-pointer"><div class="flex justify-between w-full"><div><div class="text-white font-black text-xl">Bingo ${room.bet}</div><div class="text-[11px] font-bold ${isLive?'text-red-400':'text-blue-400'} mt-1">${isLive?'እየተጠራ ነው: '+room.called_count+'/75':'ሊጀምር ነው: '+room.time_left+'s'}</div><div class="text-[10px] text-gray-400 mt-1">ሽልማት: <span class="text-white font-bold">${room.win.toFixed(0)} ETB</span></div></div><div class="flex flex-col items-end justify-center"><div class="${isLive?'text-red-500':'text-blue-500'} font-bold text-2xl">${isLive?'⏳':'▶'}</div><div class="text-[9px] ${numCardsOwned>0?'text-green-400 font-bold':'text-gray-500'} mt-2">${room.players} ተጫዋች (${numCardsOwned} ያንተ)</div></div></div></div>`;
-                    
-                    if(activeBet==room.bet){ 
-                        currentRoomTime=room.time_left; 
-                        currentRoomStatus=room.status; 
-                        document.getElementById('nav-prize').innerText=room.win.toFixed(0); 
-                        updateBanner(room.status,room.called_count,room.called_numbers);
-                    }
+                    list.innerHTML+=`<div onclick="selectRoom(${room.bet})" class="room-card ${isLive?'live':''} cursor-pointer"><div class="flex justify-between w-full"><div><div class="text-white font-black text-xl">Bingo ${room.bet}</div><div class="text-[11px] font-bold ${isLive?'text-red-400':'text-blue-400'} mt-1">${isLive?'እየተጠራ ነው: '+room.called_count+'/75':'ሊጀምር ነው: '+room.time_left+'s'}</div><div class="text-[10px] text-gray-400 mt-1">ሽልማት: <span class="text-white font-bold">${room.win.toFixed(0)} ETB</span></div></div><div class="flex flex-col items-end justify-center"><div class="${isLive?'text-red-500':'text-blue-500'} font-bold text-2xl">${isLive?'⏳':'▶'}</div><div class="text-[9px] ${numCardsOwned>0?'text-green-400 font-bold':'text-gray-500'} mt-2">${room.players} ካርዶች (${numCardsOwned} ያንተ)</div></div></div></div>`;
                 });
             } catch(e){}
         }
@@ -578,28 +571,39 @@
                     let recentHtml='';
                     [...d.called].reverse().slice(1,6).forEach(n=>{
                         let l="B"; if(n>15) l="I"; if(n>30) l="N"; if(n>45) l="G"; if(n>60) l="O";
-                        recentHtml+=`<div class="bg-slate-900 rounded-full px-2 py-0.5 text-[9px] font-bold text-slate-300 border border-slate-700 flex items-center gap-0.5"><span class="text-yellow-500">${l}</span>${n}</div>`;
+                        recentHtml+=`<div class="bg-slate-900 rounded-full px-2 py-0.5 text-[8px] font-bold text-slate-300 border border-slate-700 flex items-center gap-0.5"><span class="text-yellow-500">${l}</span>${n}</div>`;
                     });
                     document.getElementById('recent-balls').innerHTML=recentHtml;
                 }
                 if(d.boards_data && d.boards_data.length){
                     for(let x=1;x<=4;x++) document.getElementById('slot-'+x).style.display='none';
-                    d.boards_data.forEach((boardObj,i)=>{
-                        let slot=i+1, pc=document.getElementById('play-card-'+slot), parent=pc.parentElement;
-                        parent.style.display='flex';
-                        if(pc.children.length===0){
-                            // FIX: Small padding and max-w-[145px] ensures the yellow border shrink-wraps and columns fit tightly
-                            parent.className="bg-slate-800 p-1 pt-2.5 rounded-lg border-2 border-yellow-500 relative shadow-sm w-full max-w-[145px] mx-auto";
-                            parent.innerHTML=`<div class="absolute -top-2 left-2 bg-yellow-500 text-black text-[8px] font-black px-1.5 py-0.5 rounded">#${boardObj.card_number}</div><div id="play-card-${slotNum}" class="grid grid-cols-5 gap-[1px] mt-1 w-full"></div>`;
-                            pc=document.getElementById('play-card-'+slot);
-                            boardObj.board.forEach(row=>row.forEach(val=>{
-                                let cell=document.createElement('div');
-                                // FIX: w-full aspect-square lets the CSS Grid handle perfect sizing automatically!
-                                cell.className='w-full aspect-square flex items-center justify-center text-[10px] sm:text-[11px] font-black rounded-[2px] border border-blue-900/50 bg-slate-900 shadow-inner cursor-pointer transition-colors';
-                                if(val==='FREE'){ cell.innerText='⭐'; cell.classList.add('bg-blue-600','text-yellow-400','is-marked');}
-                                else{ cell.innerText=val; cell.classList.add('text-blue-200');
-                                    cell.onclick=function(){ if(autoMode) return; this.classList.toggle('bg-red-500'); this.classList.toggle('text-white'); this.classList.toggle('border-red-400'); this.classList.toggle('text-blue-200'); this.classList.toggle('is-marked'); activateBingoButton(); }; }
-                                pc.appendChild(cell);
+                    
+                    d.boards_data.forEach((boardObj, i) => {
+                        let slotNum = i + 1; 
+                        let pc = document.getElementById('play-card-' + slotNum);
+                        let parentDiv = pc.parentElement;
+                        parentDiv.style.display = 'flex';
+                        
+                        if(pc.children.length === 0) {
+                            // FIX 1: TIGHTENED CARD CONTAINER AND REMOVED LETTERS
+                            parentDiv.className = "bg-slate-800 p-1.5 pt-2.5 rounded-xl border-2 border-yellow-500 relative shadow-md w-fit mx-auto"; 
+                            parentDiv.innerHTML = `<div class="absolute -top-2 left-2 bg-yellow-500 text-black text-[8px] font-black px-1.5 py-0.5 rounded">#${boardObj.card_number}</div><div id="play-card-${slotNum}" class="grid grid-cols-5 gap-[2px] mt-0.5"></div>`;
+                            pc = document.getElementById('play-card-' + slotNum); 
+                            
+                            boardObj.board.forEach(row => row.forEach(val => { 
+                                let cell = document.createElement('div'); 
+                                // EXACT SCALED PIXEL SIZES FOR COMPACTNESS
+                                cell.className = 'w-[27px] h-[27px] sm:w-[32px] sm:h-[32px] flex items-center justify-center text-[11px] font-black rounded border border-blue-900/50 bg-slate-900 shadow-inner cursor-pointer transition-colors'; 
+                                if (val === 'FREE') { cell.innerText = '⭐'; cell.classList.add('bg-blue-600', 'text-yellow-400', 'is-marked'); } 
+                                else { 
+                                    cell.innerText = val; cell.classList.add('text-blue-200'); 
+                                    cell.onclick = function() { 
+                                        if(autoMode) return; 
+                                        this.classList.toggle('bg-red-500'); this.classList.toggle('text-white'); this.classList.toggle('border-red-400'); this.classList.toggle('text-blue-200'); this.classList.toggle('is-marked'); 
+                                        activateBingoButton(); 
+                                    }; 
+                                } 
+                                pc.appendChild(cell); 
                             }));
                         }
                     });
@@ -612,14 +616,7 @@
         function checkLocal1LineWin(){ for(let s=1;s<=4;s++){ const pc=document.getElementById('play-card-'+s); if(!pc||!pc.children.length) continue; const cells=Array.from(pc.querySelectorAll('div')); if(cells.length<25) continue; let grid=[]; for(let i=0;i<5;i++) grid.push(cells.slice(i*5,i*5+5).map(c=>c.classList.contains('is-marked')||c.innerText==='⭐')); for(let i=0;i<5;i++) if(grid[i].every(v=>v)||grid.every(row=>row[i])) return true; if([0,1,2,3,4].every(i=>grid[i][i])) return true; if([0,1,2,3,4].every(i=>grid[i][4-i])) return true; if([grid[0][0],grid[0][4],grid[4][0],grid[4][4]].every(v=>v)) return true; } return false; }
         function toggleAutoMode(el){ autoMode=el.checked; if(autoMode) markCardsInstantly(); }
         function markCardsInstantly(){ if(!globalCalledNumbers.length) return; for(let s=1;s<=4;s++) document.querySelectorAll(`#play-card-${s} div`).forEach(cell=>{ let val=cell.innerText; if(val!=='⭐' && globalCalledNumbers.includes(parseInt(val)) && !cell.classList.contains('is-marked')) cell.classList.add('bg-red-500','text-white','border-red-400','is-marked'); }); if(checkLocal1LineWin() && !autoBingoFired){ autoBingoFired=true; hitBingo(); } activateBingoButton(); }
-        
-        function activateBingoButton(){ 
-            const btn=document.getElementById('bingo-btn'); 
-            if(checkLocal1LineWin()) 
-                btn.className="w-full py-3 bg-gradient-to-r from-red-500 to-red-700 rounded-xl font-black text-lg shadow-[0_0_20px_rgba(239,68,68,0.4)] text-white active:scale-95 transition-all tracking-widest"; 
-            else 
-                btn.className="w-full py-3 bg-slate-700 text-slate-400 rounded-xl font-black text-lg border-2 border-slate-600 transition-all tracking-widest"; 
-        }
+        function activateBingoButton(){ const btn=document.getElementById('bingo-btn'); if(checkLocal1LineWin()) btn.className="w-full py-3 bg-gradient-to-r from-red-500 to-red-700 rounded-xl font-black text-lg shadow-[0_0_20px_rgba(239,68,68,0.4)] text-white active:scale-95 transition-all tracking-widest"; else btn.className="w-full py-3 bg-slate-700 text-slate-400 rounded-xl font-black text-lg border-2 border-slate-600 transition-all tracking-widest"; }
         
         async function hitBingo(){ 
             if(!checkLocal1LineWin()) return tg?tg.showAlert("⚠️ ትንሽ ይጠብቁ! ትክክለኛ መስመር አልሰሩም!"):alert("⚠️ ትንሽ ይጠብቁ! ትክክለኛ መስመር አልሰሩም!");
@@ -637,7 +634,7 @@
             } else{ 
                 indicator.innerHTML=`
                 <button onclick="pickRandom()" class="btn-random mb-2">🎲 በዕድል (RANDOM)</button>
-                <button onclick="showScreen('v-play')" class="w-full py-3 bg-green-500 hover:bg-green-600 rounded-xl font-black text-white shadow-[0_0_15px_rgba(34,197,94,0.4)] active:scale-95 mb-3 transition-all tracking-widest text-sm">▶ አሁን ግባ (JOIN NOW)</button>
+                <button onclick="showScreen('v-play')" class="w-full py-2.5 bg-green-500 hover:bg-green-600 rounded-xl font-black text-white shadow-[0_0_15px_rgba(34,197,94,0.4)] active:scale-95 mb-2 transition-all tracking-widest text-sm">▶ አሁን ግባ (JOIN NOW)</button>
                 <div class="text-center font-bold text-xs bg-slate-900 p-2 rounded-xl border border-green-500 w-full"><span class="text-green-400 text-lg">✅ ${myCards.length}/4 ተገዝቷል</span><br><span class="text-gray-400">ጨዋታ እስኪጀምር ይጠብቁ...</span></div>`;
             } 
         }
@@ -650,13 +647,10 @@
             sessionStorage.setItem('currentScreen','v-selector'); 
             document.getElementById('nav-room').innerText=t; 
             showScreen('v-selector'); 
-            
             myCards=myLobbyCardsMap[activeBet.toString()] || []; 
-            
             initGrid(); 
             myCards.forEach(c=>{ let btn=document.getElementById('c-'+c); if(btn) btn.classList.add('active');});
             if(myCards.length) previewCard(myCards[myCards.length-1]); else document.getElementById('mini-grid').innerHTML='';
-            
             updateStatusIndicator();
         }
 
@@ -673,36 +667,19 @@
                     myCards = d.my_cards;
                     document.getElementById('bal-header').innerText = d.balance.toFixed(2);
                     document.getElementById('nav-prize').innerText = d.prize.toFixed(0);
-                    
                     const btn = document.getElementById('c-'+n);
-                    if(d.action === 'added') {
-                        btn.classList.add('active');
-                        showToast(`✅ ካርድ #${n} ተገዝቷል!`);
-                    } else {
-                        btn.classList.remove('active');
-                        showToast(`🔄 ካርድ #${n} ተመልሷል!`);
-                    }
-                    if(myCards.length > 0) previewCard(myCards[myCards.length-1]);
-                    else document.getElementById('mini-grid').innerHTML = '';
+                    if(d.action === 'added') { btn.classList.add('active'); showToast(`✅ ካርድ #${n} ተገዝቷል!`); } 
+                    else { btn.classList.remove('active'); showToast(`🔄 ካርድ #${n} ተመልሷል!`); }
+                    if(myCards.length > 0) previewCard(myCards[myCards.length-1]); else document.getElementById('mini-grid').innerHTML = '';
                     updateStatusIndicator();
-                } else {
-                    if (tg) tg.showAlert(d.error); else alert(d.error);
-                }
-            })
-            .catch(e => {
-                isProcessingCard = false;
-                console.error(e);
-            });
+                } else { if (tg) tg.showAlert(d.error); else alert(d.error); }
+            }).catch(e => { isProcessingCard = false; console.error(e); });
         }
         
         function previewCard(n){ document.getElementById('prev-num').innerText="#"+n; safeFetch('/api/card-data/'+n+'/').then(d=>{ const mini=document.getElementById('mini-grid'); mini.innerHTML=''; d.board.forEach(row=>row.forEach(v=>{ let c=document.createElement('div'); c.className='mini-cell'; c.innerText=v==='FREE'?'X':v; mini.appendChild(c); })); }).catch(e=>console.error); }
         function pickRandom(){ if(myCards.length>=4) return tg?tg.showAlert("በአንድ ጊዜ ከ 4 ካርድ በላይ መግዛት አይቻልም!"):alert("በአንድ ጊዜ ከ 4 ካርድ በላይ መግዛት አይቻልም!"); let max=getMaxCards(); let r=Math.floor(Math.random()*max)+1; while(myCards.includes(r)) r=Math.floor(Math.random()*max)+1; selectCard(r); }
-        
-        function updateBanner(status,count,called_numbers){ const b=document.getElementById('active-call-banner'); const gGrid=document.getElementById('grid-container'); const sTrack=document.getElementById('spectator-tracker'); if(status==='ACTIVE'){ b.classList.remove('hidden'); document.getElementById('call-count').innerText=count; gGrid.classList.add('hidden'); sTrack.classList.remove('hidden'); buildTracker('spectator-tracker'); document.querySelectorAll('#spectator-tracker .tracker-dot').forEach(el=>el.classList.remove('called')); if(called_numbers) called_numbers.forEach(n=>{ let dot=document.getElementById('spectator-tracker-dot-'+n); if(dot) dot.classList.add('called');}); } else{ b.classList.add('hidden'); updateStatusIndicator(); gGrid.classList.remove('hidden'); sTrack.classList.add('hidden');} }
 
-        // Start engine
         setInterval(appLoop, 3000);
-        
         setInterval(() => { 
             if(!myActiveGameId) { 
                 const tEl = document.getElementById('timer'); 
