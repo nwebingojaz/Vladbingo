@@ -11,7 +11,6 @@ from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from django.db import transaction
 
-# WebSocket Imports added here!
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 
@@ -32,11 +31,10 @@ def get_card_data(request, num):
 
 def lobby_info(request, tg_id):
     user, _ = User.objects.get_or_create(username=f"tg_{tg_id}")
-    
-    # Exclude both ENDED and ANNOUNCED games from showing up as active lobby cards!
     rooms = GameRound.objects.exclude(status__in=["ENDED", "ANNOUNCED"]).order_by('bet_amount')
     
     room_data = []
+    my_lobby_cards = {} # Tracks which cards the user currently owns in the lobbies
     now = timezone.now()
     
     for r in rooms:
@@ -48,6 +46,11 @@ def lobby_info(request, tg_id):
         if r.status == "LOBBY":
             elapsed = (now - r.created_at).total_seconds()
             time_left = max(0, 60 - int(elapsed))
+            
+            # Fetch user's currently purchased cards for this tier
+            c = players_dict.get(str(tg_id), [])
+            if isinstance(c, int): c = [c]
+            my_lobby_cards[str(int(r.bet_amount))] = c
         else:
             time_left = 0
             
@@ -58,12 +61,12 @@ def lobby_info(request, tg_id):
             'time_left': time_left
         })
         
-    # Only treat games as "active" if they are currently in the LOBBY or ACTIVE state!
     active_game = GameRound.objects.filter(players__has_key=str(tg_id), status__in=["LOBBY", "ACTIVE"]).last()
     
     return JsonResponse({
         'balance': float(user.operational_credit), 
         'rooms': room_data, 
+        'my_lobby_cards': my_lobby_cards,
         'active_game_id': active_game.id if active_game else None
     })
 
@@ -91,32 +94,57 @@ def get_history(request, tg_id):
 @csrf_exempt
 @transaction.atomic
 def join_room(request, tg_id, bet, card_num):
+    # NOW ACTS AS AN INSTANT BUY/REFUND TOGGLE API!
     try:
         user = User.objects.select_for_update().get(username=f"tg_{tg_id}")
-        selected_cards = [int(x) for x in str(card_num).split(',') if x.isdigit()]
-        
-        if len(selected_cards) == 0: 
-            return JsonResponse({'status': 'error', 'error': 'No cards selected'})
-        if len(selected_cards) > 4: 
-            return JsonResponse({'status': 'error', 'error': 'Max 4 cards allowed!'})
-        
-        total_cost = Decimal(str(bet)) * len(selected_cards)
-        if user.operational_credit < total_cost: 
-            return JsonResponse({'status': 'error', 'error': f'Low Balance! You need {total_cost} ETB'})
-            
         game = GameRound.objects.select_for_update().filter(status="LOBBY", bet_amount=bet).first()
+        
         if not game: 
-            return JsonResponse({'status': 'error', 'error': 'Room is already playing. Wait for next round.'})
+            return JsonResponse({'status': 'error', 'error': 'Room is starting or unavailable. Wait for next round.'})
         
-        current_players = dict(game.players) if game.players else {}
-        current_players[str(tg_id)] = selected_cards
-        game.players = current_players
+        c_num = int(card_num)
+        players = dict(game.players) if game.players else {}
+        user_cards = players.get(str(tg_id), [])
+        if isinstance(user_cards, int): user_cards = [user_cards]
+        
+        action = ""
+        if c_num in user_cards:
+            # INSTANT REFUND
+            user_cards.remove(c_num)
+            if not user_cards:
+                del players[str(tg_id)]
+            else:
+                players[str(tg_id)] = user_cards
+            
+            user.operational_credit += Decimal(str(bet))
+            action = 'removed'
+        else:
+            # INSTANT BUY
+            if len(user_cards) >= 4:
+                return JsonResponse({'status': 'error', 'error': 'Max 4 cards allowed!'})
+            if user.operational_credit < Decimal(str(bet)):
+                return JsonResponse({'status': 'error', 'error': 'Insufficient balance!'})
+            
+            user_cards.append(c_num)
+            players[str(tg_id)] = user_cards
+            user.operational_credit -= Decimal(str(bet))
+            action = 'added'
+            
+        game.players = players
         game.save(update_fields=['players'])
-        
-        user.operational_credit -= total_cost
         user.save(update_fields=['operational_credit'])
         
-        return JsonResponse({'status': 'ok'})
+        # Recalculate live prize pool
+        total_cards = sum(len(c) if isinstance(c, list) else 1 for c in players.values())
+        prize = float(Decimal(total_cards) * game.bet_amount * Decimal("0.73"))
+        
+        return JsonResponse({
+            'status': 'ok', 
+            'action': action,
+            'balance': float(user.operational_credit),
+            'prize': prize,
+            'my_cards': user_cards
+        })
     except Exception as e:
         return JsonResponse({'status': 'error', 'error': str(e)})
 
@@ -236,23 +264,20 @@ def check_win(request, game_id, tg_id):
             game.finished_at = timezone.now()
             game.save(update_fields=['status', 'winner_username', 'winner_prize', 'finished_at'])
             
-            # 🚀 NEW WEBSOCKET BROADCAST INJECTION
-            # The millisecond someone successfully calls Bingo, this freezes the game 
-            # for EVERYONE in the room and instantly triggers the Winner Modal!
             try:
                 channel_layer = get_channel_layer()
                 async_to_sync(channel_layer.group_send)(
                     f'game_{game.id}',
                     {'type': 'bingo_message', 'message': {'action': 'game_ended'}}
                 )
-            except Exception as ws_e: 
-                print(f"WebSocket Broadcast Failed on Win: {ws_e}")
-                pass # Game still successfully saved to DB even if WS drops
+            except: pass
 
             return JsonResponse({'status': 'WINNER', 'prize': float(prize), 'winning_card': winning_card})
             
         return JsonResponse({'status': 'NOT_YET'})
     except Exception as e: return JsonResponse({'status': 'error', 'msg': str(e)})
+
+# ... Keep the rest of your views (send_telegram_message, send_otp, verify_otp, submit_deposit, etc) exactly as they are. ...
 
 def send_telegram_message(chat_id, text):
     try: requests.post(f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage", json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"}, timeout=5)
