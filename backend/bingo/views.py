@@ -322,62 +322,114 @@ def verify_otp(request):
 @csrf_exempt
 def submit_deposit(request):
     if request.method == "POST":
-        data = json.loads(request.body)
         try:
-            user = User.objects.get(username=f"tg_{data.get('tg_id')}")
-            Transaction.objects.create(agent=user, amount=data.get('amount'), note=f"TXID: {data.get('tx_id')}", type=f"DEPOSIT_{data.get('method').upper()}", status="pending")
+            data = json.loads(request.body)
+            tg_id = data.get('tg_id')
+            amount_val = data.get('amount', 0)
+            tx_id = data.get('tx_id', 'UNKNOWN')
+            method = data.get('method', 'UNKNOWN')
             
-            # FIX: Pull CHANNEL_ID directly from environment variables safely
+            try:
+                amount = Decimal(str(amount_val))
+            except:
+                return JsonResponse({"status": "error", "message": "Invalid amount format."})
+
+            # BULLETPROOF FIX: If user doesn't exist, create them instantly!
+            user, _ = User.objects.get_or_create(username=f"tg_{tg_id}")
+            
+            Transaction.objects.create(
+                agent=user, 
+                amount=amount, 
+                note=f"TXID: {tx_id}", 
+                type=f"DEPOSIT_{method.upper()}", 
+                status="pending"
+            )
+            
             channel_id = os.environ.get("CHANNEL_ID")
             if channel_id:
-                send_telegram_message(channel_id, f"🟢 <b>NEW DEPOSIT</b>\nUser: {data.get('tg_id')}\nAmount: {data.get('amount')} ETB\nMethod: {data.get('method')}\nTXID: {data.get('tx_id')}")
+                send_telegram_message(channel_id, f"🟢 <b>NEW DEPOSIT</b>\nUser: {tg_id}\nAmount: {amount} ETB\nMethod: {method}\nTXID: {tx_id}")
             
             return JsonResponse({"status": "success", "message": "Deposit submitted! Waiting for Admin approval."})
-        except User.DoesNotExist: 
-            return JsonResponse({"status": "error", "message": "User not found in database."})
+            
         except Exception as e:
-            print(f"Deposit Error: {e}")
-            return JsonResponse({"status": "error", "message": "Server error processing deposit."})
+            print(f"CRITICAL DEPOSIT ERROR: {e}")
+            return JsonResponse({"status": "error", "message": f"Server error: {str(e)}"})
 
 @csrf_exempt
 def submit_withdrawal(request):
     if request.method == "POST":
-        data = json.loads(request.body); tg_id = data.get('tg_id'); amount = Decimal(str(data.get('amount', 0)))
         try:
-            user = User.objects.get(username=f"tg_{tg_id}")
-            if user.operational_credit < amount: return JsonResponse({"status": "error", "message": "Insufficient balance!"})
-            if amount < 50: return JsonResponse({"status": "error", "message": "Minimum withdrawal is 50 ETB."})
+            data = json.loads(request.body)
+            tg_id = data.get('tg_id')
+            amount_val = data.get('amount', 0)
             
-            user.operational_credit -= amount; user.save()
-            Transaction.objects.create(agent=user, amount=amount, note=f"To: {data.get('account')}", type="WITHDRAWAL", status="pending")
+            try:
+                amount = Decimal(str(amount_val))
+            except:
+                return JsonResponse({"status": "error", "message": "Invalid amount format."})
+
+            # BULLETPROOF FIX
+            user, _ = User.objects.get_or_create(username=f"tg_{tg_id}")
             
-            # FIX: Pull CHANNEL_ID directly from environment variables safely
+            if user.operational_credit < amount: 
+                return JsonResponse({"status": "error", "message": "Insufficient balance!"})
+            if amount < 50: 
+                return JsonResponse({"status": "error", "message": "Minimum withdrawal is 50 ETB."})
+            
+            user.operational_credit -= amount
+            user.save()
+            
+            Transaction.objects.create(
+                agent=user, 
+                amount=amount, 
+                note=f"To: {data.get('account')}", 
+                type="WITHDRAWAL", 
+                status="pending"
+            )
+            
             channel_id = os.environ.get("CHANNEL_ID")
             if channel_id:
                 send_telegram_message(channel_id, f"🔴 <b>NEW WITHDRAWAL</b>\nUser: {tg_id}\nAmount: {amount} ETB\nAccount: {data.get('account')}\nPhone: {user.phone_number}")
             
             return JsonResponse({"status": "success", "message": "Withdrawal requested successfully!"})
-        except User.DoesNotExist: 
-            return JsonResponse({"status": "error", "message": "User not found."})
+            
         except Exception as e:
             print(f"Withdrawal Error: {e}")
-            return JsonResponse({"status": "error", "message": "Server error processing withdrawal."})
+            return JsonResponse({"status": "error", "message": f"Server error: {str(e)}"})
 
 @csrf_exempt
 def submit_transfer(request):
     if request.method == "POST":
-        data = json.loads(request.body); tg_id = data.get('tg_id'); amount = Decimal(str(data.get('amount', 0))); target_account = data.get('account')
         try:
-            sender = User.objects.get(username=f"tg_{tg_id}")
-            if sender.operational_credit < amount: return JsonResponse({"status": "error", "message": "Insufficient balance!"})
-            if amount < 10: return JsonResponse({"status": "error", "message": "Minimum transfer is 10 ETB."})
+            data = json.loads(request.body)
+            tg_id = data.get('tg_id')
+            amount_val = data.get('amount', 0)
+            target_account = data.get('account')
+            
+            try:
+                amount = Decimal(str(amount_val))
+            except:
+                return JsonResponse({"status": "error", "message": "Invalid amount format."})
+
+            # BULLETPROOF FIX
+            sender, _ = User.objects.get_or_create(username=f"tg_{tg_id}")
+            
+            if sender.operational_credit < amount: 
+                return JsonResponse({"status": "error", "message": "Insufficient balance!"})
+            if amount < 10: 
+                return JsonResponse({"status": "error", "message": "Minimum transfer is 10 ETB."})
             
             receiver = User.objects.filter(phone_number=target_account).first() or User.objects.filter(username=f"tg_{target_account}").first()
-            if not receiver: return JsonResponse({"status": "error", "message": "Receiver account not found!"})
-            if sender == receiver: return JsonResponse({"status": "error", "message": "You cannot transfer to yourself!"})
+            if not receiver: 
+                return JsonResponse({"status": "error", "message": "Receiver account not found!"})
+            if sender == receiver: 
+                return JsonResponse({"status": "error", "message": "You cannot transfer to yourself!"})
             
-            sender.operational_credit -= amount; sender.save()
-            receiver.operational_credit += amount; receiver.save()
+            sender.operational_credit -= amount
+            sender.save()
+            
+            receiver.operational_credit += amount
+            receiver.save()
             
             Transaction.objects.create(agent=sender, amount=amount, note=f"Transfer to {target_account}", type="TRANSFER_OUT", status="approved")
             Transaction.objects.create(agent=receiver, amount=amount, note=f"Transfer from {tg_id}", type="TRANSFER_IN", status="approved")
@@ -386,11 +438,10 @@ def submit_transfer(request):
                 send_telegram_message(receiver.telegram_id, f"💸 <b>Transfer Received!</b>\nYou received {amount} ETB from user {tg_id}.")
             
             return JsonResponse({"status": "success", "message": f"Successfully transferred {amount} ETB!"})
-        except User.DoesNotExist: 
-            return JsonResponse({"status": "error", "message": "User not found."})
+            
         except Exception as e:
             print(f"Transfer Error: {e}")
-            return JsonResponse({"status": "error", "message": "Server error processing transfer."})
+            return JsonResponse({"status": "error", "message": f"Server error: {str(e)}"})
 
 @csrf_exempt
 def change_password(request):
