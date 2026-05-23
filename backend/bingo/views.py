@@ -97,9 +97,12 @@ def get_history(request, tg_id):
 @csrf_exempt
 @transaction.atomic
 def join_room(request, tg_id, bet, card_num):
-    # INSTANT BUY/REFUND TOGGLE API
+    # INSTANT BUY/REFUND TOGGLE API (ULTRA-SAFE)
     try:
-        user = User.objects.select_for_update().get(username=f"tg_{tg_id}")
+        # Use get_or_create so this API never fails with "User Does Not Exist"
+        user, _ = User.objects.get_or_create(username=f"tg_{tg_id}")
+        user = User.objects.select_for_update().get(id=user.id)
+        
         game = GameRound.objects.select_for_update().filter(status="LOBBY", bet_amount=bet).first()
         
         if not game: 
@@ -149,6 +152,7 @@ def join_room(request, tg_id, bet, card_num):
             'my_cards': user_cards
         })
     except Exception as e:
+        print(f"Join Room Error: {e}")
         return JsonResponse({'status': 'error', 'error': str(e)})
 
 def get_game_info(request, game_id, tg_id):
@@ -200,7 +204,7 @@ def get_game_info(request, game_id, tg_id):
                             if all(board[i][c] == "FREE" or board[i][c] in called_set for c in range(5)): lines += 1
                             if all(board[r][i] == "FREE" or board[r][i] in called_set for r in range(5)): lines += 1
                         if all(board[i][i] == "FREE" or board[i][i] in called_set for i in range(5)): lines += 1
-                        if all(board[i][4-i] == "FREE" or board[i][4-i] in called_set for i in range(5)): lines += 1
+                        if redemption_board_match := all(board[i][4-i] == "FREE" or board[i][4-i] in called_set for i in range(5)): lines += 1
                         corners = [board[0][0], board[0][4], board[4][0], board[4][4]]
                         if all(c == "FREE" or c in called_set for c in corners): lines += 1
                         
@@ -267,7 +271,6 @@ def check_win(request, game_id, tg_id):
             game.finished_at = timezone.now()
             game.save(update_fields=['status', 'winner_username', 'winner_prize', 'finished_at'])
             
-            # 🚀 WEBSOCKET BROADCAST INJECTION
             try:
                 channel_layer = get_channel_layer()
                 async_to_sync(channel_layer.group_send)(
@@ -351,9 +354,9 @@ def submit_deposit(request):
             except:
                 return JsonResponse({"status": "error", "message": "Invalid amount format."})
 
-            # BULLETPROOF FIX: If user doesn't exist, create them instantly!
             user, _ = User.objects.get_or_create(username=f"tg_{tg_id}")
             
+            # Capture the transaction object so we can get its ID!
             tx = Transaction.objects.create(
                 agent=user, 
                 amount=amount, 
@@ -384,7 +387,6 @@ def submit_withdrawal(request):
             except:
                 return JsonResponse({"status": "error", "message": "Invalid amount format."})
 
-            # BULLETPROOF FIX
             user, _ = User.objects.get_or_create(username=f"tg_{tg_id}")
             
             if user.operational_credit < amount: 
@@ -426,7 +428,6 @@ def submit_transfer(request):
             except:
                 return JsonResponse({"status": "error", "message": "Invalid amount format."})
 
-            # BULLETPROOF FIX
             sender, _ = User.objects.get_or_create(username=f"tg_{tg_id}")
             
             if sender.operational_credit < amount: 
@@ -489,12 +490,8 @@ def redeem_promo(request):
             if not friend: 
                 return JsonResponse({"status": "error", "message": "Invalid Promo Code!"})
                 
-            user.operational_credit += 10
-            user.used_promo_code = True
-            user.save()
-            
-            friend.operational_credit += 10
-            friend.save()
+            user.operational_credit += 10; user.used_promo_code = True; user.save()
+            friend.operational_credit += 10; friend.save()
             
             Transaction.objects.create(agent=user, amount=10, note=f"Used promo code: {promo_code}", type="BONUS", status="approved")
             Transaction.objects.create(agent=friend, amount=10, note=f"Referral bonus from: {tg_id}", type="REFERRAL_BONUS", status="approved")
