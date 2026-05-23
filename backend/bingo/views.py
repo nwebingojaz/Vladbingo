@@ -292,7 +292,7 @@ def send_telegram_message(chat_id, text):
         # ==========================================
         # ⚠️ PASTE YOUR EXACT BOT TOKEN HERE:
         # ==========================================
-        bot_token = "8561294016:AAHxzmWBOKFRtNldjIG9Zpp0D5DoxXza7Mo"
+        bot_token = "YOUR_ACTUAL_BOT_TOKEN_HERE"
         
         url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
         payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
@@ -349,10 +349,10 @@ def submit_deposit(request):
             except:
                 return JsonResponse({"status": "error", "message": "Invalid amount format."})
 
-            # BULLETPROOF FIX: If user doesn't exist, create them instantly!
             user, _ = User.objects.get_or_create(username=f"tg_{tg_id}")
             
-            Transaction.objects.create(
+            # Capture the transaction object so we can get its ID!
+            tx = Transaction.objects.create(
                 agent=user, 
                 amount=amount, 
                 note=f"TXID: {tx_id}", 
@@ -360,9 +360,9 @@ def submit_deposit(request):
                 status="pending"
             )
             
-            # HARDCODED ADMIN GROUP ID
             admin_group_id = "-5139316806"
-            send_telegram_message(admin_group_id, f"🟢 <b>NEW DEPOSIT</b>\nUser: {tg_id}\nAmount: {amount} ETB\nMethod: {method}\nTXID: {tx_id}")
+            # Included the exact ID and a fast approve command!
+            send_telegram_message(admin_group_id, f"🟢 <b>NEW DEPOSIT</b>\n<b>ID: {tx.id}</b>\nUser: {tg_id}\nAmount: {amount} ETB\nMethod: {method}\nTXID: {tx_id}\n\n<i>To approve, type:</i>\n<code>/approve {tx.id}</code>")
             
             return JsonResponse({"status": "success", "message": "Deposit submitted! Waiting for Admin approval."})
             
@@ -383,7 +383,6 @@ def submit_withdrawal(request):
             except:
                 return JsonResponse({"status": "error", "message": "Invalid amount format."})
 
-            # BULLETPROOF FIX
             user, _ = User.objects.get_or_create(username=f"tg_{tg_id}")
             
             if user.operational_credit < amount: 
@@ -394,7 +393,8 @@ def submit_withdrawal(request):
             user.operational_credit -= amount
             user.save()
             
-            Transaction.objects.create(
+            # Capture the transaction object!
+            tx = Transaction.objects.create(
                 agent=user, 
                 amount=amount, 
                 note=f"To: {data.get('account')}", 
@@ -402,9 +402,9 @@ def submit_withdrawal(request):
                 status="pending"
             )
             
-            # HARDCODED ADMIN GROUP ID
             admin_group_id = "-5139316806"
-            send_telegram_message(admin_group_id, f"🔴 <b>NEW WITHDRAWAL</b>\nUser: {tg_id}\nAmount: {amount} ETB\nAccount: {data.get('account')}\nPhone: {user.phone_number}")
+            # Included the exact ID and a fast approve command!
+            send_telegram_message(admin_group_id, f"🔴 <b>NEW WITHDRAWAL</b>\n<b>ID: {tx.id}</b>\nUser: {tg_id}\nAmount: {amount} ETB\nAccount: {data.get('account')}\nPhone: {user.phone_number}\n\n<i>To approve, type:</i>\n<code>/approve {tx.id}</code>")
             
             return JsonResponse({"status": "success", "message": "Withdrawal requested successfully!"})
             
@@ -426,7 +426,6 @@ def submit_transfer(request):
             except:
                 return JsonResponse({"status": "error", "message": "Invalid amount format."})
 
-            # BULLETPROOF FIX
             sender, _ = User.objects.get_or_create(username=f"tg_{tg_id}")
             
             if sender.operational_credit < amount: 
@@ -446,11 +445,13 @@ def submit_transfer(request):
             receiver.operational_credit += amount
             receiver.save()
             
-            Transaction.objects.create(agent=sender, amount=amount, note=f"Transfer to {target_account}", type="TRANSFER_OUT", status="approved")
+            tx_out = Transaction.objects.create(agent=sender, amount=amount, note=f"Transfer to {target_account}", type="TRANSFER_OUT", status="approved")
             Transaction.objects.create(agent=receiver, amount=amount, note=f"Transfer from {tg_id}", type="TRANSFER_IN", status="approved")
             
+            admin_group_id = "-5139316806"
+            send_telegram_message(admin_group_id, f"💸 <b>TRANSFER PROCESSED</b>\n<b>ID: {tx_out.id}</b>\nFrom: {tg_id}\nTo: {target_account}\nAmount: {amount} ETB")
+            
             if receiver.telegram_id: 
-                # This stays dynamic so it sends a private DM to the player receiving the money!
                 send_telegram_message(receiver.telegram_id, f"💸 <b>Transfer Received!</b>\nYou received {amount} ETB from user {tg_id}.")
             
             return JsonResponse({"status": "success", "message": f"Successfully transferred {amount} ETB!"})
