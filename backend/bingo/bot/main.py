@@ -19,7 +19,6 @@ from bingo.models import User, Transaction, GameControl, GameRound
 # ==========================================
 # 2. ADMIN CONFIGURATION
 # ==========================================
-# Make sure to set ADMIN_TG_ID in your Render environment variables!
 ADMIN_TG_ID = os.environ.get("ADMIN_TG_ID", "YOUR_TG_ID") 
 
 def is_admin(tg_id):
@@ -81,8 +80,12 @@ def get_and_mark_finished_rooms():
         room.save(update_fields=['status'])
     return finished_rooms
 
+@sync_to_async
+def get_all_user_tg_ids():
+    return [u.username.replace('tg_', '') for u in User.objects.filter(username__startswith='tg_')]
+
 # ==========================================
-# 4. BACKGROUND BROADCASTER JOB
+# 4. BACKGROUND JOBS (Broadcaster & Promo)
 # ==========================================
 async def broadcast_winners_task(context: ContextTypes.DEFAULT_TYPE):
     channel_id = os.environ.get("CHANNEL_ID", "@bigestbingo")
@@ -91,16 +94,27 @@ async def broadcast_winners_task(context: ContextTypes.DEFAULT_TYPE):
     for room in finished_rooms:
         msg = (f"🏆 *Game Finished!*\n\n"
                f"💰 Bet: {room.bet_amount} ETB\n"
-               f"👤 Winner: {room.winner_username}\n"
+               f"👤 Winner: {room.winner_username.replace('tg_','')}\n"
                f"🎁 Prize: {room.winner_prize} ETB\n\n"
                f"Play now: https://t.me/Bigestbingobot")
         try:
             await context.bot.send_message(chat_id=channel_id, text=msg, parse_mode="Markdown")
-        except Exception as e:
-            print(f"Broadcast failed: {e}")
+        except Exception as e: pass
+
+async def daily_promo_task(context: ContextTypes.DEFAULT_TYPE):
+    channel_id = os.environ.get("CHANNEL_ID", "@bigestbingo")
+    photo_url = "https://i.ibb.co/3m20B6k/bingo-money.jpg" 
+    caption = "🎰 <b>BIGEST BINGO BOT</b> 🎰\n\nበየቀኑ በሺዎች የሚቆጠሩ ብሮችን ያሸንፉ!\nአሁኑኑ ይጫወቱ እና እድልዎን ይሞክሩ!"
+    keyboard = [[InlineKeyboardButton("🎮 አሁኑኑ ይጫወቱ (PLAY NOW)", url="https://t.me/Bigestbingobot")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    try:
+        await context.bot.send_photo(chat_id=channel_id, photo=photo_url, caption=caption, parse_mode="HTML", reply_markup=reply_markup)
+    except Exception as e: print(f"Daily promo failed: {e}")
+
 
 # ==========================================
-# 5. USER FLOW COMMANDS (Your original code)
+# 5. USER FLOW COMMANDS
 # ==========================================
 async def send_main_menu(update: Update, user):
     photo_url = "https://i.ibb.co/3m20B6k/bingo-money.jpg"
@@ -112,17 +126,17 @@ async def send_main_menu(update: Update, user):
         f"ከታች ካሉት አማራጮች ውስጥ ይምረጡ:\n_(Choose an option below)_"
     )
 
-    # Append Admin Commands if the user is an admin
     if is_admin(user.username.replace('tg_', '')):
-        caption += "\n\n👑 *Admin Commands:*\n/pending - View pending TXs\n/approve [id] - Approve TX\n/reject [id] - Reject TX\n/forcewin [card_num] - Force a card\n/stats - View Casino Stats"
+        caption += "\n\n👑 *Admin Commands:*\n/pending - View pending TXs\n/approve [id] - Approve TX\n/reject [id] - Reject TX\n/forcewin [card_num] - Force a card\n/stats - View Casino Stats\n/broadcast - Mass DM to all players"
     
     base_url = "https://vladbingo-dmzg.onrender.com/api/live/"
     
+    # FIX: Using query parameters (?tab=) instead of hashes (#) to guarantee Telegram opens them properly!
     keyboard = [
         [InlineKeyboardButton("🎮 ጌም ይጫወቱ (Play Games)", web_app=WebAppInfo(url=base_url))],
-        [InlineKeyboardButton("💰 ያስገቡ (Deposit)", web_app=WebAppInfo(url=base_url + "#deposit")), InlineKeyboardButton("💸 ያውጡ (Withdraw)", web_app=WebAppInfo(url=base_url + "#withdraw"))],
-        [InlineKeyboardButton("↔️ ያስተላልፉ (Transfer)", web_app=WebAppInfo(url=base_url + "#transfer")), InlineKeyboardButton("👤 ፕሮፋይል (Profile)", callback_data="profile")],
-        [InlineKeyboardButton("📜 ታሪክ (History)", web_app=WebAppInfo(url=base_url + "#history")), InlineKeyboardButton("⚖️ ሂሳብ (Balance)", callback_data="balance")],
+        [InlineKeyboardButton("💰 ያስገቡ (Deposit)", web_app=WebAppInfo(url=base_url + "?tab=deposit")), InlineKeyboardButton("💸 ያውጡ (Withdraw)", web_app=WebAppInfo(url=base_url + "?tab=withdraw"))],
+        [InlineKeyboardButton("↔️ ያስተላልፉ (Transfer)", web_app=WebAppInfo(url=base_url + "?tab=transfer")), InlineKeyboardButton("👤 ፕሮፋይል (Profile)", callback_data="profile")],
+        [InlineKeyboardButton("📜 ታሪክ (History)", web_app=WebAppInfo(url=base_url + "?tab=history")), InlineKeyboardButton("⚖️ ሂሳብ (Balance)", callback_data="balance")],
         [InlineKeyboardButton("📢 ቻናል (Channel)", url="https://t.me/bigestbingo"), InlineKeyboardButton("💬 ግሩፕ (Group)", url="https://t.me/bigestbingochat")],
         [InlineKeyboardButton("🎧 ያግኙን (Contact Admin)", url="https://t.me/yeab")]
     ]
@@ -216,6 +230,22 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await get_casino_stats()
     await update.message.reply_text(msg, parse_mode="HTML")
 
+async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.message.from_user.id): return
+    tg_ids = await get_all_user_tg_ids()
+    photo_url = "https://i.ibb.co/3m20B6k/bingo-money.jpg" 
+    caption = "🎰 <b>BIGEST BINGO BOT</b> 🎰\n\nበየቀኑ በሺዎች የሚቆጠሩ ብሮችን ያሸንፉ!\nአሁኑኑ ይጫወቱ እና እድልዎን ይሞክሩ!"
+    keyboard = [[InlineKeyboardButton("🎮 አሁኑኑ ይጫወቱ (PLAY NOW)", url="https://t.me/Bigestbingobot")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(f"⏳ Sending mass broadcast to {len(tg_ids)} users...")
+    success_count = 0
+    for tid in tg_ids:
+        try:
+            await context.bot.send_photo(chat_id=tid, photo=photo_url, caption=caption, parse_mode="HTML", reply_markup=reply_markup)
+            success_count += 1
+        except: pass
+    await update.message.reply_text(f"✅ Broadcast successfully delivered to {success_count} users!")
+
 # ==========================================
 # 7. RUN BOT
 # ==========================================
@@ -227,23 +257,19 @@ def run():
         
     app = Application.builder().token(token).post_init(lambda a: a.bot.delete_webhook(drop_pending_updates=True)).build()
     
-    # Add User Handlers
     app.add_handler(CommandHandler("start", start))
-    
-    # Add Admin Command Handlers
     app.add_handler(CommandHandler("pending", cmd_pending))
     app.add_handler(CommandHandler("approve", cmd_approve))
     app.add_handler(CommandHandler("reject", cmd_reject))
     app.add_handler(CommandHandler("forcewin", cmd_forcewin))
     app.add_handler(CommandHandler("stats", cmd_stats))
-    
-    # Add Text/Contact/Callback Handlers
+    app.add_handler(CommandHandler("broadcast", cmd_broadcast))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
     app.add_handler(CallbackQueryHandler(handle_buttons))
     
-    # Start the Broadcaster Background Job (Runs every 10 seconds)
     app.job_queue.run_repeating(broadcast_winners_task, interval=10, first=5)
+    app.job_queue.run_repeating(daily_promo_task, interval=86400, first=60)
     
     print("🚀 BIGEST BINGO BOT & BROADCASTER ARE RUNNING...")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
