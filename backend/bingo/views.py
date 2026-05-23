@@ -31,6 +31,8 @@ def get_card_data(request, num):
 
 def lobby_info(request, tg_id):
     user, _ = User.objects.get_or_create(username=f"tg_{tg_id}")
+    
+    # Exclude both ENDED and ANNOUNCED games from showing up as active lobby cards!
     rooms = GameRound.objects.exclude(status__in=["ENDED", "ANNOUNCED"]).order_by('bet_amount')
     
     room_data = []
@@ -61,6 +63,7 @@ def lobby_info(request, tg_id):
             'time_left': time_left
         })
         
+    # Only treat games as "active" if they are currently in the LOBBY or ACTIVE state!
     active_game = GameRound.objects.filter(players__has_key=str(tg_id), status__in=["LOBBY", "ACTIVE"]).last()
     
     return JsonResponse({
@@ -264,20 +267,21 @@ def check_win(request, game_id, tg_id):
             game.finished_at = timezone.now()
             game.save(update_fields=['status', 'winner_username', 'winner_prize', 'finished_at'])
             
+            # 🚀 WEBSOCKET BROADCAST INJECTION
             try:
                 channel_layer = get_channel_layer()
                 async_to_sync(channel_layer.group_send)(
                     f'game_{game.id}',
                     {'type': 'bingo_message', 'message': {'action': 'game_ended'}}
                 )
-            except: pass
+            except Exception as ws_e: 
+                print(f"WebSocket Broadcast Failed on Win: {ws_e}")
+                pass
 
             return JsonResponse({'status': 'WINNER', 'prize': float(prize), 'winning_card': winning_card})
             
         return JsonResponse({'status': 'NOT_YET'})
     except Exception as e: return JsonResponse({'status': 'error', 'msg': str(e)})
-
-# ... Keep the rest of your views (send_telegram_message, send_otp, verify_otp, submit_deposit, etc) exactly as they are. ...
 
 def send_telegram_message(chat_id, text):
     try: requests.post(f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage", json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"}, timeout=5)
@@ -322,9 +326,18 @@ def submit_deposit(request):
         try:
             user = User.objects.get(username=f"tg_{data.get('tg_id')}")
             Transaction.objects.create(agent=user, amount=data.get('amount'), note=f"TXID: {data.get('tx_id')}", type=f"DEPOSIT_{data.get('method').upper()}", status="pending")
-            send_telegram_message(settings.CHANNEL_ID, f"🟢 <b>NEW DEPOSIT</b>\nUser: {data.get('tg_id')}\nAmount: {data.get('amount')} ETB\nMethod: {data.get('method')}\nTXID: {data.get('tx_id')}")
+            
+            # FIX: Pull CHANNEL_ID directly from environment variables safely
+            channel_id = os.environ.get("CHANNEL_ID")
+            if channel_id:
+                send_telegram_message(channel_id, f"🟢 <b>NEW DEPOSIT</b>\nUser: {data.get('tg_id')}\nAmount: {data.get('amount')} ETB\nMethod: {data.get('method')}\nTXID: {data.get('tx_id')}")
+            
             return JsonResponse({"status": "success", "message": "Deposit submitted! Waiting for Admin approval."})
-        except: return JsonResponse({"status": "error", "message": "User not found."})
+        except User.DoesNotExist: 
+            return JsonResponse({"status": "error", "message": "User not found in database."})
+        except Exception as e:
+            print(f"Deposit Error: {e}")
+            return JsonResponse({"status": "error", "message": "Server error processing deposit."})
 
 @csrf_exempt
 def submit_withdrawal(request):
@@ -334,11 +347,21 @@ def submit_withdrawal(request):
             user = User.objects.get(username=f"tg_{tg_id}")
             if user.operational_credit < amount: return JsonResponse({"status": "error", "message": "Insufficient balance!"})
             if amount < 50: return JsonResponse({"status": "error", "message": "Minimum withdrawal is 50 ETB."})
+            
             user.operational_credit -= amount; user.save()
             Transaction.objects.create(agent=user, amount=amount, note=f"To: {data.get('account')}", type="WITHDRAWAL", status="pending")
-            send_telegram_message(settings.CHANNEL_ID, f"🔴 <b>NEW WITHDRAWAL</b>\nUser: {tg_id}\nAmount: {amount} ETB\nAccount: {data.get('account')}\nPhone: {user.phone_number}")
+            
+            # FIX: Pull CHANNEL_ID directly from environment variables safely
+            channel_id = os.environ.get("CHANNEL_ID")
+            if channel_id:
+                send_telegram_message(channel_id, f"🔴 <b>NEW WITHDRAWAL</b>\nUser: {tg_id}\nAmount: {amount} ETB\nAccount: {data.get('account')}\nPhone: {user.phone_number}")
+            
             return JsonResponse({"status": "success", "message": "Withdrawal requested successfully!"})
-        except: return JsonResponse({"status": "error", "message": "User not found."})
+        except User.DoesNotExist: 
+            return JsonResponse({"status": "error", "message": "User not found."})
+        except Exception as e:
+            print(f"Withdrawal Error: {e}")
+            return JsonResponse({"status": "error", "message": "Server error processing withdrawal."})
 
 @csrf_exempt
 def submit_transfer(request):
@@ -348,16 +371,26 @@ def submit_transfer(request):
             sender = User.objects.get(username=f"tg_{tg_id}")
             if sender.operational_credit < amount: return JsonResponse({"status": "error", "message": "Insufficient balance!"})
             if amount < 10: return JsonResponse({"status": "error", "message": "Minimum transfer is 10 ETB."})
+            
             receiver = User.objects.filter(phone_number=target_account).first() or User.objects.filter(username=f"tg_{target_account}").first()
             if not receiver: return JsonResponse({"status": "error", "message": "Receiver account not found!"})
             if sender == receiver: return JsonResponse({"status": "error", "message": "You cannot transfer to yourself!"})
+            
             sender.operational_credit -= amount; sender.save()
             receiver.operational_credit += amount; receiver.save()
+            
             Transaction.objects.create(agent=sender, amount=amount, note=f"Transfer to {target_account}", type="TRANSFER_OUT", status="approved")
             Transaction.objects.create(agent=receiver, amount=amount, note=f"Transfer from {tg_id}", type="TRANSFER_IN", status="approved")
-            if receiver.telegram_id: send_telegram_message(receiver.telegram_id, f"💸 <b>Transfer Received!</b>\nYou received {amount} ETB from user {tg_id}.")
+            
+            if receiver.telegram_id: 
+                send_telegram_message(receiver.telegram_id, f"💸 <b>Transfer Received!</b>\nYou received {amount} ETB from user {tg_id}.")
+            
             return JsonResponse({"status": "success", "message": f"Successfully transferred {amount} ETB!"})
-        except: return JsonResponse({"status": "error", "message": "User not found."})
+        except User.DoesNotExist: 
+            return JsonResponse({"status": "error", "message": "User not found."})
+        except Exception as e:
+            print(f"Transfer Error: {e}")
+            return JsonResponse({"status": "error", "message": "Server error processing transfer."})
 
 @csrf_exempt
 def change_password(request):
