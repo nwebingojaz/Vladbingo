@@ -15,9 +15,15 @@ class User(AbstractUser):
     otp_code = models.CharField(max_length=6, null=True, blank=True)
     otp_expiry = models.DateTimeField(null=True, blank=True)
 
+    def __str__(self):
+        return f"{self.real_name} (@{self.username.replace('tg_', '')})"
+
 class PermanentCard(models.Model):
     card_number = models.PositiveSmallIntegerField(unique=True)
     board = models.JSONField()
+
+    def __str__(self):
+        return f"Card #{self.card_number}"
 
 class GameRound(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
@@ -29,6 +35,9 @@ class GameRound(models.Model):
     winner_prize = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     finished_at = models.DateTimeField(null=True, blank=True)
 
+    def __str__(self):
+        return f"Room {int(self.bet_amount)} ETB - {self.status}"
+
 class Transaction(models.Model):
     agent = models.ForeignKey("User", on_delete=models.CASCADE)
     timestamp = models.DateTimeField(default=timezone.now)
@@ -36,6 +45,9 @@ class Transaction(models.Model):
     type = models.CharField(max_length=20, default="DEPOSIT")
     note = models.TextField(default="")
     status = models.CharField(max_length=20, default="pending") # pending, approved, rejected
+
+    def __str__(self):
+        return f"{self.type} - {self.amount} ETB ({self.status})"
 
 class GameControl(models.Model):
     forced_winner_card_number = models.IntegerField(null=True, blank=True)
@@ -47,6 +59,9 @@ class GameControl(models.Model):
             self.daily_forced_wins = 0
             self.last_reset = timezone.now().date()
         super().save(*args, **kwargs)
+
+    def __str__(self):
+        return "Master Game Control Settings"
 
 # ==========================================
 # AUTOMATIC BALANCE HANDLER (DJANGO SIGNAL)
