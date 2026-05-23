@@ -82,7 +82,13 @@ def get_and_mark_finished_rooms():
 
 @sync_to_async
 def get_all_user_tg_ids():
-    return [u.username.replace('tg_', '') for u in User.objects.filter(username__startswith='tg_')]
+    # FIX: Must return as INTEGERS, not strings, or Telegram rejects them!
+    ids = []
+    for u in User.objects.filter(username__startswith='tg_'):
+        try:
+            ids.append(int(u.username.replace('tg_', '')))
+        except: pass
+    return ids
 
 # ==========================================
 # 4. BACKGROUND JOBS (Broadcaster & Promo)
@@ -127,11 +133,10 @@ async def send_main_menu(update: Update, user):
     )
 
     if is_admin(user.username.replace('tg_', '')):
-        caption += "\n\n👑 *Admin Commands:*\n/pending - View pending TXs\n/approve [id] - Approve TX\n/reject [id] - Reject TX\n/forcewin [card_num] - Force a card\n/stats - View Casino Stats\n/broadcast - Mass DM to all players"
+        caption += "\n\n👑 *Admin Commands:*\n/pending - View pending TXs\n/approve [id] - Approve TX\n/reject [id] - Reject TX\n/forcewin [card_num] - Force a card\n/stats - View Casino Stats\n/broadcast - Reply to any msg/photo to Mass DM"
     
     base_url = "https://vladbingo-dmzg.onrender.com/api/live/"
     
-    # FIX: Using query parameters (?tab=) instead of hashes (#) to guarantee Telegram opens them properly!
     keyboard = [
         [InlineKeyboardButton("🎮 ጌም ይጫወቱ (Play Games)", web_app=WebAppInfo(url=base_url))],
         [InlineKeyboardButton("💰 ያስገቡ (Deposit)", web_app=WebAppInfo(url=base_url + "?tab=deposit")), InlineKeyboardButton("💸 ያውጡ (Withdraw)", web_app=WebAppInfo(url=base_url + "?tab=withdraw"))],
@@ -232,18 +237,27 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id): return
+    
+    # NEW DYNAMIC BROADCAST SYSTEM
+    # Admin MUST reply to a message with /broadcast
+    if not update.message.reply_to_message:
+        await update.message.reply_text("⚠️ You must REPLY to a message, photo, or video with /broadcast to send it to everyone.")
+        return
+        
+    target_message = update.message.reply_to_message
     tg_ids = await get_all_user_tg_ids()
-    photo_url = "https://i.ibb.co/3m20B6k/bingo-money.jpg" 
-    caption = "🎰 <b>BIGEST BINGO BOT</b> 🎰\n\nበየቀኑ በሺዎች የሚቆጠሩ ብሮችን ያሸንፉ!\nአሁኑኑ ይጫወቱ እና እድልዎን ይሞክሩ!"
-    keyboard = [[InlineKeyboardButton("🎮 አሁኑኑ ይጫወቱ (PLAY NOW)", url="https://t.me/Bigestbingobot")]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(f"⏳ Sending mass broadcast to {len(tg_ids)} users...")
+    
+    await update.message.reply_text(f"⏳ Copying your message and sending to {len(tg_ids)} users...")
+    
     success_count = 0
     for tid in tg_ids:
         try:
-            await context.bot.send_photo(chat_id=tid, photo=photo_url, caption=caption, parse_mode="HTML", reply_markup=reply_markup)
+            # copy_message is perfect because it perfectly clones text, photos, buttons, or videos!
+            await context.bot.copy_message(chat_id=tid, from_chat_id=target_message.chat_id, message_id=target_message.message_id)
             success_count += 1
-        except: pass
+        except Exception as e: 
+            print(f"Failed to send to {tid}: {e}")
+        
     await update.message.reply_text(f"✅ Broadcast successfully delivered to {success_count} users!")
 
 # ==========================================
