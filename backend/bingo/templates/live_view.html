@@ -141,7 +141,6 @@
 
         <div id="play-tracker" class="mb-2 p-1 bg-slate-900/80 rounded-xl border border-blue-900/50 hidden"></div>
         <div id="multi-card-container" class="grid grid-cols-2 gap-1 mb-3">
-            <!-- FIX: Added Loading Skeletons -->
             <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-1"><div id="play-card-1" class="w-full flex items-center justify-center h-full"><span class="text-slate-600 font-black text-[10px] animate-pulse">LOADING CARDS...</span></div></div>
             <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-2"><div id="play-card-2" class="w-full flex items-center justify-center h-full"><span class="text-slate-600 font-black text-[10px] animate-pulse">LOADING CARDS...</span></div></div>
             <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-3"><div id="play-card-3" class="w-full flex items-center justify-center h-full"><span class="text-slate-600 font-black text-[10px] animate-pulse">LOADING CARDS...</span></div></div>
@@ -267,7 +266,8 @@
             </div>
             <div id="win-name-display" class="text-4xl font-black text-white uppercase tracking-widest mb-1 drop-shadow-md">PLAYER</div>
             <div class="text-gray-400 text-[10px] font-bold tracking-widest mb-8 uppercase">TICKET #<span id="win-ticket-sub"></span> • <span id="win-prize-display">0</span> ETB</div>
-            <button onclick="exitToLobby()" class="border border-gray-600 text-gray-300 bg-slate-900/50 font-bold rounded-full px-8 py-3 hover:bg-slate-800 transition-colors uppercase tracking-widest active:scale-95 w-full max-w-[200px] text-xs">BACK TO LOBBY</button>
+            
+            <button id="auto-exit-btn" onclick="exitToLobby()" class="border border-gray-600 text-gray-300 bg-slate-900/50 font-bold rounded-full px-8 py-3 hover:bg-slate-800 transition-colors uppercase tracking-widest active:scale-95 w-full max-w-[200px] text-xs">BACK TO LOBBY (5s)</button>
         </div>
     </div>
     
@@ -300,6 +300,14 @@
         let pollingInterval = null;
         let refreshRunning = false; 
 
+        // 🔊 AUDIO ENGINE
+        function playSound(filename) {
+            try {
+                let audio = new Audio('/static/audio/' + filename);
+                audio.play().catch(e => console.log("Audio play blocked by browser:", e));
+            } catch(e) { console.error("Audio error:", e); }
+        }
+
         function exitToLobby() {
             document.getElementById('m-win').style.display = 'none';
             sessionStorage.setItem('currentScreen', 'v-lobby');
@@ -320,6 +328,10 @@
             try {
                 const d = await safeFetch(`/api/game-info/${gameId}/${uid}/`);
                 if (d.status === 'ENDED' || d.status === 'ANNOUNCED') {
+                    
+                    // 🔊 Play Winner Sound!
+                    playSound('good.mp3');
+
                     document.getElementById('win-name-display').innerText = d.winner ? d.winner.replace('tg_', '').toUpperCase() : "PLAYER";
                     document.getElementById('win-prize-display').innerText = d.prize.toFixed(0);
                     document.getElementById('win-card-num-display').innerText = d.winning_card || "---";
@@ -349,18 +361,36 @@
                     myActiveGameId = null;
                     if(pollingInterval) clearInterval(pollingInterval);
                     disconnectWebSocket();
+
+                    let exitCountdown = 5;
+                    const exitBtn = document.getElementById('auto-exit-btn');
+                    if(exitBtn) exitBtn.innerText = `BACK TO LOBBY (${exitCountdown}s)`;
+                    const exitTimer = setInterval(() => {
+                        exitCountdown--;
+                        if(exitBtn) exitBtn.innerText = `BACK TO LOBBY (${exitCountdown}s)`;
+                        if(exitCountdown <= 0) {
+                            clearInterval(exitTimer);
+                            exitToLobby();
+                        }
+                    }, 1000);
+
                 }
             } catch(e) { console.error("Winner modal fetch failed", e); }
         }
 
         function handleGameUpdate(data) {
             if (data.action === 'new_ball' && data.ball) {
+                
+                // 🔊 Play the called ball sound!
+                let letter = "B"; if(data.ball>15) letter="I"; if(data.ball>30) letter="N"; if(data.ball>45) letter="G"; if(data.ball>60) letter="O";
+                playSound(letter + data.ball + '.mp3');
+
                 document.getElementById('latest-ball').innerText = data.ball;
                 document.getElementById('called-count-badge').innerText = data.called_count;
                 const badge = document.getElementById('play-status-badge');
                 if(badge) { badge.innerText = "እየተጠራ ነው: "+data.called_count+"/75"; badge.className = "text-[8px] bg-red-500/20 border border-red-500 text-red-500 px-2 py-0.5 rounded-full font-black animate-pulse"; }
                 if (!globalCalledNumbers.includes(data.ball) && typeof data.ball === 'number') globalCalledNumbers.push(data.ball);
-                let letter = "B"; if(data.ball>15) letter="I"; if(data.ball>30) letter="N"; if(data.ball>45) letter="G"; if(data.ball>60) letter="O";
+                
                 let ballHtml = `<div class="bg-slate-900 rounded-full px-2 py-0.5 text-[8px] font-bold text-slate-300 border border-slate-700 flex items-center gap-0.5"><span class="text-yellow-500">${letter}</span>${data.ball}</div>`;
                 const recent = document.getElementById('recent-balls');
                 if(recent && !recent.innerHTML.includes(`>${data.ball}</div>`)) { recent.innerHTML = ballHtml + recent.innerHTML; if(recent.children.length>5) recent.removeChild(recent.lastChild); }
@@ -404,9 +434,10 @@
         function buildTracker(containerId){ const cont=document.getElementById(containerId); if(!cont) return; cont.innerHTML=''; ['B','I','N','G','O'].forEach((letter,idx)=>{ let row=document.createElement('div'); row.className='tracker-row'; let label=document.createElement('div'); label.className='tracker-letter'; label.innerText=letter; row.appendChild(label); for(let i=1;i<=15;i++){ let num=idx*15+i; let dot=document.createElement('div'); dot.className='tracker-dot'; dot.id=`${containerId}-dot-${num}`; dot.innerText=num; row.appendChild(dot); } cont.appendChild(row); }); }
 
         window.addEventListener('DOMContentLoaded', (event) => {
-            const hash = window.location.hash.substring(1);
-            if (['deposit', 'withdraw', 'transfer'].includes(hash)) { openWallet(hash); history.replaceState(null, null, ' '); } 
-            else if (hash === 'history') { openHistory(); history.replaceState(null, null, ' '); }
+            const urlParams = new URLSearchParams(window.location.search);
+            const tab = urlParams.get('tab') || window.location.hash.substring(1);
+            if (['deposit', 'withdraw', 'transfer'].includes(tab)) { openWallet(tab); window.history.replaceState({}, document.title, window.location.pathname); } 
+            else if (tab === 'history') { openHistory(); window.history.replaceState({}, document.title, window.location.pathname); }
         });
 
         function toggleMenu() { const sb = document.getElementById('sidebar'), ov = document.getElementById('sidebar-overlay'); if(sb.classList.contains('open')) { sb.classList.remove('open'); ov.style.display='none'; } else { sb.classList.add('open'); ov.style.display='block'; } }
@@ -687,7 +718,14 @@
                 lbl.innerText = "ጨዋታው ላይ ነው:"; tEl.innerText = "(PLAYING)"; tEl.classList.add('text-red-400'); 
             } else { 
                 lbl.innerText = "ጨዋታው ሊጀምር ነው: "; tEl.classList.remove('text-red-400'); 
-                if(currentRoomTime > 0) currentRoomTime--; 
+                if(currentRoomTime > 0) {
+                    currentRoomTime--; 
+                    
+                    // 🔊 Play Game Start Sound exactly at 00:00!
+                    if (currentRoomTime === 0 && sessionStorage.getItem('currentScreen') === 'v-selector') {
+                        playSound('game_start.mp3');
+                    }
+                }
                 let m = Math.floor(currentRoomTime / 60), s = currentRoomTime % 60; 
                 tEl.innerText = m + ":" + (s < 10 ? "0" + s : s); 
             } 
