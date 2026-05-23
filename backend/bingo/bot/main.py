@@ -96,10 +96,11 @@ async def broadcast_winners_task(context: ContextTypes.DEFAULT_TYPE):
     finished_rooms = await get_and_mark_finished_rooms()
     
     for room in finished_rooms:
-        msg = (f"🏆 <b>Game Finished!</b>\n\n"
-               f"💰 Bet: {room.bet_amount} ETB\n"
+        # FIX: Added Game ID to the announcement!
+        msg = (f"🏆 <b>Game #{room.id} Finished!</b>\n\n"
+               f"💰 Bet: {float(room.bet_amount):.2f} ETB\n"
                f"👤 Winner: {room.winner_username.replace('tg_','')}\n"
-               f"🎁 Prize: {room.winner_prize} ETB\n\n"
+               f"🎁 Prize: {float(room.winner_prize):.2f} ETB\n\n"
                f"Play now: https://t.me/Bigestbingobot")
         try: await context.bot.send_message(chat_id=channel_id, text=msg, parse_mode="HTML")
         except: pass
@@ -121,7 +122,6 @@ async def daily_promo_task(context: ContextTypes.DEFAULT_TYPE):
 async def send_main_menu(update: Update, user):
     photo_url = "https://i.ibb.co/3m20B6k/bingo-money.jpg"
     
-    # FIX: Switched to HTML to prevent Markdown crashes!
     caption = (
         f"🎰 <b>BIGEST BINGO BOT</b> 🎰\n\n"
         f"እንኳን በደህና መጡ፣ <b>{user.real_name}</b>! (Welcome)\n"
