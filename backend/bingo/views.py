@@ -97,7 +97,7 @@ def get_history(request, tg_id):
 @csrf_exempt
 @transaction.atomic
 def join_room(request, tg_id, bet, card_num):
-    # NOW ACTS AS AN INSTANT BUY/REFUND TOGGLE API!
+    # INSTANT BUY/REFUND TOGGLE API
     try:
         user = User.objects.select_for_update().get(username=f"tg_{tg_id}")
         game = GameRound.objects.select_for_update().filter(status="LOBBY", bet_amount=bet).first()
@@ -283,9 +283,27 @@ def check_win(request, game_id, tg_id):
         return JsonResponse({'status': 'NOT_YET'})
     except Exception as e: return JsonResponse({'status': 'error', 'msg': str(e)})
 
+
+# ==========================================
+# TELEGRAM NOTIFICATION SYSTEM
+# ==========================================
 def send_telegram_message(chat_id, text):
-    try: requests.post(f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage", json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"}, timeout=5)
-    except: pass
+    try: 
+        bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+        if not bot_token:
+            print("TELEGRAM ERROR: No Bot Token found in environment variables!")
+            return
+            
+        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+        payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+        
+        response = requests.post(url, json=payload, timeout=5)
+        
+        if response.status_code != 200:
+            print(f"TELEGRAM API ERROR: {response.text}")
+            
+    except Exception as e: 
+        print(f"TELEGRAM CRASH: {e}")
 
 def send_gateway_otp(phone_number, otp_code):
     gateway_token = os.environ.get("GATEWAY_TOKEN") 
