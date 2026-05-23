@@ -31,12 +31,10 @@ def get_card_data(request, num):
 
 def lobby_info(request, tg_id):
     user, _ = User.objects.get_or_create(username=f"tg_{tg_id}")
-    
-    # Exclude both ENDED and ANNOUNCED games from showing up as active lobby cards!
     rooms = GameRound.objects.exclude(status__in=["ENDED", "ANNOUNCED"]).order_by('bet_amount')
     
     room_data = []
-    my_lobby_cards = {} # Tracks which cards the user currently owns in the lobbies
+    my_lobby_cards = {} 
     now = timezone.now()
     
     for r in rooms:
@@ -49,7 +47,6 @@ def lobby_info(request, tg_id):
             elapsed = (now - r.created_at).total_seconds()
             time_left = max(0, 60 - int(elapsed))
             
-            # Fetch user's currently purchased cards for this tier
             c = players_dict.get(str(tg_id), [])
             if isinstance(c, int): c = [c]
             my_lobby_cards[str(int(r.bet_amount))] = c
@@ -63,7 +60,6 @@ def lobby_info(request, tg_id):
             'time_left': time_left
         })
         
-    # Only treat games as "active" if they are currently in the LOBBY or ACTIVE state!
     active_game = GameRound.objects.filter(players__has_key=str(tg_id), status__in=["LOBBY", "ACTIVE"]).last()
     
     return JsonResponse({
@@ -97,7 +93,6 @@ def get_history(request, tg_id):
 @csrf_exempt
 @transaction.atomic
 def join_room(request, tg_id, bet, card_num):
-    # INSTANT BUY/REFUND TOGGLE API
     try:
         user = User.objects.select_for_update().get(username=f"tg_{tg_id}")
         game = GameRound.objects.select_for_update().filter(status="LOBBY", bet_amount=bet).first()
@@ -112,7 +107,6 @@ def join_room(request, tg_id, bet, card_num):
         
         action = ""
         if c_num in user_cards:
-            # INSTANT REFUND
             user_cards.remove(c_num)
             if not user_cards:
                 del players[str(tg_id)]
@@ -122,7 +116,6 @@ def join_room(request, tg_id, bet, card_num):
             user.operational_credit += Decimal(str(bet))
             action = 'removed'
         else:
-            # INSTANT BUY
             if len(user_cards) >= 4:
                 return JsonResponse({'status': 'error', 'error': 'Max 4 cards allowed!'})
             if user.operational_credit < Decimal(str(bet)):
@@ -137,7 +130,6 @@ def join_room(request, tg_id, bet, card_num):
         game.save(update_fields=['players'])
         user.save(update_fields=['operational_credit'])
         
-        # Recalculate live prize pool
         total_cards = sum(len(c) if isinstance(c, list) else 1 for c in players.values())
         prize = float(Decimal(total_cards) * game.bet_amount * Decimal("0.73"))
         
@@ -267,22 +259,18 @@ def check_win(request, game_id, tg_id):
             game.finished_at = timezone.now()
             game.save(update_fields=['status', 'winner_username', 'winner_prize', 'finished_at'])
             
-            # 🚀 WEBSOCKET BROADCAST INJECTION
             try:
                 channel_layer = get_channel_layer()
                 async_to_sync(channel_layer.group_send)(
                     f'game_{game.id}',
                     {'type': 'bingo_message', 'message': {'action': 'game_ended'}}
                 )
-            except Exception as ws_e: 
-                print(f"WebSocket Broadcast Failed on Win: {ws_e}")
-                pass
+            except: pass
 
             return JsonResponse({'status': 'WINNER', 'prize': float(prize), 'winning_card': winning_card})
             
         return JsonResponse({'status': 'NOT_YET'})
     except Exception as e: return JsonResponse({'status': 'error', 'msg': str(e)})
-
 
 # ==========================================
 # TELEGRAM NOTIFICATION SYSTEM
@@ -292,12 +280,14 @@ def send_telegram_message(chat_id, text):
         # ==========================================
         # ⚠️ PASTE YOUR EXACT BOT TOKEN HERE:
         # ==========================================
-        bot_token = "YOUR_ACTUAL_BOT_TOKEN_HERE"
+        bot_token = "8212617770:AAEGMXyirnTEjOJVG_t7xINkmF7DAhOP8WM"
         
         url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
         payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
         
-        requests.post(url, json=payload, timeout=5)
+        response = requests.post(url, json=payload, timeout=5)
+        if response.status_code != 200:
+            print(f"TELEGRAM API ERROR: {response.text}")
             
     except Exception as e: 
         print(f"TELEGRAM CRASH: {e}")
@@ -351,7 +341,6 @@ def submit_deposit(request):
 
             user, _ = User.objects.get_or_create(username=f"tg_{tg_id}")
             
-            # Capture the transaction object so we can get its ID!
             tx = Transaction.objects.create(
                 agent=user, 
                 amount=amount, 
@@ -361,8 +350,7 @@ def submit_deposit(request):
             )
             
             admin_group_id = "-5139316806"
-            # Included the exact ID and a fast approve command!
-            send_telegram_message(admin_group_id, f"🟢 <b>NEW DEPOSIT</b>\n<b>ID: {tx.id}</b>\nUser: {tg_id}\nAmount: {amount} ETB\nMethod: {method}\nTXID: {tx_id}\n\n<i>To approve, type:</i>\n<code>/approve {tx.id}</code>")
+            send_telegram_message(admin_group_id, f"🟢 <b>NEW DEPOSIT</b>\n<b>ID: {tx.id}</b>\nUser: <code>{tg_id}</code>\nAmount: {amount} ETB\nMethod: {method}\nTXID: {tx_id}\n\n<i>To approve, tap:</i>\n<code>/approve {tx.id}</code>")
             
             return JsonResponse({"status": "success", "message": "Deposit submitted! Waiting for Admin approval."})
             
@@ -393,7 +381,6 @@ def submit_withdrawal(request):
             user.operational_credit -= amount
             user.save()
             
-            # Capture the transaction object!
             tx = Transaction.objects.create(
                 agent=user, 
                 amount=amount, 
@@ -403,8 +390,7 @@ def submit_withdrawal(request):
             )
             
             admin_group_id = "-5139316806"
-            # Included the exact ID and a fast approve command!
-            send_telegram_message(admin_group_id, f"🔴 <b>NEW WITHDRAWAL</b>\n<b>ID: {tx.id}</b>\nUser: {tg_id}\nAmount: {amount} ETB\nAccount: {data.get('account')}\nPhone: {user.phone_number}\n\n<i>To approve, type:</i>\n<code>/approve {tx.id}</code>")
+            send_telegram_message(admin_group_id, f"🔴 <b>NEW WITHDRAWAL</b>\n<b>ID: {tx.id}</b>\nUser: <code>{tg_id}</code>\nAmount: {amount} ETB\nAccount: <code>{data.get('account')}</code>\nPhone: {user.phone_number}\n\n<i>To approve, tap:</i>\n<code>/approve {tx.id}</code>")
             
             return JsonResponse({"status": "success", "message": "Withdrawal requested successfully!"})
             
@@ -449,42 +435,10 @@ def submit_transfer(request):
             Transaction.objects.create(agent=receiver, amount=amount, note=f"Transfer from {tg_id}", type="TRANSFER_IN", status="approved")
             
             admin_group_id = "-5139316806"
-            send_telegram_message(admin_group_id, f"💸 <b>TRANSFER PROCESSED</b>\n<b>ID: {tx_out.id}</b>\nFrom: {tg_id}\nTo: {target_account}\nAmount: {amount} ETB")
+            send_telegram_message(admin_group_id, f"💸 <b>TRANSFER PROCESSED</b>\n<b>ID: {tx_out.id}</b>\nFrom: <code>{tg_id}</code>\nTo: <code>{target_account}</code>\nAmount: {amount} ETB")
             
             if receiver.telegram_id: 
                 send_telegram_message(receiver.telegram_id, f"💸 <b>Transfer Received!</b>\nYou received {amount} ETB from user {tg_id}.")
             
             return JsonResponse({"status": "success", "message": f"Successfully transferred {amount} ETB!"})
-            
-        except Exception as e:
-            print(f"Transfer Error: {e}")
-            return JsonResponse({"status": "error", "message": f"Server error: {str(e)}"})
-
-@csrf_exempt
-def change_password(request):
-    if request.method == "POST":
-        data = json.loads(request.body)
-        try:
-            user = User.objects.get(username=f"tg_{data.get('tg_id')}")
-            user.set_password(data.get('password'))
-            user.save()
-            return JsonResponse({"status": "success", "message": "Security PIN updated successfully!"})
-        except: return JsonResponse({"status": "error", "message": "User not found."})
-
-@csrf_exempt
-def redeem_promo(request):
-    if request.method == "POST":
-        data = json.loads(request.body); tg_id = data.get('tg_id'); promo_code = str(data.get('promo_code', '')).strip()
-        try:
-            user = User.objects.get(username=f"tg_{tg_id}")
-            if getattr(user, 'used_promo_code', False): return JsonResponse({"status": "error", "message": "You have already used a promo code!"})
-            if promo_code == str(tg_id): return JsonResponse({"status": "error", "message": "You cannot use your own code!"})
-            friend = User.objects.filter(username=f"tg_{promo_code}").first()
-            if not friend: return JsonResponse({"status": "error", "message": "Invalid Promo Code!"})
-            user.operational_credit += 10; user.used_promo_code = True; user.save()
-            friend.operational_credit += 10; friend.save()
-            Transaction.objects.create(agent=user, amount=10, note=f"Used promo code: {promo_code}", type="BONUS", status="approved")
-            Transaction.objects.create(agent=friend, amount=10, note=f"Referral bonus from: {tg_id}", type="REFERRAL_BONUS", status="approved")
-            if friend.telegram_id: send_telegram_message(friend.telegram_id, f"🎉 <b>Referral Bonus!</b>\nA friend just used your promo code! <b>10 ETB</b> has been added to your balance.")
-            return JsonResponse({"status": "success", "message": "🎉 Success! 10 ETB added to your balance."})
-        except: return JsonResponse({"status": "error", "message": "User not found."})
+     
