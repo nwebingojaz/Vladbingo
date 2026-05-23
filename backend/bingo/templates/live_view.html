@@ -265,8 +265,6 @@
             </div>
             <div id="win-name-display" class="text-4xl font-black text-white uppercase tracking-widest mb-1 drop-shadow-md">PLAYER</div>
             <div class="text-gray-400 text-[10px] font-bold tracking-widest mb-8 uppercase">TICKET #<span id="win-ticket-sub"></span> • <span id="win-prize-display">0</span> ETB</div>
-            
-            <!-- AUTO EXIT BUTTON -->
             <button id="auto-exit-btn" onclick="exitToLobby()" class="border border-gray-600 text-gray-300 bg-slate-900/50 font-bold rounded-full px-8 py-3 hover:bg-slate-800 transition-colors uppercase tracking-widest active:scale-95 w-full max-w-[200px] text-xs">BACK TO LOBBY (5s)</button>
         </div>
     </div>
@@ -351,7 +349,6 @@
                     if(pollingInterval) clearInterval(pollingInterval);
                     disconnectWebSocket();
 
-                    // 5-SECOND AUTO EXIT LOGIC
                     let exitCountdown = 5;
                     const exitBtn = document.getElementById('auto-exit-btn');
                     if(exitBtn) exitBtn.innerText = `BACK TO LOBBY (${exitCountdown}s)`;
@@ -419,9 +416,17 @@
         function buildTracker(containerId){ const cont=document.getElementById(containerId); if(!cont) return; cont.innerHTML=''; ['B','I','N','G','O'].forEach((letter,idx)=>{ let row=document.createElement('div'); row.className='tracker-row'; let label=document.createElement('div'); label.className='tracker-letter'; label.innerText=letter; row.appendChild(label); for(let i=1;i<=15;i++){ let num=idx*15+i; let dot=document.createElement('div'); dot.className='tracker-dot'; dot.id=`${containerId}-dot-${num}`; dot.innerText=num; row.appendChild(dot); } cont.appendChild(row); }); }
 
         window.addEventListener('DOMContentLoaded', (event) => {
-            const hash = window.location.hash.substring(1);
-            if (['deposit', 'withdraw', 'transfer'].includes(hash)) { openWallet(hash); history.replaceState(null, null, ' '); } 
-            else if (hash === 'history') { openHistory(); history.replaceState(null, null, ' '); }
+            const urlParams = new URLSearchParams(window.location.search);
+            const tab = urlParams.get('tab') || window.location.hash.substring(1);
+            
+            if (['deposit', 'withdraw', 'transfer'].includes(tab)) { 
+                openWallet(tab); 
+                window.history.replaceState({}, document.title, window.location.pathname); 
+            } 
+            else if (tab === 'history') { 
+                openHistory(); 
+                window.history.replaceState({}, document.title, window.location.pathname); 
+            }
         });
 
         function toggleMenu() { const sb = document.getElementById('sidebar'), ov = document.getElementById('sidebar-overlay'); if(sb.classList.contains('open')) { sb.classList.remove('open'); ov.style.display='none'; } else { sb.classList.add('open'); ov.style.display='block'; } }
