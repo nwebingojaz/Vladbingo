@@ -82,11 +82,9 @@ def get_and_mark_finished_rooms():
 
 @sync_to_async
 def get_all_user_tg_ids():
-    # FIX: Must return as INTEGERS, not strings, or Telegram rejects them!
     ids = []
     for u in User.objects.filter(username__startswith='tg_'):
-        try:
-            ids.append(int(u.username.replace('tg_', '')))
+        try: ids.append(int(u.username.replace('tg_', '')))
         except: pass
     return ids
 
@@ -98,14 +96,13 @@ async def broadcast_winners_task(context: ContextTypes.DEFAULT_TYPE):
     finished_rooms = await get_and_mark_finished_rooms()
     
     for room in finished_rooms:
-        msg = (f"🏆 *Game Finished!*\n\n"
+        msg = (f"🏆 <b>Game Finished!</b>\n\n"
                f"💰 Bet: {room.bet_amount} ETB\n"
                f"👤 Winner: {room.winner_username.replace('tg_','')}\n"
                f"🎁 Prize: {room.winner_prize} ETB\n\n"
                f"Play now: https://t.me/Bigestbingobot")
-        try:
-            await context.bot.send_message(chat_id=channel_id, text=msg, parse_mode="Markdown")
-        except Exception as e: pass
+        try: await context.bot.send_message(chat_id=channel_id, text=msg, parse_mode="HTML")
+        except: pass
 
 async def daily_promo_task(context: ContextTypes.DEFAULT_TYPE):
     channel_id = os.environ.get("CHANNEL_ID", "@bigestbingo")
@@ -114,8 +111,7 @@ async def daily_promo_task(context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("🎮 አሁኑኑ ይጫወቱ (PLAY NOW)", url="https://t.me/Bigestbingobot")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    try:
-        await context.bot.send_photo(chat_id=channel_id, photo=photo_url, caption=caption, parse_mode="HTML", reply_markup=reply_markup)
+    try: await context.bot.send_photo(chat_id=channel_id, photo=photo_url, caption=caption, parse_mode="HTML", reply_markup=reply_markup)
     except Exception as e: print(f"Daily promo failed: {e}")
 
 
@@ -125,15 +121,16 @@ async def daily_promo_task(context: ContextTypes.DEFAULT_TYPE):
 async def send_main_menu(update: Update, user):
     photo_url = "https://i.ibb.co/3m20B6k/bingo-money.jpg"
     
+    # FIX: Switched to HTML to prevent Markdown crashes!
     caption = (
-        f"🎰 **BIGEST BINGO BOT** 🎰\n\n"
-        f"እንኳን በደህና መጡ፣ **{user.real_name}**! (Welcome)\n"
-        f"💰 **ቀሪ ሂሳብ (Balance):** {user.operational_credit} ETB\n\n"
-        f"ከታች ካሉት አማራጮች ውስጥ ይምረጡ:\n_(Choose an option below)_"
+        f"🎰 <b>BIGEST BINGO BOT</b> 🎰\n\n"
+        f"እንኳን በደህና መጡ፣ <b>{user.real_name}</b>! (Welcome)\n"
+        f"💰 <b>ቀሪ ሂሳብ (Balance):</b> {user.operational_credit} ETB\n\n"
+        f"ከታች ካሉት አማራጮች ውስጥ ይምረጡ:\n<i>(Choose an option below)</i>"
     )
 
     if is_admin(user.username.replace('tg_', '')):
-        caption += "\n\n👑 *Admin Commands:*\n/pending - View pending TXs\n/approve [id] - Approve TX\n/reject [id] - Reject TX\n/forcewin [card_num] - Force a card\n/stats - View Casino Stats\n/broadcast - Reply to any msg/photo to Mass DM"
+        caption += "\n\n👑 <b>Admin Commands:</b>\n/pending - View pending TXs\n/approve [id] - Approve TX\n/reject [id] - Reject TX\n/forcewin [card_num] - Force a card\n/stats - View Casino Stats\n/broadcast - Reply to any msg to Mass DM"
     
     base_url = "https://vladbingo-dmzg.onrender.com/api/live/"
     
@@ -149,9 +146,10 @@ async def send_main_menu(update: Update, user):
 
     if update.message:
         try:
-            await update.message.reply_photo(photo=photo_url, caption=caption, reply_markup=reply_markup, parse_mode='Markdown')
-        except:
-            await update.message.reply_text(text=caption, reply_markup=reply_markup, parse_mode='Markdown')
+            await update.message.reply_photo(photo=photo_url, caption=caption, reply_markup=reply_markup, parse_mode='HTML')
+        except Exception as e:
+            print(f"Photo send failed: {e}. Falling back to text.")
+            await update.message.reply_text(text=caption, reply_markup=reply_markup, parse_mode='HTML')
 
 async def start(update: Update, context):
     tg_id = update.effective_user.id
@@ -159,7 +157,7 @@ async def start(update: Update, context):
     
     if not user.real_name:
         await sync_to_async(db_op)(tg_id, "state", "REG_NAME")
-        return await update.message.reply_text("👋 ወደ **BIGEST BINGO BOT** እንኳን በደህና መጡ!\n\nእባክዎ ትክክለኛ ሙሉ ስምዎን ያስገቡ (Please enter your Full Name):", parse_mode='Markdown')
+        return await update.message.reply_text("👋 ወደ <b>BIGEST BINGO BOT</b> እንኳን በደህና መጡ!\n\nእባክዎ ትክክለኛ ሙሉ ስምዎን ያስገቡ (Please enter your Full Name):", parse_mode='HTML')
         
     if not user.phone_number:
         btn = [[KeyboardButton("📲 ስልክ ቁጥር ያጋሩ (Share Phone)", request_contact=True)]]
@@ -237,26 +235,20 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id): return
-    
-    # NEW DYNAMIC BROADCAST SYSTEM
-    # Admin MUST reply to a message with /broadcast
     if not update.message.reply_to_message:
         await update.message.reply_text("⚠️ You must REPLY to a message, photo, or video with /broadcast to send it to everyone.")
         return
         
     target_message = update.message.reply_to_message
     tg_ids = await get_all_user_tg_ids()
-    
     await update.message.reply_text(f"⏳ Copying your message and sending to {len(tg_ids)} users...")
     
     success_count = 0
     for tid in tg_ids:
         try:
-            # copy_message is perfect because it perfectly clones text, photos, buttons, or videos!
             await context.bot.copy_message(chat_id=tid, from_chat_id=target_message.chat_id, message_id=target_message.message_id)
             success_count += 1
-        except Exception as e: 
-            print(f"Failed to send to {tid}: {e}")
+        except Exception as e: pass
         
     await update.message.reply_text(f"✅ Broadcast successfully delivered to {success_count} users!")
 
