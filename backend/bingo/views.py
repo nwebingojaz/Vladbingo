@@ -289,18 +289,15 @@ def check_win(request, game_id, tg_id):
 # ==========================================
 def send_telegram_message(chat_id, text):
     try: 
-        bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
-        if not bot_token:
-            print("TELEGRAM ERROR: No Bot Token found in environment variables!")
-            return
-            
+        # ==========================================
+        # ⚠️ PASTE YOUR EXACT BOT TOKEN HERE:
+        # ==========================================
+        bot_token = "8561294016:AAHxzmWBOKFRtNldjIG9Zpp0D5DoxXza7Mo"
+        
         url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
         payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
         
-        response = requests.post(url, json=payload, timeout=5)
-        
-        if response.status_code != 200:
-            print(f"TELEGRAM API ERROR: {response.text}")
+        requests.post(url, json=payload, timeout=5)
             
     except Exception as e: 
         print(f"TELEGRAM CRASH: {e}")
@@ -363,9 +360,9 @@ def submit_deposit(request):
                 status="pending"
             )
             
-            channel_id = os.environ.get("CHANNEL_ID")
-            if channel_id:
-                send_telegram_message(channel_id, f"🟢 <b>NEW DEPOSIT</b>\nUser: {tg_id}\nAmount: {amount} ETB\nMethod: {method}\nTXID: {tx_id}")
+            # HARDCODED ADMIN GROUP ID
+            admin_group_id = "-5139316806"
+            send_telegram_message(admin_group_id, f"🟢 <b>NEW DEPOSIT</b>\nUser: {tg_id}\nAmount: {amount} ETB\nMethod: {method}\nTXID: {tx_id}")
             
             return JsonResponse({"status": "success", "message": "Deposit submitted! Waiting for Admin approval."})
             
@@ -405,9 +402,9 @@ def submit_withdrawal(request):
                 status="pending"
             )
             
-            channel_id = os.environ.get("CHANNEL_ID")
-            if channel_id:
-                send_telegram_message(channel_id, f"🔴 <b>NEW WITHDRAWAL</b>\nUser: {tg_id}\nAmount: {amount} ETB\nAccount: {data.get('account')}\nPhone: {user.phone_number}")
+            # HARDCODED ADMIN GROUP ID
+            admin_group_id = "-5139316806"
+            send_telegram_message(admin_group_id, f"🔴 <b>NEW WITHDRAWAL</b>\nUser: {tg_id}\nAmount: {amount} ETB\nAccount: {data.get('account')}\nPhone: {user.phone_number}")
             
             return JsonResponse({"status": "success", "message": "Withdrawal requested successfully!"})
             
@@ -453,6 +450,7 @@ def submit_transfer(request):
             Transaction.objects.create(agent=receiver, amount=amount, note=f"Transfer from {tg_id}", type="TRANSFER_IN", status="approved")
             
             if receiver.telegram_id: 
+                # This stays dynamic so it sends a private DM to the player receiving the money!
                 send_telegram_message(receiver.telegram_id, f"💸 <b>Transfer Received!</b>\nYou received {amount} ETB from user {tg_id}.")
             
             return JsonResponse({"status": "success", "message": f"Successfully transferred {amount} ETB!"})
