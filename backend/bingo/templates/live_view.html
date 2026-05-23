@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>BIGEST BINGO BOT</title>
+    <title>BIGGEST BINGO BOT</title>
+    <link rel="icon" href="data:,">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -72,8 +73,8 @@
             <div class="menu-item" onclick="toggleMenu(); openSettings()">⚙️ ሴቲንግ (Settings)</div>
             
             <div class="mt-4 mb-2 px-4 text-xs font-black text-slate-500 uppercase tracking-widest">ማህበረሰብ (Community)</div>
-            <div class="menu-item text-blue-400" onclick="tg.openTelegramLink('https://t.me/bigestbingo')">📢 ዋና ቻናል (Channel)</div>
-            <div class="menu-item text-blue-400" onclick="tg.openTelegramLink('https://t.me/bigestbingochat')">💬 መወያያ ግሩፕ (Group)</div>
+            <div class="menu-item text-blue-400" onclick="tg.openTelegramLink('https://t.me/biggestbingo')">📢 ዋና ቻናል (Channel)</div>
+            <div class="menu-item text-blue-400" onclick="tg.openTelegramLink('https://t.me/biggestbingochat')">💬 መወያያ ግሩፕ (Group)</div>
         </div>
         <div class="menu-item text-red-400 border-t-2 border-slate-800" onclick="tg.close()">🚪 ይውጡ (Exit Game)</div>
     </div>
@@ -82,7 +83,7 @@
     <div class="header-bg p-2.5 flex justify-between items-center shadow-lg relative z-40">
         <div class="flex items-center gap-3">
             <button onclick="toggleMenu()" class="text-white text-xl px-2">☰</button>
-            <div class="flex items-center gap-1"><div class="bg-blue-600 p-1 rounded font-black text-[9px] text-white italic">BIGEST</div><div class="font-black text-[10px] uppercase text-white">BINGO BOT</div></div>
+            <div class="flex items-center gap-1"><div class="bg-blue-600 p-1 rounded font-black text-[9px] text-white italic">BIGGEST</div><div class="font-black text-[10px] uppercase text-white">BINGO BOT</div></div>
         </div>
         <div class="flex items-center gap-2">
             <div class="bg-slate-800 px-3 py-1 rounded-full flex items-center gap-2 border border-blue-900" onclick="openWallet('deposit')">
@@ -140,10 +141,11 @@
 
         <div id="play-tracker" class="mb-2 p-1 bg-slate-900/80 rounded-xl border border-blue-900/50 hidden"></div>
         <div id="multi-card-container" class="grid grid-cols-2 gap-1 mb-3">
-            <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-1"><div id="play-card-1" class="w-full"></div></div>
-            <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-2"><div id="play-card-2" class="w-full"></div></div>
-            <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-3"><div id="play-card-3" class="w-full"></div></div>
-            <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-4"><div id="play-card-4" class="w-full"></div></div>
+            <!-- FIX: Added Loading Skeletons -->
+            <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-1"><div id="play-card-1" class="w-full flex items-center justify-center h-full"><span class="text-slate-600 font-black text-[10px] animate-pulse">LOADING CARDS...</span></div></div>
+            <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-2"><div id="play-card-2" class="w-full flex items-center justify-center h-full"><span class="text-slate-600 font-black text-[10px] animate-pulse">LOADING CARDS...</span></div></div>
+            <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-3"><div id="play-card-3" class="w-full flex items-center justify-center h-full"><span class="text-slate-600 font-black text-[10px] animate-pulse">LOADING CARDS...</span></div></div>
+            <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-4"><div id="play-card-4" class="w-full flex items-center justify-center h-full"><span class="text-slate-600 font-black text-[10px] animate-pulse">LOADING CARDS...</span></div></div>
         </div>
         <button onclick="hitBingo()" id="bingo-btn" class="w-full py-3 bg-slate-700 text-slate-400 rounded-xl font-black text-lg border-2 border-slate-600 transition-all tracking-widest shadow-lg">BINGO!</button>
     </div>
@@ -265,7 +267,7 @@
             </div>
             <div id="win-name-display" class="text-4xl font-black text-white uppercase tracking-widest mb-1 drop-shadow-md">PLAYER</div>
             <div class="text-gray-400 text-[10px] font-bold tracking-widest mb-8 uppercase">TICKET #<span id="win-ticket-sub"></span> • <span id="win-prize-display">0</span> ETB</div>
-            <button id="auto-exit-btn" onclick="exitToLobby()" class="border border-gray-600 text-gray-300 bg-slate-900/50 font-bold rounded-full px-8 py-3 hover:bg-slate-800 transition-colors uppercase tracking-widest active:scale-95 w-full max-w-[200px] text-xs">BACK TO LOBBY (5s)</button>
+            <button onclick="exitToLobby()" class="border border-gray-600 text-gray-300 bg-slate-900/50 font-bold rounded-full px-8 py-3 hover:bg-slate-800 transition-colors uppercase tracking-widest active:scale-95 w-full max-w-[200px] text-xs">BACK TO LOBBY</button>
         </div>
     </div>
     
@@ -343,24 +345,10 @@
                             cell.appendChild(inner); grid.appendChild(cell);
                         }));
                     }
-                    
                     document.getElementById('m-win').style.display = 'flex';
                     myActiveGameId = null;
                     if(pollingInterval) clearInterval(pollingInterval);
                     disconnectWebSocket();
-
-                    let exitCountdown = 5;
-                    const exitBtn = document.getElementById('auto-exit-btn');
-                    if(exitBtn) exitBtn.innerText = `BACK TO LOBBY (${exitCountdown}s)`;
-                    const exitTimer = setInterval(() => {
-                        exitCountdown--;
-                        if(exitBtn) exitBtn.innerText = `BACK TO LOBBY (${exitCountdown}s)`;
-                        if(exitCountdown <= 0) {
-                            clearInterval(exitTimer);
-                            exitToLobby();
-                        }
-                    }, 1000);
-
                 }
             } catch(e) { console.error("Winner modal fetch failed", e); }
         }
@@ -416,17 +404,9 @@
         function buildTracker(containerId){ const cont=document.getElementById(containerId); if(!cont) return; cont.innerHTML=''; ['B','I','N','G','O'].forEach((letter,idx)=>{ let row=document.createElement('div'); row.className='tracker-row'; let label=document.createElement('div'); label.className='tracker-letter'; label.innerText=letter; row.appendChild(label); for(let i=1;i<=15;i++){ let num=idx*15+i; let dot=document.createElement('div'); dot.className='tracker-dot'; dot.id=`${containerId}-dot-${num}`; dot.innerText=num; row.appendChild(dot); } cont.appendChild(row); }); }
 
         window.addEventListener('DOMContentLoaded', (event) => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const tab = urlParams.get('tab') || window.location.hash.substring(1);
-            
-            if (['deposit', 'withdraw', 'transfer'].includes(tab)) { 
-                openWallet(tab); 
-                window.history.replaceState({}, document.title, window.location.pathname); 
-            } 
-            else if (tab === 'history') { 
-                openHistory(); 
-                window.history.replaceState({}, document.title, window.location.pathname); 
-            }
+            const hash = window.location.hash.substring(1);
+            if (['deposit', 'withdraw', 'transfer'].includes(hash)) { openWallet(hash); history.replaceState(null, null, ' '); } 
+            else if (hash === 'history') { openHistory(); history.replaceState(null, null, ' '); }
         });
 
         function toggleMenu() { const sb = document.getElementById('sidebar'), ov = document.getElementById('sidebar-overlay'); if(sb.classList.contains('open')) { sb.classList.remove('open'); ov.style.display='none'; } else { sb.classList.add('open'); ov.style.display='block'; } }
@@ -448,7 +428,7 @@
         function openWalletTab(tab){ ['deposit','withdraw','transfer'].forEach(t=>{document.getElementById('w-tab-'+t).classList.remove('active'); document.getElementById('w-sec-'+t).classList.add('hidden');}); document.getElementById('w-tab-'+tab).classList.add('active'); document.getElementById('w-sec-'+tab).classList.remove('hidden'); }
         function openSettings(){ document.getElementById('m-settings').style.display='flex'; }
         function openReferral(){ document.getElementById('m-referral').style.display='flex'; document.getElementById('my-promo-code').innerText=uid; }
-        function copyPromoMessage(){ const shareText=`🎰 Play BIGEST BINGO BOT and win real money!\n\nUse my Promo Code [ ${uid} ] in the Wallet to get 10 ETB Free Bonus!\n\n1. Open: https://t.me/Bigestbingobot\n2. Go to Refer & Earn 🎟️\n3. Paste my code in the Promo box!\n\nGood luck! 🍀`; if(navigator.clipboard&&window.isSecureContext) navigator.clipboard.writeText(shareText).then(()=>{if(tg) tg.showAlert("✅ Promo message copied!");}).catch(()=>fallbackCopy(shareText)); else fallbackCopy(shareText); }
+        function copyPromoMessage(){ const shareText=`🎰 Play BIGGEST BINGO BOT and win real money!\n\nUse my Promo Code [ ${uid} ] in the Wallet to get 10 ETB Free Bonus!\n\n1. Open: https://t.me/Bigestbingobot\n2. Go to Refer & Earn 🎟️\n3. Paste my code in the Promo box!\n\nGood luck! 🍀`; if(navigator.clipboard&&window.isSecureContext) navigator.clipboard.writeText(shareText).then(()=>{if(tg) tg.showAlert("✅ Promo message copied!");}).catch(()=>fallbackCopy(shareText)); else fallbackCopy(shareText); }
         function fallbackCopy(text){ let ta=document.createElement("textarea"); ta.value=text; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy'); if(tg) tg.showAlert("✅ Copied!");}catch(e){} document.body.removeChild(ta); }
         
         function redeemPromo(){ 
@@ -574,7 +554,7 @@
                     const isLive=room.status==='ACTIVE';
                     const numCardsOwned = (myLobbyCardsMap[room.bet.toString()] || []).length;
                     
-                    list.innerHTML+=`<div onclick="selectRoom(${room.bet})" class="room-card ${isLive?'live':''} cursor-pointer"><div class="flex justify-between w-full"><div><div class="text-white font-black text-xl">Bingo ${room.bet}</div><div class="text-[11px] font-bold ${isLive?'text-red-400':'text-blue-400'} mt-1">${isLive?'እየተጠራ ነው: '+room.called_count+'/75':'ሊጀምር ነው: '+room.time_left+'s'}</div><div class="text-[10px] text-gray-400 mt-1">ሽልማት: <span class="text-white font-bold">${room.win.toFixed(0)} ETB</span></div></div><div class="flex flex-col items-end justify-center"><div class="${isLive?'text-red-500':'text-blue-500'} font-bold text-2xl">${isLive?'⏳':'▶'}</div><div class="text-[9px] ${numCardsOwned>0?'text-green-400 font-bold':'text-gray-500'} mt-2">${room.players} ተጫዋች (${numCardsOwned} ያንተ)</div></div></div></div>`;
+                    list.innerHTML+=`<div onclick="selectRoom(${room.bet})" class="room-card ${isLive?'live':''} cursor-pointer"><div class="flex justify-between w-full"><div><div class="text-white font-black text-xl">BIGGEST BINGO ${room.bet}</div><div class="text-[11px] font-bold ${isLive?'text-red-400':'text-blue-400'} mt-1">${isLive?'እየተጠራ ነው: '+room.called_count+'/75':'ሊጀምር ነው: '+room.time_left+'s'}</div><div class="text-[10px] text-gray-400 mt-1">ሽልማት: <span class="text-white font-bold">${room.win.toFixed(0)} ETB</span></div></div><div class="flex flex-col items-end justify-center"><div class="${isLive?'text-red-500':'text-blue-500'} font-bold text-2xl">${isLive?'⏳':'▶'}</div><div class="text-[9px] ${numCardsOwned>0?'text-green-400 font-bold':'text-gray-500'} mt-2">${room.players} ተጫዋች (${numCardsOwned} ያንተ)</div></div></div></div>`;
                 });
             } catch(e){}
         }
