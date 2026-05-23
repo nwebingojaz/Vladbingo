@@ -142,9 +142,9 @@
         <div id="play-tracker" class="mb-2 p-1 bg-slate-900/80 rounded-xl border border-blue-900/50 hidden"></div>
         <div id="multi-card-container" class="grid grid-cols-2 gap-1 mb-3">
             <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-1"><div id="play-card-1" class="w-full flex items-center justify-center h-full"><span class="text-slate-600 font-black text-[10px] animate-pulse">LOADING CARDS...</span></div></div>
-            <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-2"><div id="play-card-2" class="w-full flex items-center justify-center h-full"><span class="text-slate-600 font-black text-[10px] animate-pulse">LOADING CARDS...</span></div></div>
-            <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-3"><div id="play-card-3" class="w-full flex items-center justify-center h-full"><span class="text-slate-600 font-black text-[10px] animate-pulse">LOADING CARDS...</span></div></div>
-            <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-4"><div id="play-card-4" class="w-full flex items-center justify-center h-full"><span class="text-slate-600 font-black text-[10px] animate-pulse">LOADING CARDS...</span></div></div>
+            <div class="bg-slate-900/50 p-1 rounded-xl border-2 border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-2"><div id="play-card-2" class="w-full flex items-center justify-center h-full"><span class="text-slate-600 font-black text-[10px] animate-pulse">LOADING CARDS...</span></div></div>
+            <div class="bg-slate-900/50 p-1 rounded-xl border-2 border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-3"><div id="play-card-3" class="w-full flex items-center justify-center h-full"><span class="text-slate-600 font-black text-[10px] animate-pulse">LOADING CARDS...</span></div></div>
+            <div class="bg-slate-900/50 p-1 rounded-xl border-2 border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-4"><div id="play-card-4" class="w-full flex items-center justify-center h-full"><span class="text-slate-600 font-black text-[10px] animate-pulse">LOADING CARDS...</span></div></div>
         </div>
         <button onclick="hitBingo()" id="bingo-btn" class="w-full py-3 bg-slate-700 text-slate-400 rounded-xl font-black text-lg border-2 border-slate-600 transition-all tracking-widest shadow-lg">BINGO!</button>
     </div>
@@ -267,6 +267,7 @@
             <div id="win-name-display" class="text-4xl font-black text-white uppercase tracking-widest mb-1 drop-shadow-md">PLAYER</div>
             <div class="text-gray-400 text-[10px] font-bold tracking-widest mb-8 uppercase">TICKET #<span id="win-ticket-sub"></span> • <span id="win-prize-display">0</span> ETB</div>
             
+            <!-- AUTO EXIT BUTTON -->
             <button id="auto-exit-btn" onclick="exitToLobby()" class="border border-gray-600 text-gray-300 bg-slate-900/50 font-bold rounded-full px-8 py-3 hover:bg-slate-800 transition-colors uppercase tracking-widest active:scale-95 w-full max-w-[200px] text-xs">BACK TO LOBBY (5s)</button>
         </div>
     </div>
@@ -515,9 +516,7 @@
         }
 
         function openHistory(){ document.getElementById('m-history').style.display='flex'; safeFetch('/api/history/'+uid+'/').then(d=>{historyData=d; switchTab('bets');}).catch(e=>console.error); }
-        function switchTab(tab){ const content=document.getElementById('history-content'); content.innerHTML=''; if(tab==='bets') { if(historyData.my_bets.length===0) content.innerHTML="<div class='text-center text-gray-500 mt-10'>ምንም ታሪክ የለም (No bets yet)</div>"; historyData.my_bets.forEach(h=>{content.innerHTML+=`<div class="history-row border-l-2 ${h.status==='WON'?'border-green-500':'border-red-500'}"><div><div class="text-gray-400">Game</div><div class="font-bold">#${h.game_id}</div></div><div><div class="text-gray-400">Bet/Card</div><div class="text-blue-400">${h.bet}/[${h.card}]</div></div><div class="text-right"><div class="text-gray-400">Result</div><div class="font-black ${h.status==='WON'?'text-green-500':'text-red-500'}">${h.status==='WON'?'+'+h.prize:'-'+(h.bet * (h.card?h.card.toString().split(',').length:1))}</div></div></div>`;});} else historyData.winners.forEach(h=>{content.innerHTML+=`<div class="history-row"><div><div class="text-gray-400">Game</div><div class="font-bold">#${h.game_id}</div></div><div><div class="text-gray-400">Winner</div><div class="text-blue-400">@${h.winner}</div></div><div class="text-right"><div class="text-gray-400">Prize</div><div class="text-green-400 font-black">${h.prize} ETB</div></div></div>`;}); }
-
-        function showToast(msg){ const t=document.getElementById('toast-msg'); t.innerText=msg; t.classList.remove('opacity-0'); setTimeout(()=>t.classList.add('opacity-0'),1500); }
+        function switchTab(tab){ const content=document.getElementById('history-content'); content.innerHTML=''; if(tab==='bets') historyData.my_bets.forEach(h=>{content.innerHTML+=`<div class="history-row border-l-2 ${h.status==='WON'?'border-green-500':'border-red-500'}"><div><div class="text-gray-400">Game</div><div class="font-bold">#${h.game_id}</div></div><div><div class="text-gray-400">Bet/Card</div><div class="text-blue-400">${h.bet}/[${h.card}]</div></div><div class="text-right"><div class="text-gray-400">Result</div><div class="font-black ${h.status==='WON'?'text-green-500':'text-red-500'}">${h.status==='WON'?'+'+h.prize:'-'+(h.bet * (h.card?h.card.toString().split(',').length:1))}</div></div></div>`;}); else historyData.winners.forEach(h=>{content.innerHTML+=`<div class="history-row"><div><div class="text-gray-400">Game</div><div class="font-bold">#${h.game_id}</div></div><div><div class="text-gray-400">Winner</div><div class="text-blue-400">@${h.winner}</div></div><div class="text-right"><div class="text-gray-400">Prize</div><div class="text-green-400 font-black">${h.prize} ETB</div></div></div>`;}); }
         
         async function appLoop(){ 
             if(refreshRunning) return; 
@@ -617,7 +616,7 @@
                         let parentDiv = pc.parentElement;
                         parentDiv.style.display = 'flex';
                         
-                        if(pc.children.length === 0) {
+                        if(pc.children.length === 0 || pc.innerHTML.includes("LOADING CARDS...")) {
                             parentDiv.className = "bg-slate-800 p-1.5 pt-2.5 rounded-xl border-2 border-yellow-500 relative shadow-md w-fit mx-auto"; 
                             parentDiv.innerHTML = `<div class="absolute -top-2 left-2 bg-yellow-500 text-black text-[8px] font-black px-1.5 py-0.5 rounded">#${boardObj.card_number}</div><div id="play-card-${slotNum}" class="grid grid-cols-5 gap-[2px] mt-0.5"></div>`;
                             pc = document.getElementById('play-card-' + slotNum); 
