@@ -142,8 +142,8 @@
         <div id="play-tracker" class="mb-2 p-1 bg-slate-900/80 rounded-xl border border-blue-900/50 hidden"></div>
         <div id="multi-card-container" class="grid grid-cols-2 gap-1 mb-3">
             <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-1"><div id="play-card-1" class="w-full flex items-center justify-center h-full"><span class="text-slate-600 font-black text-[10px] animate-pulse">LOADING CARDS...</span></div></div>
-            <div class="bg-slate-900/50 p-1 rounded-xl border-2 border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-2"><div id="play-card-2" class="w-full flex items-center justify-center h-full"><span class="text-slate-600 font-black text-[10px] animate-pulse">LOADING CARDS...</span></div></div>
-            <div class="bg-slate-900/50 p-1 rounded-xl border-2 border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-3"><div id="play-card-3" class="w-full flex items-center justify-center h-full"><span class="text-slate-600 font-black text-[10px] animate-pulse">LOADING CARDS...</span></div></div>
+            <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-2"><div id="play-card-2" class="w-full flex items-center justify-center h-full"><span class="text-slate-600 font-black text-[10px] animate-pulse">LOADING CARDS...</span></div></div>
+            <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-3"><div id="play-card-3" class="w-full flex items-center justify-center h-full"><span class="text-slate-600 font-black text-[10px] animate-pulse">LOADING CARDS...</span></div></div>
             <div class="bg-slate-900/50 p-1 rounded-xl border-2 border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-4"><div id="play-card-4" class="w-full flex items-center justify-center h-full"><span class="text-slate-600 font-black text-[10px] animate-pulse">LOADING CARDS...</span></div></div>
         </div>
         <button onclick="hitBingo()" id="bingo-btn" class="w-full py-3 bg-slate-700 text-slate-400 rounded-xl font-black text-lg border-2 border-slate-600 transition-all tracking-widest shadow-lg">BINGO!</button>
@@ -184,8 +184,20 @@
             </div>
         </div>
 
+        <!-- WITHDRAW SECTION WITH TIME WARNING NOTICE -->
         <div id="w-sec-withdraw" class="w-section hidden bg-slate-800 p-4 rounded-xl border border-slate-700">
             <h3 class="text-red-400 font-black mb-4">ገንዘብ ያውጡ (Withdraw)</h3>
+            
+            <!-- 🕒 AUTO-ALERT NOTICE: WITHDRAWAL TIMINGS -->
+            <div class="bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 p-3 rounded-xl text-[11px] mb-4 flex items-start gap-2 leading-relaxed">
+                <span class="text-base">🕒</span>
+                <div>
+                    <p class="font-bold text-white mb-0.5 uppercase tracking-wider">የማውጫ ሰዓት (WITHDRAWAL TIMINGS)</p>
+                    <p>ገንዘብ ማውጣት በየቀኑ ከጠዋቱ <b>2:00 AM</b> እስከ <b>5:00 AM</b> ይፈቀዳል።</p>
+                    <p class="text-gray-400 mt-0.5">Withdrawals are processed daily from <b>2:00 AM</b> to <b>5:00 AM</b>.</p>
+                </div>
+            </div>
+
             <input type="tel" id="with-phone" placeholder="ስልክ ቁጥርዎን (Phone)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
             <input type="number" id="with-amount" placeholder="የገንዘብ መጠን (Min 50 ETB)" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
             <select id="with-bank" class="w-full bg-slate-900 border border-slate-700 rounded p-3 mb-3 text-white">
@@ -355,7 +367,7 @@
                             if(isWin) inner.classList.add('bg-green-500','text-white','shadow-[0_0_10px_rgba(34,197,94,0.8)]','scale-110');
                             else if(called) inner.classList.add('bg-yellow-500','text-white');
                             else inner.classList.add('text-gray-800');
-                            cell.appendChild(inner); grid.appendChild(cell);
+                            cell.appendChild(grid.appendChild(cell));
                         }));
                     }
                     document.getElementById('m-win').style.display = 'flex';
@@ -471,7 +483,8 @@
             .catch(e=>{if(tg) tg.showAlert("Error");}); 
         }
 
-        function showDepositForm(method){ currentMethod=method; document.getElementById('dep-step-1').classList.add('hidden'); document.getElementById('dep-step-2').classList.remove('hidden'); document.getElementById('dep-title').innerText=method+" Deposit"; const acc=document.getElementById('dep-account-info'); if(method==='M-Pesa') acc.innerHTML="0707659618<br><span class='text-sm text-gray-400'>ስም: Biniyam</span>"; else if(method==='Telebirr') acc.innerHTML="0977733630<br><span class='text-sm text-gray-400'>ስም: Solomon</span>"; else acc.innerHTML="1000379893698<br><span class='text-sm text-gray-400'>ስም: Yeabkal</span>"; }
+        // FIX: TELEBIRR NUMBER UPDATED TO MESFIN (0929625025)
+        function showDepositForm(method){ currentMethod=method; document.getElementById('dep-step-1').classList.add('hidden'); document.getElementById('dep-step-2').classList.remove('hidden'); document.getElementById('dep-title').innerText=method+" Deposit"; const acc=document.getElementById('dep-account-info'); if(method==='M-Pesa') acc.innerHTML="0707659618<br><span class='text-sm text-gray-400'>ስም: Biniyam</span>"; else if(method==='Telebirr') acc.innerHTML="0929625025<br><span class='text-sm text-gray-400'>ስም: Mesfin</span>"; else acc.innerHTML="1000379893698<br><span class='text-sm text-gray-400'>ስም: Yeabkal</span>"; }
         function backToDepositMethods(){ document.getElementById('dep-step-2').classList.add('hidden'); document.getElementById('dep-step-1').classList.remove('hidden'); document.getElementById('dep-amount').value=''; document.getElementById('dep-txid').value=''; }
         
         function requestOTP(formType){ 
@@ -702,8 +715,17 @@
                     else { btn.classList.remove('active'); showToast(`🔄 ካርድ #${n} ተመልሷል!`); }
                     if(myCards.length > 0) previewCard(myCards[myCards.length-1]); else document.getElementById('mini-grid').innerHTML = '';
                     updateStatusIndicator();
-                } else { if (tg) tg.showAlert(d.error); else alert(d.error); }
-            }).catch(e => { isProcessingCard = false; console.error(e); });
+                } else {
+                    // Diagnostic Fallback Alert
+                    alert("⚠️ SERVER ERROR: " + d.error);
+                    if (tg) tg.showAlert(d.error); 
+                }
+            }).catch(e => { 
+                isProcessingCard = false; 
+                // Diagnostic Network Alert
+                alert("🚨 NETWORK CRASH: " + e.message);
+                console.error(e); 
+            });
         }
         
         function previewCard(n){ document.getElementById('prev-num').innerText="#"+n; safeFetch('/api/card-data/'+n+'/').then(d=>{ const mini=document.getElementById('mini-grid'); mini.innerHTML=''; d.board.forEach(row=>row.forEach(v=>{ let c=document.createElement('div'); c.className='mini-cell'; c.innerText=v==='FREE'?'X':v; mini.appendChild(c); })); }).catch(e=>console.error); }
