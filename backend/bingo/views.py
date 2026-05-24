@@ -17,7 +17,7 @@ from asgiref.sync import async_to_sync
 from .models import User, PermanentCard, GameRound, Transaction, GameControl
 
 def home(request): 
-    return HttpResponse("<h1>BIGEST BINGO BOT ENGINE ACTIVE</h1>")
+    return HttpResponse("<h1>BIGGEST BINGO BOT ENGINE ACTIVE</h1>")
 
 def live_view(request): 
     return render(request, 'live_view.html')
@@ -109,7 +109,14 @@ def join_room(request, tg_id, bet, card_num):
             return JsonResponse({'status': 'error', 'error': 'Room is starting or unavailable. Wait for next round.'})
         
         c_num = int(card_num)
-        players = dict(game.players) if game.players else {}
+        
+        # Safe JSON parsing failsafe
+        players = game.players
+        if isinstance(players, str):
+            try: players = json.loads(players)
+            except: players = {}
+        players = dict(players) if players else {}
+        
         user_cards = players.get(str(tg_id), [])
         if isinstance(user_cards, int): user_cards = [user_cards]
         
@@ -204,7 +211,7 @@ def get_game_info(request, game_id, tg_id):
                             if all(board[i][c] == "FREE" or board[i][c] in called_set for c in range(5)): lines += 1
                             if all(board[r][i] == "FREE" or board[r][i] in called_set for r in range(5)): lines += 1
                         if all(board[i][i] == "FREE" or board[i][i] in called_set for i in range(5)): lines += 1
-                        if redemption_board_match := all(board[i][4-i] == "FREE" or board[i][4-i] in called_set for i in range(5)): lines += 1
+                        if all(board[i][4-i] == "FREE" or board[i][4-i] in called_set for i in range(5)): lines += 1
                         corners = [board[0][0], board[0][4], board[4][0], board[4][4]]
                         if all(c == "FREE" or c in called_set for c in corners): lines += 1
                         
@@ -295,7 +302,7 @@ def send_telegram_message(chat_id, text):
         # ==========================================
         # ⚠️ PASTE YOUR EXACT BOT TOKEN HERE:
         # ==========================================
-        bot_token = "8212617770:AAEGMXyirnTEjOJVG_t7xINkmF7DAhOP8WM"
+        bot_token = "YOUR_ACTUAL_BOT_TOKEN_HERE"
         
         url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
         payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
