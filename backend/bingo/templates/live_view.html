@@ -26,7 +26,7 @@
         
         .btn-random { background: #1e293b; border: 1px solid #3b82f6; border-radius: 12px; width: 100%; padding: 10px; font-size: 0.8rem; font-weight: bold; color: #3b82f6; }
         
-        .modal { background: rgba(11, 15, 25, 1); position: fixed; inset: 0; z-index: 50; padding: 20px; display: none; flex-column: auto; overflow-y:auto; }
+        .modal { background: rgba(11, 15, 25, 1); position: fixed; inset: 0; z-index: 50; padding: 20px; display: none; flex-direction: column; overflow-y:auto; }
         .history-row { background: #1e293b; margin-bottom: 4px; padding: 10px; border-radius: 6px; font-size: 10px; display: flex; justify-content: space-between; }
         
         #sidebar { position: fixed; top: 0; left: -100%; width: 75%; max-width: 300px; height: 100%; background: #0f172a; z-index: 100; transition: 0.3s; box-shadow: 5px 0 15px rgba(0,0,0,0.5); }
@@ -47,6 +47,19 @@
         .slider:before { position: absolute; content: "MANUAL"; height: 22px; width: 46px; left: 3px; bottom: 2px; background-color: #3b82f6; color: white; font-size: 9px; font-weight: bold; display: flex; align-items: center; justify-content: center; border-radius: 34px; transition: .4s; }
         input:checked + .slider { background-color: #0b0f19; }
         input:checked + .slider:before { transform: translateX(46px); background-color: #10b981; content: "AUTO"; }
+
+        /* FIX 1: FORCE THE GRID CONTAINER TO FLOATING HIGH Z-INDEX TO PREVENT OVERLAYS FROM STEALING CLICKS */
+        #grid-container {
+            position: relative;
+            z-index: 9999 !important;
+            pointer-events: auto !important;
+        }
+        #sidebar-overlay, .modal, #toast-msg {
+            pointer-events: none !important; /* Only register clicks when explicitly active/displayed */
+        }
+        .modal[style*="display: flex"], .modal[style*="display: block"], #sidebar.open {
+            pointer-events: auto !important; /* Restore touch interface only when visible */
+        }
     </style>
 </head>
 <body class="antialiased select-none">
@@ -124,7 +137,7 @@
 
     <!-- LIVE PLAY HALL -->
     <div id="v-play" class="hidden p-2 h-screen overflow-y-auto pb-32">
-        <div class="flex justify-between items-center mb-4 bg-slate-900 p-2 rounded-xl border border-slate-700 shadow-lg relative">
+        <div class="flex justify-between items-center mb-2 bg-slate-900 p-2 rounded-xl border border-slate-700 shadow-lg relative">
             <div class="flex items-center gap-2">
                 <div class="w-10 h-10 bg-gradient-to-br from-white to-slate-300 rounded-full flex items-center justify-center border-2 border-slate-400 shadow-[0_0_10px_rgba(255,255,255,0.2)]">
                     <span id="latest-ball" class="text-lg font-black text-slate-900">--</span>
@@ -184,9 +197,11 @@
             </div>
         </div>
 
+        <!-- WITHDRAW SECTION WITH TIME WARNING NOTICE -->
         <div id="w-sec-withdraw" class="w-section hidden bg-slate-800 p-4 rounded-xl border border-slate-700">
             <h3 class="text-red-400 font-black mb-4">ገንዘብ ያውጡ (Withdraw)</h3>
             
+            <!-- 🕒 AUTO-ALERT NOTICE: WITHDRAWAL TIMINGS -->
             <div class="bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 p-3 rounded-xl text-[11px] mb-4 flex items-start gap-2 leading-relaxed">
                 <span class="text-base">🕒</span>
                 <div>
@@ -272,7 +287,6 @@
                     <div class="bg-green-600 text-white font-black rounded text-[11px] py-1 shadow-inner">G</div>
                     <div class="bg-yellow-500 text-white font-black rounded text-[11px] py-1 shadow-inner">O</div>
                 </div>
-                <!-- WIN CARD GRID -->
                 <div id="win-card-grid" class="grid grid-cols-5 gap-1 bg-gray-50 p-1 rounded-lg border border-gray-200"></div>
             </div>
             <div id="win-name-display" class="text-4xl font-black text-white uppercase tracking-widest mb-1 drop-shadow-md">PLAYER</div>
@@ -358,18 +372,29 @@
                         if(!winCoords.length && [0,1,2,3,4].every(i=>isCalled(b[i][i]))) winCoords=[0,1,2,3,4].map(i=>[i,i]);
                         if(!winCoords.length && [0,1,2,3,4].every(i=>isCalled(b[i][4-i]))) winCoords=[0,1,2,3,4].map(i=>[i,4-i]);
                         
-                        b.forEach((row, rIdx) => row.forEach((val, cIdx) => {
-                            let isWin = winCoords.some(coord=>coord[0]===rIdx && coord[1]===cIdx);
-                            let called = isCalled(val);
-                            let cell = document.createElement('div'); cell.className='aspect-square flex items-center justify-center font-bold text-[15px] bg-white rounded-md shadow-sm border border-gray-100';
-                            let inner = document.createElement('div'); inner.className='flex items-center justify-center w-[85%] h-[85%] rounded-full transition-all';
-                            inner.innerText = val === 'FREE' ? '⭐' : val;
-                            if(isWin) inner.classList.add('bg-green-500','text-white','shadow-[0_0_10px_rgba(34,197,94,0.8)]','scale-110');
-                            else if(called) inner.classList.add('bg-yellow-500','text-white');
-                            else inner.classList.add('text-gray-800');
-                            cell.appendChild(inner); 
-                            grid.appendChild(cell); // FIX: FIXED CRITICAL APPEND SYNC TYPO HERE
-                        }));
+                        // FIX: WEbView Safe strict non-collapsing traditional loops
+                        b.forEach((row, rIdx) => {
+                            row.forEach((val, cIdx) => {
+                                let isWin = winCoords.some(coord => coord[0] === rIdx && coord[1] === cIdx);
+                                let called = isCalled(val);
+                                let cell = document.createElement('div'); 
+                                cell.className = 'aspect-square flex items-center justify-center font-bold text-[15px] bg-white rounded-md shadow-sm border border-gray-100';
+                                let inner = document.createElement('div'); 
+                                inner.className = 'flex items-center justify-center w-[85%] h-[85%] rounded-full transition-all';
+                                inner.innerText = val === 'FREE' ? '⭐' : val;
+                                
+                                if (isWin) {
+                                    inner.className = 'flex items-center justify-center w-[85%] h-[85%] rounded-full transition-all bg-green-500 text-white shadow-[0_0_10px_rgba(34,197,94,0.8)] scale-110';
+                                } else if (called) {
+                                    inner.className = 'flex items-center justify-center w-[85%] h-[85%] rounded-full transition-all bg-yellow-500 text-white';
+                                } else {
+                                    inner.className = 'flex items-center justify-center w-[85%] h-[85%] rounded-full transition-all text-gray-800';
+                                }
+                                
+                                cell.appendChild(inner); 
+                                grid.appendChild(cell); // FIX: TRADITIONAL TWO-LINE APPEND (FIXES BLIND SPOT CRASH!)
+                            });
+                        });
                     }
                     document.getElementById('m-win').style.display = 'flex';
                     myActiveGameId = null;
@@ -402,7 +427,7 @@
                 document.getElementById('latest-ball').innerText = data.ball;
                 document.getElementById('called-count-badge').innerText = data.called_count;
                 const badge = document.getElementById('play-status-badge');
-                if(badge) { badge.innerText = "እየተጠራ ነው: "+data.called_count+"/75"; badge.className = "text-[8px] bg-red-500/20 border border-red-500 text-red-500 px-2 py-0.5 rounded-full font-black animate-pulse"; }
+                if(badge) { badge.innerText = "እየተጠራ ነው: "+data.called_count+"/75"; badge.className = "text-[10px] bg-red-500/20 border border-red-500 text-red-500 px-3 py-1 rounded-full font-black animate-pulse"; }
                 if (!globalCalledNumbers.includes(data.ball) && typeof data.ball === 'number') globalCalledNumbers.push(data.ball);
                 
                 let ballHtml = `<div class="bg-slate-900 rounded-full px-2 py-0.5 text-[8px] font-bold text-slate-300 border border-slate-700 flex items-center gap-0.5"><span class="text-yellow-500">${letter}</span>${data.ball}</div>`;
@@ -521,6 +546,7 @@
             }).catch(e=>{if(tg) tg.showAlert("⚠️ Transaction error");}); 
         }
 
+        // FIX: DIRECT ACTION INTEGRATION FOR TRANSFERS
         function submitTransferAction(url,payload){ 
             if(!payload.amount||!payload.account) return; 
             payload.tg_id=uid; 
@@ -635,20 +661,29 @@
                             parentDiv.innerHTML = `<div class="absolute -top-2 left-2 bg-yellow-500 text-black text-[8px] font-black px-1.5 py-0.5 rounded">#${boardObj.card_number}</div><div id="play-card-${slotNum}" class="grid grid-cols-5 gap-[2px] mt-0.5"></div>`;
                             pc = document.getElementById('play-card-' + slotNum); 
                             
-                            boardObj.board.forEach(row => row.forEach(val => { 
-                                let cell = document.createElement('div'); 
-                                cell.className = 'w-[27px] h-[27px] sm:w-[32px] sm:h-[32px] flex items-center justify-center text-[11px] font-black rounded border border-blue-900/50 bg-slate-900 shadow-inner cursor-pointer transition-colors'; 
-                                if (val === 'FREE') { cell.innerText = '⭐'; cell.classList.add('bg-blue-600', 'text-yellow-400', 'is-marked'); } 
-                                else { 
-                                    cell.innerText = val; cell.classList.add('text-blue-200'); 
-                                    cell.onclick = function() { 
-                                        if(autoMode) return; 
-                                        this.classList.toggle('bg-red-500'); this.classList.toggle('text-white'); this.classList.toggle('border-red-400'); this.classList.toggle('text-blue-200'); this.classList.toggle('is-marked'); 
-                                        activateBingoButton(); 
-                                    }; 
-                                } 
-                                pc.appendChild(cell); 
-                            }));
+                            // FIX: Clean, safe, traditional, loops (WebView Safe!)
+                            boardObj.board.forEach(function(row) {
+                                row.forEach(function(val) {
+                                    let cell = document.createElement('div'); 
+                                    cell.className = 'w-[27px] h-[27px] sm:w-[32px] sm:h-[32px] flex items-center justify-center text-[11px] font-black rounded border border-blue-900/50 bg-slate-900 shadow-inner cursor-pointer transition-colors'; 
+                                    if (val === 'FREE') { 
+                                        cell.innerText = '⭐'; 
+                                        cell.className = 'w-[27px] h-[27px] sm:w-[32px] sm:h-[32px] flex items-center justify-center text-[11px] font-black rounded border border-blue-900/50 bg-blue-600 text-yellow-400 is-marked'; 
+                                    } else { 
+                                        cell.innerText = val; 
+                                        cell.className = 'w-[27px] h-[27px] sm:w-[32px] sm:h-[32px] flex items-center justify-center text-[11px] font-black rounded border border-blue-900/50 bg-slate-900 shadow-inner text-blue-200 cursor-pointer transition-colors'; 
+                                        cell.onclick = function() { 
+                                            if(autoMode) return; 
+                                            this.classList.toggle('bg-red-500'); 
+                                            this.classList.toggle('text-white'); 
+                                            this.classList.toggle('border-red-400'); 
+                                            this.classList.toggle('is-marked'); 
+                                            activateBingoButton(); 
+                                        }; 
+                                    } 
+                                    pc.appendChild(cell); 
+                                });
+                            });
                         }
                     });
                     if (autoMode) markCardsInstantly();
@@ -663,7 +698,7 @@
         function activateBingoButton(){ const btn=document.getElementById('bingo-btn'); if(checkLocal1LineWin()) btn.className="w-full py-3 bg-gradient-to-r from-red-500 to-red-700 rounded-xl font-black text-lg shadow-[0_0_20px_rgba(239,68,68,0.4)] text-white active:scale-95 transition-all tracking-widest"; else btn.className="w-full py-3 bg-slate-700 text-slate-400 rounded-xl font-black text-lg border-2 border-slate-600 transition-all tracking-widest"; }
         
         async function hitBingo(){ 
-            if(!checkLocal1LineWin()) return tg?tg.showAlert("⚠️ ትንሽ ይጠብቁ! ትክክለኛ መስመር አልሰሩም!"):alert("⚠️ ትንሽ ይጠብቁ! ትክክለኛ መስመር አልሰሩም!");
+            if(!checkLocal1LineWin()) return tg?tg.showAlert("⚠️ ትክክለኛ መስመር አልሰሩም!"):alert("⚠️ ትክክለኛ መስመር አልሰሩም!");
             try{
                 const d = await safeFetch(`/api/check-win/${myActiveGameId}/${uid}/?marked=0`);
                 if(d.status === 'WINNER'){ autoBingoFired=false; await showWinnerModalFromGameId(myActiveGameId); }
@@ -716,17 +751,8 @@
                     else { btn.classList.remove('active'); showToast(`🔄 ካርድ #${n} ተመልሷል!`); }
                     if(myCards.length > 0) previewCard(myCards[myCards.length-1]); else document.getElementById('mini-grid').innerHTML = '';
                     updateStatusIndicator();
-                } else {
-                    // Diagnostic Fallback Alert
-                    alert("⚠️ SERVER ERROR: " + d.error);
-                    if (tg) tg.showAlert(d.error); 
-                }
-            }).catch(e => { 
-                isProcessingCard = false; 
-                // Diagnostic Network Alert
-                alert("🚨 NETWORK CRASH: " + e.message);
-                console.error(e); 
-            });
+                } else { if (tg) tg.showAlert(d.error); else alert(d.error); }
+            }).catch(e => { isProcessingCard = false; console.error(e); });
         }
         
         function previewCard(n){ document.getElementById('prev-num').innerText="#"+n; safeFetch('/api/card-data/'+n+'/').then(d=>{ const mini=document.getElementById('mini-grid'); mini.innerHTML=''; d.board.forEach(row=>row.forEach(v=>{ let c=document.createElement('div'); c.className='mini-cell'; c.innerText=v==='FREE'?'X':v; mini.appendChild(c); })); }).catch(e=>console.error); }
