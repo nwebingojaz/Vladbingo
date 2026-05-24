@@ -302,7 +302,7 @@ def send_telegram_message(chat_id, text):
         # ==========================================
         # ⚠️ PASTE YOUR EXACT BOT TOKEN HERE:
         # ==========================================
-        bot_token = "YOUR_ACTUAL_BOT_TOKEN_HERE"
+        bot_token = "8212617770:AAEGMXyirnTEjOJVG_t7xINkmF7DAhOP8WM"
         
         url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
         payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
