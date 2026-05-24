@@ -31,7 +31,12 @@
         
         #sidebar { position: fixed; top: 0; left: -100%; width: 75%; max-width: 300px; height: 100%; background: #0f172a; z-index: 100; transition: 0.3s; box-shadow: 5px 0 15px rgba(0,0,0,0.5); }
         #sidebar.open { left: 0; }
-        #sidebar-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 90; display: none; }
+        
+        /* FIX: FORCE THE GRID CONTAINER TO FLOATING HIGH Z-INDEX TO PREVENT OVERLAYS FROM STEALING CLICKS */
+        #grid-container { position: relative; z-index: 9999 !important; pointer-events: auto !important; }
+        #sidebar-overlay, .modal, #toast-msg { pointer-events: none !important; }
+        .modal[style*="display: flex"], .modal[style*="display: block"], #sidebar.open { pointer-events: auto !important; }
+
         .menu-item { display: flex; align-items: center; gap: 15px; padding: 15px 20px; font-size: 1.1rem; font-weight: bold; border-bottom: 1px solid #1e293b; color: #e2e8f0; }
         .menu-item:active { background: #1e293b; }
 
@@ -47,19 +52,6 @@
         .slider:before { position: absolute; content: "MANUAL"; height: 22px; width: 46px; left: 3px; bottom: 2px; background-color: #3b82f6; color: white; font-size: 9px; font-weight: bold; display: flex; align-items: center; justify-content: center; border-radius: 34px; transition: .4s; }
         input:checked + .slider { background-color: #0b0f19; }
         input:checked + .slider:before { transform: translateX(46px); background-color: #10b981; content: "AUTO"; }
-
-        /* FIX 1: FORCE THE GRID CONTAINER TO FLOATING HIGH Z-INDEX TO PREVENT OVERLAYS FROM STEALING CLICKS */
-        #grid-container {
-            position: relative;
-            z-index: 9999 !important;
-            pointer-events: auto !important;
-        }
-        #sidebar-overlay, .modal, #toast-msg {
-            pointer-events: none !important; /* Only register clicks when explicitly active/displayed */
-        }
-        .modal[style*="display: flex"], .modal[style*="display: block"], #sidebar.open {
-            pointer-events: auto !important; /* Restore touch interface only when visible */
-        }
     </style>
 </head>
 <body class="antialiased select-none">
@@ -197,11 +189,9 @@
             </div>
         </div>
 
-        <!-- WITHDRAW SECTION WITH TIME WARNING NOTICE -->
         <div id="w-sec-withdraw" class="w-section hidden bg-slate-800 p-4 rounded-xl border border-slate-700">
             <h3 class="text-red-400 font-black mb-4">ገንዘብ ያውጡ (Withdraw)</h3>
             
-            <!-- 🕒 AUTO-ALERT NOTICE: WITHDRAWAL TIMINGS -->
             <div class="bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 p-3 rounded-xl text-[11px] mb-4 flex items-start gap-2 leading-relaxed">
                 <span class="text-base">🕒</span>
                 <div>
@@ -292,7 +282,6 @@
             <div id="win-name-display" class="text-4xl font-black text-white uppercase tracking-widest mb-1 drop-shadow-md">PLAYER</div>
             <div class="text-gray-400 text-[10px] font-bold tracking-widest mb-8 uppercase">TICKET #<span id="win-ticket-sub"></span> • <span id="win-prize-display">0</span> ETB</div>
             
-            <!-- AUTO EXIT BUTTON -->
             <button id="auto-exit-btn" onclick="exitToLobby()" class="border border-gray-600 text-gray-300 bg-slate-900/50 font-bold rounded-full px-8 py-3 hover:bg-slate-800 transition-colors uppercase tracking-widest active:scale-95 w-full max-w-[200px] text-xs">BACK TO LOBBY (5s)</button>
         </div>
     </div>
@@ -372,7 +361,6 @@
                         if(!winCoords.length && [0,1,2,3,4].every(i=>isCalled(b[i][i]))) winCoords=[0,1,2,3,4].map(i=>[i,i]);
                         if(!winCoords.length && [0,1,2,3,4].every(i=>isCalled(b[i][4-i]))) winCoords=[0,1,2,3,4].map(i=>[i,4-i]);
                         
-                        // FIX: WEbView Safe strict non-collapsing traditional loops
                         b.forEach((row, rIdx) => {
                             row.forEach((val, cIdx) => {
                                 let isWin = winCoords.some(coord => coord[0] === rIdx && coord[1] === cIdx);
@@ -392,7 +380,7 @@
                                 }
                                 
                                 cell.appendChild(inner); 
-                                grid.appendChild(cell); // FIX: TRADITIONAL TWO-LINE APPEND (FIXES BLIND SPOT CRASH!)
+                                grid.appendChild(cell); 
                             });
                         });
                     }
@@ -427,7 +415,7 @@
                 document.getElementById('latest-ball').innerText = data.ball;
                 document.getElementById('called-count-badge').innerText = data.called_count;
                 const badge = document.getElementById('play-status-badge');
-                if(badge) { badge.innerText = "እየተጠራ ነው: "+data.called_count+"/75"; badge.className = "text-[10px] bg-red-500/20 border border-red-500 text-red-500 px-3 py-1 rounded-full font-black animate-pulse"; }
+                if(badge) { badge.innerText = "እየተጠራ ነው: "+data.called_count+"/75"; badge.className = "text-[8px] bg-red-500/20 border border-red-500 text-red-500 px-2 py-0.5 rounded-full font-black animate-pulse"; }
                 if (!globalCalledNumbers.includes(data.ball) && typeof data.ball === 'number') globalCalledNumbers.push(data.ball);
                 
                 let ballHtml = `<div class="bg-slate-900 rounded-full px-2 py-0.5 text-[8px] font-bold text-slate-300 border border-slate-700 flex items-center gap-0.5"><span class="text-yellow-500">${letter}</span>${data.ball}</div>`;
@@ -509,7 +497,6 @@
             .catch(e=>{if(tg) tg.showAlert("Error");}); 
         }
 
-        // TELEBIRR BANK TARGET: MESFIN (0929625025)
         function showDepositForm(method){ currentMethod=method; document.getElementById('dep-step-1').classList.add('hidden'); document.getElementById('dep-step-2').classList.remove('hidden'); document.getElementById('dep-title').innerText=method+" Deposit"; const acc=document.getElementById('dep-account-info'); if(method==='M-Pesa') acc.innerHTML="0707659618<br><span class='text-sm text-gray-400'>ስም: Biniyam</span>"; else if(method==='Telebirr') acc.innerHTML="0929625025<br><span class='text-sm text-gray-400'>ስም: Mesfin</span>"; else acc.innerHTML="1000379893698<br><span class='text-sm text-gray-400'>ስም: Yeabkal</span>"; }
         function backToDepositMethods(){ document.getElementById('dep-step-2').classList.add('hidden'); document.getElementById('dep-step-1').classList.remove('hidden'); document.getElementById('dep-amount').value=''; document.getElementById('dep-txid').value=''; }
         
@@ -546,7 +533,6 @@
             }).catch(e=>{if(tg) tg.showAlert("⚠️ Transaction error");}); 
         }
 
-        // FIX: DIRECT ACTION INTEGRATION FOR TRANSFERS
         function submitTransferAction(url,payload){ 
             if(!payload.amount||!payload.account) return; 
             payload.tg_id=uid; 
@@ -556,7 +542,9 @@
         }
 
         function openHistory(){ document.getElementById('m-history').style.display='flex'; safeFetch('/api/history/'+uid+'/').then(d=>{historyData=d; switchTab('bets');}).catch(e=>console.error); }
-        function switchTab(tab){ const content=document.getElementById('history-content'); content.innerHTML=''; if(tab==='bets') historyData.my_bets.forEach(h=>{content.innerHTML+=`<div class="history-row border-l-2 ${h.status==='WON'?'border-green-500':'border-red-500'}"><div><div class="text-gray-400">Game</div><div class="font-bold">#${h.game_id}</div></div><div><div class="text-gray-400">Bet/Card</div><div class="text-blue-400">${h.bet}/[${h.card}]</div></div><div class="text-right"><div class="text-gray-400">Result</div><div class="font-black ${h.status==='WON'?'text-green-500':'text-red-500'}">${h.status==='WON'?'+'+h.prize:'-'+(h.bet * (h.card?h.card.toString().split(',').length:1))}</div></div></div>`;}); else historyData.winners.forEach(h=>{content.innerHTML+=`<div class="history-row"><div><div class="text-gray-400">Game</div><div class="font-bold">#${h.game_id}</div></div><div><div class="text-gray-400">Winner</div><div class="text-blue-400">@${h.winner}</div></div><div class="text-right"><div class="text-gray-400">Prize</div><div class="text-green-400 font-black">${h.prize} ETB</div></div></div>`;}); }
+        function switchTab(tab){ const content=document.getElementById('history-content'); content.innerHTML=''; if(tab==='bets') { if(historyData.my_bets.length===0) content.innerHTML="<div class='text-center text-gray-500 mt-10'>ምንም ታሪክ የለም (No bets yet)</div>"; historyData.my_bets.forEach(h=>{content.innerHTML+=`<div class="history-row border-l-2 ${h.status==='WON'?'border-green-500':'border-red-500'}"><div><div class="text-gray-400">Game</div><div class="font-bold">#${h.game_id}</div></div><div><div class="text-gray-400">Bet/Card</div><div class="text-blue-400">${h.bet}/[${h.card}]</div></div><div class="text-right"><div class="text-gray-400">Result</div><div class="font-black ${h.status==='WON'?'text-green-500':'text-red-500'}">${h.status==='WON'?'+'+h.prize:'-'+(h.bet * (h.card?h.card.toString().split(',').length:1))}</div></div></div>`;});} else historyData.winners.forEach(h=>{content.innerHTML+=`<div class="history-row"><div><div class="text-gray-400">Game</div><div class="font-bold">#${h.game_id}</div></div><div><div class="text-gray-400">Winner</div><div class="text-blue-400">@${h.winner}</div></div><div class="text-right"><div class="text-gray-400">Prize</div><div class="text-green-400 font-black">${h.prize} ETB</div></div></div>`;}); }
+
+        function showToast(msg){ const t=document.getElementById('toast-msg'); t.innerText=msg; t.classList.remove('opacity-0'); setTimeout(()=>t.classList.add('opacity-0'),1500); }
         
         async function appLoop(){ 
             if(refreshRunning) return; 
@@ -661,23 +649,16 @@
                             parentDiv.innerHTML = `<div class="absolute -top-2 left-2 bg-yellow-500 text-black text-[8px] font-black px-1.5 py-0.5 rounded">#${boardObj.card_number}</div><div id="play-card-${slotNum}" class="grid grid-cols-5 gap-[2px] mt-0.5"></div>`;
                             pc = document.getElementById('play-card-' + slotNum); 
                             
-                            // FIX: Clean, safe, traditional, loops (WebView Safe!)
-                            boardObj.board.forEach(function(row) {
-                                row.forEach(function(val) {
+                            boardObj.board.forEach(row => {
+                                row.forEach(val => { 
                                     let cell = document.createElement('div'); 
                                     cell.className = 'w-[27px] h-[27px] sm:w-[32px] sm:h-[32px] flex items-center justify-center text-[11px] font-black rounded border border-blue-900/50 bg-slate-900 shadow-inner cursor-pointer transition-colors'; 
-                                    if (val === 'FREE') { 
-                                        cell.innerText = '⭐'; 
-                                        cell.className = 'w-[27px] h-[27px] sm:w-[32px] sm:h-[32px] flex items-center justify-center text-[11px] font-black rounded border border-blue-900/50 bg-blue-600 text-yellow-400 is-marked'; 
-                                    } else { 
-                                        cell.innerText = val; 
-                                        cell.className = 'w-[27px] h-[27px] sm:w-[32px] sm:h-[32px] flex items-center justify-center text-[11px] font-black rounded border border-blue-900/50 bg-slate-900 shadow-inner text-blue-200 cursor-pointer transition-colors'; 
+                                    if (val === 'FREE') { cell.innerText = '⭐'; cell.classList.add('bg-blue-600', 'text-yellow-400', 'is-marked'); } 
+                                    else { 
+                                        cell.innerText = val; cell.classList.add('text-blue-200'); 
                                         cell.onclick = function() { 
                                             if(autoMode) return; 
-                                            this.classList.toggle('bg-red-500'); 
-                                            this.classList.toggle('text-white'); 
-                                            this.classList.toggle('border-red-400'); 
-                                            this.classList.toggle('is-marked'); 
+                                            this.classList.toggle('bg-red-500'); this.classList.toggle('text-white'); this.classList.toggle('border-red-400'); this.classList.toggle('text-blue-200'); this.classList.toggle('is-marked'); 
                                             activateBingoButton(); 
                                         }; 
                                     } 
@@ -698,7 +679,7 @@
         function activateBingoButton(){ const btn=document.getElementById('bingo-btn'); if(checkLocal1LineWin()) btn.className="w-full py-3 bg-gradient-to-r from-red-500 to-red-700 rounded-xl font-black text-lg shadow-[0_0_20px_rgba(239,68,68,0.4)] text-white active:scale-95 transition-all tracking-widest"; else btn.className="w-full py-3 bg-slate-700 text-slate-400 rounded-xl font-black text-lg border-2 border-slate-600 transition-all tracking-widest"; }
         
         async function hitBingo(){ 
-            if(!checkLocal1LineWin()) return tg?tg.showAlert("⚠️ ትክክለኛ መስመር አልሰሩም!"):alert("⚠️ ትክክለኛ መስመር አልሰሩም!");
+            if(!checkLocal1LineWin()) return tg?tg.showAlert("⚠️ ትንሽ ይጠብቁ! ትክክለኛ መስመር አልሰሩም!"):alert("⚠️ ትንሽ ይጠብቁ! ትክክለኛ መስመር አልሰሩም!");
             try{
                 const d = await safeFetch(`/api/check-win/${myActiveGameId}/${uid}/?marked=0`);
                 if(d.status === 'WINNER'){ autoBingoFired=false; await showWinnerModalFromGameId(myActiveGameId); }
@@ -736,12 +717,27 @@
         function initGrid(){ const g=document.getElementById('grid-container'); g.innerHTML=''; let max=getMaxCards(); for(let i=1;i<=max;i++){ let b=document.createElement('button'); b.className="card-num"; b.id="c-"+i; b.innerText=i; b.onclick=()=>selectCard(i); g.appendChild(b); } }
         
         function selectCard(n) { 
-            if(isProcessingCard) return;
+            // DIAGNOSTIC ALERT: If button is locked, tell the user!
+            if(isProcessingCard) {
+                if (tg) tg.showAlert("Please wait, processing previous click..."); 
+                else alert("Please wait, processing previous click...");
+                return;
+            }
+            
             isProcessingCard = true;
             showToast("⏳...");
+            
+            // SAFETY UNLOCK: Force unlock after 3 seconds if server hangs
+            let safetyUnlock = setTimeout(() => {
+                isProcessingCard = false;
+                console.log("Safety unlock triggered!");
+            }, 3000);
+            
             safeFetch(`/api/join-room/${uid}/${activeBet}/${n}/`)
             .then(d => {
+                clearTimeout(safetyUnlock);
                 isProcessingCard = false;
+                
                 if(d.status === 'ok') {
                     myCards = d.my_cards;
                     document.getElementById('bal-header').innerText = d.balance.toFixed(2);
@@ -751,8 +747,19 @@
                     else { btn.classList.remove('active'); showToast(`🔄 ካርድ #${n} ተመልሷል!`); }
                     if(myCards.length > 0) previewCard(myCards[myCards.length-1]); else document.getElementById('mini-grid').innerHTML = '';
                     updateStatusIndicator();
-                } else { if (tg) tg.showAlert(d.error); else alert(d.error); }
-            }).catch(e => { isProcessingCard = false; console.error(e); });
+                } else { 
+                    // DIAGNOSTIC ALERT: Show exact server error
+                    if (tg) tg.showAlert("SERVER ERROR: " + d.error); 
+                    else alert("SERVER ERROR: " + d.error); 
+                }
+            }).catch(e => { 
+                clearTimeout(safetyUnlock);
+                isProcessingCard = false; 
+                // DIAGNOSTIC ALERT: Show exact network crash
+                if (tg) tg.showAlert("NETWORK ERROR: " + e.message);
+                else alert("NETWORK ERROR: " + e.message);
+                console.error(e); 
+            });
         }
         
         function previewCard(n){ document.getElementById('prev-num').innerText="#"+n; safeFetch('/api/card-data/'+n+'/').then(d=>{ const mini=document.getElementById('mini-grid'); mini.innerHTML=''; d.board.forEach(row=>row.forEach(v=>{ let c=document.createElement('div'); c.className='mini-cell'; c.innerText=v==='FREE'?'X':v; mini.appendChild(c); })); }).catch(e=>console.error); }
@@ -768,8 +775,6 @@
                 lbl.innerText = "ጨዋታው ሊጀምር ነው: "; tEl.classList.remove('text-red-400'); 
                 if(currentRoomTime > 0) {
                     currentRoomTime--; 
-                    
-                    // 🔊 Play Game Start Sound exactly at 00:00!
                     if (currentRoomTime === 0 && sessionStorage.getItem('currentScreen') === 'v-selector') {
                         playSound('game_start.mp3');
                     }
