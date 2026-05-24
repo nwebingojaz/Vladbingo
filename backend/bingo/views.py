@@ -75,7 +75,25 @@ def lobby_info(request, tg_id):
 
 def get_history(request, tg_id):
     history = GameRound.objects.filter(status__in=["ENDED", "ANNOUNCED"]).order_by('-id')[:15]
-    winners_data = [{'game_id': g.id, 'winner': g.winner_username or "None", 'called': f"{len(g.called_numbers)}/75", 'prize': float(g.winner_prize)} for g in history]
+    
+    # FIX: Fetch the actual real_name of the winner instead of their tg_id!
+    winners_data = []
+    for g in history:
+        w_name = "None"
+        if g.winner_username:
+            w_user = User.objects.filter(username=g.winner_username).first()
+            if w_user and w_user.real_name:
+                w_name = w_user.real_name
+            else:
+                w_name = g.winner_username.replace('tg_', '')
+        
+        winners_data.append({
+            'game_id': g.id, 
+            'winner': w_name, 
+            'called': f"{len(g.called_numbers)}/75", 
+            'prize': float(g.winner_prize)
+        })
+        
     my_games = GameRound.objects.filter(players__has_key=str(tg_id)).order_by('-id')[:15]
     
     my_bets_data = []
