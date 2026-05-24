@@ -17,7 +17,7 @@ from asgiref.sync import async_to_sync
 from .models import User, PermanentCard, GameRound, Transaction, GameControl
 
 def home(request): 
-    return HttpResponse("<h1>BIGGEST BINGO BOT ENGINE ACTIVE</h1>")
+    return HttpResponse("<h1>BIGEST BINGO BOT ENGINE ACTIVE</h1>")
 
 def live_view(request): 
     return render(request, 'live_view.html')
@@ -76,7 +76,6 @@ def lobby_info(request, tg_id):
 def get_history(request, tg_id):
     history = GameRound.objects.filter(status__in=["ENDED", "ANNOUNCED"]).order_by('-id')[:15]
     
-    # FIX: Fetch the actual real_name of the winner instead of their tg_id!
     winners_data = []
     for g in history:
         w_name = "None"
@@ -117,7 +116,6 @@ def get_history(request, tg_id):
 def join_room(request, tg_id, bet, card_num):
     # INSTANT BUY/REFUND TOGGLE API (ULTRA-SAFE)
     try:
-        # Use get_or_create so this API never fails with "User Does Not Exist"
         user, _ = User.objects.get_or_create(username=f"tg_{tg_id}")
         user = User.objects.select_for_update().get(id=user.id)
         
@@ -128,7 +126,7 @@ def join_room(request, tg_id, bet, card_num):
         
         c_num = int(card_num)
         
-        # Safe JSON parsing failsafe
+        # SAFE JSON PARSING
         players = game.players
         if isinstance(players, str):
             try: players = json.loads(players)
@@ -296,6 +294,7 @@ def check_win(request, game_id, tg_id):
             game.finished_at = timezone.now()
             game.save(update_fields=['status', 'winner_username', 'winner_prize', 'finished_at'])
             
+            # 🚀 WEBSOCKET BROADCAST INJECTION
             try:
                 channel_layer = get_channel_layer()
                 async_to_sync(channel_layer.group_send)(
@@ -379,6 +378,7 @@ def submit_deposit(request):
             except:
                 return JsonResponse({"status": "error", "message": "Invalid amount format."})
 
+            # BULLETPROOF FIX: If user doesn't exist, create them instantly!
             user, _ = User.objects.get_or_create(username=f"tg_{tg_id}")
             
             # Capture the transaction object so we can get its ID!
@@ -412,6 +412,7 @@ def submit_withdrawal(request):
             except:
                 return JsonResponse({"status": "error", "message": "Invalid amount format."})
 
+            # BULLETPROOF FIX
             user, _ = User.objects.get_or_create(username=f"tg_{tg_id}")
             
             if user.operational_credit < amount: 
@@ -422,6 +423,7 @@ def submit_withdrawal(request):
             user.operational_credit -= amount
             user.save()
             
+            # Capture the transaction object!
             tx = Transaction.objects.create(
                 agent=user, 
                 amount=amount, 
@@ -453,6 +455,7 @@ def submit_transfer(request):
             except:
                 return JsonResponse({"status": "error", "message": "Invalid amount format."})
 
+            # BULLETPROOF FIX
             sender, _ = User.objects.get_or_create(username=f"tg_{tg_id}")
             
             if sender.operational_credit < amount: 
@@ -515,8 +518,12 @@ def redeem_promo(request):
             if not friend: 
                 return JsonResponse({"status": "error", "message": "Invalid Promo Code!"})
                 
-            user.operational_credit += 10; user.used_promo_code = True; user.save()
-            friend.operational_credit += 10; friend.save()
+            user.operational_credit += 10
+            user.used_promo_code = True
+            user.save()
+            
+            friend.operational_credit += 10
+            friend.save()
             
             Transaction.objects.create(agent=user, amount=10, note=f"Used promo code: {promo_code}", type="BONUS", status="approved")
             Transaction.objects.create(agent=friend, amount=10, note=f"Referral bonus from: {tg_id}", type="REFERRAL_BONUS", status="approved")
