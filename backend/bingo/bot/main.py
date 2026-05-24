@@ -107,7 +107,7 @@ async def broadcast_winners_task(context: ContextTypes.DEFAULT_TYPE):
 async def daily_promo_task(context: ContextTypes.DEFAULT_TYPE):
     channel_id = os.environ.get("CHANNEL_ID", "@bigestbingo")
     photo_url = "https://i.ibb.co/3m20B6k/bingo-money.jpg" 
-    caption = "🎰 <b>BIGEST BINGO BOT</b> 🎰\n\nበየቀኑ በሺዎች የሚቆጠሩ ብሮችን ያሸንፉ!\nአሁኑኑ ይጫወቱ እና እድልዎን ይሞክሩ!"
+    caption = "🎰 <b>BIGGEST BINGO BOT</b> 🎰\n\nበየቀኑ በሺዎች የሚቆጠሩ ብሮችን ያሸንፉ!\nአሁኑኑ ይጫወቱ እና እድልዎን ይሞክሩ!"
     keyboard = [[InlineKeyboardButton("🎮 አሁኑኑ ይጫወቱ (PLAY NOW)", url="https://t.me/Bigestbingobot")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -122,7 +122,7 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, use
     photo_url = "https://i.ibb.co/3m20B6k/bingo-money.jpg"
     
     caption = (
-        f"🎰 <b>BIGEST BINGO BOT</b> 🎰\n\n"
+        f"🎰 <b>BIGGEST BINGO BOT</b> 🎰\n\n"
         f"እንኳን በደህና መጡ፣ <b>{user.real_name}</b>! (Welcome)\n"
         f"💰 <b>ቀሪ ሂሳብ (Balance):</b> {user.operational_credit} ETB\n\n"
         f"ከታች ካሉት አማራጮች ውስጥ ይምረጡ:\n<i>(Choose an option below)</i>"
@@ -131,19 +131,19 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, use
     if is_admin(user.username.replace('tg_', '')):
         caption += "\n\n👑 <b>Admin Commands:</b>\n/pending - View pending TXs\n/approve [id] - Approve TX\n/reject [id] - Reject TX\n/forcewin [card_num] - Force a card\n/stats - View Casino Stats\n/broadcast - Reply to any msg to Mass DM"
     
-    base_url = "https://vladbingo-dmzg.onrender.com/api/live/"
+    # FIX: Added ?v=2.1 Cache-Buster query parameter here!
+    base_url = "https://vladbingo-dmzg.onrender.com/api/live/?v=2.1"
     
     keyboard = [
         [InlineKeyboardButton("🎮 ጌም ይጫወቱ (Play Games)", web_app=WebAppInfo(url=base_url))],
         [InlineKeyboardButton("💰 ያስገቡ (Deposit)", web_app=WebAppInfo(url=base_url + "?tab=deposit")), InlineKeyboardButton("💸 ያውጡ (Withdraw)", web_app=WebAppInfo(url=base_url + "?tab=withdraw"))],
         [InlineKeyboardButton("↔️ ያስተላልፉ (Transfer)", web_app=WebAppInfo(url=base_url + "?tab=transfer")), InlineKeyboardButton("👤 ፕሮፋይል (Profile)", callback_data="profile")],
         [InlineKeyboardButton("📜 ታሪክ (History)", web_app=WebAppInfo(url=base_url + "?tab=history")), InlineKeyboardButton("⚖️ ሂሳብ (Balance)", callback_data="balance")],
-        [InlineKeyboardButton("📢 ቻናል (Channel)", url="https://t.me/bigestbingo"), InlineKeyboardButton("💬 ግሩፕ (Group)", url="https://t.me/bigestbingochat")],
+        [InlineKeyboardButton("📢 ቻናል (Channel)", url="https://t.me/biggestbingo"), InlineKeyboardButton("💬 ግሩፕ (Group)", url="https://t.me/biggestbingochat")],
         [InlineKeyboardButton("🎧 ያግኙን (Contact Admin)", url="https://t.me/yeab")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # FIX: Use context.bot.send_photo so it works even if chat history is empty!
     chat_id = update.effective_chat.id
     try:
         await context.bot.send_photo(chat_id=chat_id, photo=photo_url, caption=caption, reply_markup=reply_markup, parse_mode='HTML')
@@ -157,7 +157,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if not user.real_name:
         await sync_to_async(db_op)(tg_id, "state", "REG_NAME")
-        return await context.bot.send_message(chat_id=update.effective_chat.id, text="👋 ወደ <b>BIGEST BINGO BOT</b> እንኳን በደህና መጡ!\n\nእባክዎ ትክክለኛ ሙሉ ስምዎን ያስገቡ (Please enter your Full Name):", parse_mode='HTML')
+        return await context.bot.send_message(chat_id=update.effective_chat.id, text="👋 ወደ <b>BIGGEST BINGO BOT</b> እንኳን በደህና መጡ!\n\nእባክዎ ትክክለኛ ሙሉ ስምዎን ያስገቡ (Please enter your Full Name):", parse_mode='HTML')
         
     if not user.phone_number:
         btn = [[KeyboardButton("📲 ስልክ ቁጥር ያጋሩ (Share Phone)", request_contact=True)]]
@@ -277,7 +277,7 @@ def run():
     app.job_queue.run_repeating(broadcast_winners_task, interval=10, first=5)
     app.job_queue.run_repeating(daily_promo_task, interval=86400, first=60)
     
-    print("🚀 BIGEST BINGO BOT & BROADCASTER ARE RUNNING...")
+    print("🚀 BIGGEST BINGO BOT & BROADCASTER ARE RUNNING...")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__": 
