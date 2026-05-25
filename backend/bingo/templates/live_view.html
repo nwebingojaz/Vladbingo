@@ -32,6 +32,7 @@
         #sidebar { position: fixed; top: 0; left: -100%; width: 75%; max-width: 300px; height: 100%; background: #0f172a; z-index: 100; transition: 0.3s; box-shadow: 5px 0 15px rgba(0,0,0,0.5); }
         #sidebar.open { left: 0; }
         
+        /* FIX: FORCE THE GRID CONTAINER TO FLOATING HIGH Z-INDEX TO PREVENT OVERLAYS FROM STEALING CLICKS */
         #grid-container { position: relative; z-index: 9999 !important; pointer-events: auto !important; }
         #sidebar-overlay, .modal, #toast-msg { pointer-events: none !important; }
         .modal[style*="display: flex"], .modal[style*="display: block"], #sidebar.open { pointer-events: auto !important; }
@@ -97,7 +98,7 @@
         </div>
     </div>
     
-    <!-- NEW REDESIGNED ROOM NAV BAR -->
+    <!-- ROOM NAV BAR -->
     <div class="bg-slate-900/90 p-2 flex justify-between items-center text-[10px] font-bold text-blue-400 uppercase border-b border-blue-900/50 shadow-md">
         <div class="flex items-center gap-1 bg-slate-800 px-2 py-1 rounded-lg border border-slate-700">
             🎲 <span class="text-white text-sm" id="nav-room">10</span>
@@ -152,7 +153,7 @@
                 </div>
             </div>
             <div class="flex flex-col items-end gap-1">
-                <label class="switch origin-right"><input type="checkbox" id="auto-toggle" onchange="toggleAutoMode(this)"><span class="slider"></span></label>
+                <label class="switch origin-right"><input type="checkbox" id="auto-toggle" onchange="toggleAutoMode(this)" checked><span class="slider"></span></label>
                 <div id="play-status-badge" class="text-[8px] bg-blue-500/20 border border-blue-500 text-blue-500 px-2 py-0.5 rounded-full font-black uppercase">ይጠብቁ (WAITING)</div>
                 <div class="text-[8px] text-yellow-400 font-bold tracking-widest"><span id="called-count-badge">0</span>/75</div>
             </div>
@@ -319,7 +320,7 @@
         let isFirstLoad = true;
         
         let historyData = {winners: [], my_bets: []}; let currentRoomTime = 0; let currentRoomStatus = 'LOBBY'; let myActiveGameId = null;
-        let currentMethod = ""; let autoMode = false; let autoBingoFired = false; let globalCalledNumbers = [];
+        let currentMethod = ""; let autoMode = true; let autoBingoFired = false; let globalCalledNumbers = [];
         let isProcessingCard = false;
 
         let gameSocket = null;
@@ -327,6 +328,7 @@
         let usePollingFallback = false;
         let pollingInterval = null;
         let refreshRunning = false; 
+        let globalBoardsData = [];
 
         // 🔊 AUDIO ENGINE
         function playSound(filename) {
@@ -357,7 +359,6 @@
                 const d = await safeFetch(`/api/game-info/${gameId}/${uid}/`);
                 if (d.status === 'ENDED' || d.status === 'ANNOUNCED') {
                     
-                    // 🔊 Play Winner Sound!
                     playSound('good.mp3');
 
                     document.getElementById('win-name-display').innerText = d.winner ? d.winner.replace('tg_', '').toUpperCase() : "PLAYER";
@@ -421,7 +422,6 @@
         function handleGameUpdate(data) {
             if (data.action === 'new_ball' && data.ball) {
                 
-                // 🔊 Play the called ball sound!
                 let letter = "B"; if(data.ball>15) letter="I"; if(data.ball>30) letter="N"; if(data.ball>45) letter="G"; if(data.ball>60) letter="O";
                 playSound(letter + data.ball + '.mp3');
 
@@ -554,9 +554,8 @@
             .catch(e=>{if(tg) tg.showAlert("⚠️ Transfer error");}); 
         }
 
-        // FIX: History modal winner names now show 👤 instead of @tg_
         function openHistory(){ document.getElementById('m-history').style.display='flex'; safeFetch('/api/history/'+uid+'/').then(d=>{historyData=d; switchTab('bets');}).catch(e=>console.error); }
-        function switchTab(tab){ const content=document.getElementById('history-content'); content.innerHTML=''; if(tab==='bets') { if(historyData.my_bets.length===0) content.innerHTML="<div class='text-center text-gray-500 mt-10'>ምንም ታሪክ የለም (No bets yet)</div>"; historyData.my_bets.forEach(h=>{content.innerHTML+=`<div class="history-row border-l-2 ${h.status==='WON'?'border-green-500':'border-red-500'}"><div><div class="text-gray-400">Game</div><div class="font-bold">#${h.game_id}</div></div><div><div class="text-gray-400">Bet/Card</div><div class="text-blue-400">${h.bet}/[${h.card}]</div></div><div class="text-right"><div class="text-gray-400">Result</div><div class="font-black ${h.status==='WON'?'text-green-500':'text-red-500'}">${h.status==='WON'?'+'+h.prize:'-'+(h.bet * (h.card?h.card.toString().split(',').length:1))}</div></div></div>`;});} else historyData.winners.forEach(h=>{content.innerHTML+=`<div class="history-row"><div><div class="text-gray-400">Game</div><div class="font-bold">#${h.game_id}</div></div><div><div class="text-gray-400">Winner</div><div class="text-blue-400 font-bold">👤 ${h.winner}</div></div><div class="text-right"><div class="text-gray-400">Prize</div><div class="text-green-400 font-black">${h.prize} ETB</div></div></div>`;}); }
+        function switchTab(tab){ const content=document.getElementById('history-content'); content.innerHTML=''; if(tab==='bets') { if(historyData.my_bets.length===0) content.innerHTML="<div class='text-center text-gray-500 mt-10'>ምንም ታሪክ የለም (No bets yet)</div>"; historyData.my_bets.forEach(h=>{content.innerHTML+=`<div class="history-row border-l-2 ${h.status==='WON'?'border-green-500':'border-red-500'}"><div><div class="text-gray-400">Game</div><div class="font-bold">#${h.game_id}</div></div><div><div class="text-gray-400">Bet/Card</div><div class="text-blue-400">${h.bet}/[${h.card}]</div></div><div class="text-right"><div class="text-gray-400">Result</div><div class="font-black ${h.status==='WON'?'text-green-500':'text-red-500'}">${h.status==='WON'?'+'+h.prize:'-'+(h.bet * (h.card?h.card.toString().split(',').length:1))}</div></div></div>`;});} else historyData.winners.forEach(h=>{content.innerHTML+=`<div class="history-row"><div><div class="text-gray-400">Game</div><div class="font-bold">#${h.game_id}</div></div><div><div class="text-gray-400">Winner</div><div class="text-blue-400">@${h.winner}</div></div><div class="text-right"><div class="text-gray-400">Prize</div><div class="text-green-400 font-black">${h.prize} ETB</div></div></div>`;}); }
 
         function showToast(msg){ const t=document.getElementById('toast-msg'); t.innerText=msg; t.classList.remove('opacity-0'); setTimeout(()=>t.classList.add('opacity-0'),1500); }
         
@@ -638,6 +637,9 @@
                 if(d.status==='ENDED'||d.status==='ANNOUNCED'){ await showWinnerModalFromGameId(myActiveGameId); return; }
                 document.getElementById('nav-prize').innerText=d.prize.toFixed(0);
                 globalCalledNumbers=d.called||[];
+                
+                globalBoardsData = d.boards_data || [];
+                
                 if(d.called && d.called.length){
                     let latest=d.called[d.called.length-1];
                     document.getElementById('latest-ball').innerText=latest;
@@ -649,18 +651,29 @@
                     });
                     document.getElementById('recent-balls').innerHTML=recentHtml;
                 }
-                if(d.boards_data && d.boards_data.length){
+                if(globalBoardsData.length > 0){
                     for(let x=1;x<=4;x++) document.getElementById('slot-'+x).style.display='none';
                     
-                    d.boards_data.forEach((boardObj, i) => {
+                    globalBoardsData.slice(0, 4).forEach((boardObj, i) => {
                         let slotNum = i + 1; 
                         let pc = document.getElementById('play-card-' + slotNum);
                         let parentDiv = pc.parentElement;
                         parentDiv.style.display = 'flex';
                         
                         if(pc.children.length === 0 || pc.innerHTML.includes("LOADING CARDS...")) {
-                            parentDiv.className = "bg-slate-800 p-1.5 pt-2.5 rounded-xl border-2 border-yellow-500 relative shadow-md w-fit mx-auto"; 
-                            parentDiv.innerHTML = `<div class="absolute -top-2 left-2 bg-yellow-500 text-black text-[8px] font-black px-1.5 py-0.5 rounded">#${boardObj.card_number}</div><div id="play-card-${slotNum}" class="grid grid-cols-5 gap-[2px] mt-0.5"></div>`;
+                            // FIX: Added B-I-N-G-O letters back into the active card header!
+                            parentDiv.className = "bg-slate-800 p-1.5 pt-3 rounded-xl border-2 border-yellow-500 relative shadow-md w-fit mx-auto"; 
+                            parentDiv.innerHTML = `
+                                <div class="absolute -top-2 left-2 bg-yellow-500 text-black text-[8px] font-black px-1.5 py-0.5 rounded">#${boardObj.card_number}</div>
+                                <div class="grid grid-cols-5 gap-[2px] mt-1 mb-0.5 text-center">
+                                    <div class="font-black text-[10px] text-blue-400">B</div>
+                                    <div class="font-black text-[10px] text-blue-400">I</div>
+                                    <div class="font-black text-[10px] text-blue-400">N</div>
+                                    <div class="font-black text-[10px] text-blue-400">G</div>
+                                    <div class="font-black text-[10px] text-blue-400">O</div>
+                                </div>
+                                <div id="play-card-${slotNum}" class="grid grid-cols-5 gap-[2px]"></div>
+                            `;
                             pc = document.getElementById('play-card-' + slotNum); 
                             
                             boardObj.board.forEach(row => {
@@ -687,7 +700,25 @@
             } catch(e){}
         }
 
-        function checkLocal1LineWin(){ for(let s=1;s<=4;s++){ const pc=document.getElementById('play-card-'+s); if(!pc||!pc.children.length) continue; const cells=Array.from(pc.querySelectorAll('div')); if(cells.length<25) continue; let grid=[]; for(let i=0;i<5;i++) grid.push(cells.slice(i*5,i*5+5).map(c=>c.classList.contains('is-marked')||c.innerText==='⭐')); for(let i=0;i<5;i++) if(grid[i].every(v=>v)||grid.every(row=>row[i])) return true; if([0,1,2,3,4].every(i=>grid[i][i])) return true; if([0,1,2,3,4].every(i=>grid[i][4-i])) return true; if([grid[0][0],grid[0][4],grid[4][0],grid[4][4]].every(v=>v)) return true; } return false; }
+        function checkLocal1LineWin() { 
+            if (!globalBoardsData.length) return false;
+            let calledSet = new Set(globalCalledNumbers);
+            calledSet.add('FREE');
+            const isCalled = (v) => calledSet.has(v === 'FREE' ? 'FREE' : parseInt(v));
+            
+            for (let b of globalBoardsData) {
+                let board = b.board;
+                for(let i=0; i<5; i++) {
+                    if (board[i].every(v => isCalled(v))) return true;
+                    if ([0,1,2,3,4].every(r => isCalled(board[r][i]))) return true;
+                }
+                if ([0,1,2,3,4].every(i => isCalled(board[i][i]))) return true;
+                if ([0,1,2,3,4].every(i => isCalled(board[i][4-i]))) return true;
+                if ([board[0][0], board[0][4], board[4][0], board[4][4]].every(v => isCalled(v))) return true;
+            }
+            return false; 
+        }
+
         function toggleAutoMode(el){ autoMode=el.checked; if(autoMode) markCardsInstantly(); }
         function markCardsInstantly(){ if(!globalCalledNumbers.length) return; for(let s=1;s<=4;s++) document.querySelectorAll(`#play-card-${s} div`).forEach(cell=>{ let val=cell.innerText; if(val!=='⭐' && globalCalledNumbers.includes(parseInt(val)) && !cell.classList.contains('is-marked')) cell.classList.add('bg-red-500','text-white','border-red-400','is-marked'); }); if(checkLocal1LineWin() && !autoBingoFired){ autoBingoFired=true; hitBingo(); } activateBingoButton(); }
         function activateBingoButton(){ const btn=document.getElementById('bingo-btn'); if(checkLocal1LineWin()) btn.className="w-full py-3 bg-gradient-to-r from-red-500 to-red-700 rounded-xl font-black text-lg shadow-[0_0_20px_rgba(239,68,68,0.4)] text-white active:scale-95 transition-all tracking-widest"; else btn.className="w-full py-3 bg-slate-700 text-slate-400 rounded-xl font-black text-lg border-2 border-slate-600 transition-all tracking-widest"; }
@@ -703,13 +734,15 @@
 
         function updateStatusIndicator() { 
             const indicator=document.getElementById('action-button-container'); 
+            let maxAllowed = activeBet === 10 ? 50 : 4;
+            
             if(myCards.length===0){ 
                 indicator.innerHTML=`<button onclick="pickRandom()" class="btn-random mb-2">🎲 በዕድል (RANDOM)</button><div class="text-center font-bold text-gray-500 text-xs">0 ካርድ ተገዝቷል<br>(Tap numbers to buy)</div>`;
             } else{ 
                 indicator.innerHTML=`
                 <button onclick="pickRandom()" class="btn-random mb-2">🎲 በዕድል (RANDOM)</button>
                 <button onclick="showScreen('v-play')" class="w-full py-2.5 bg-green-500 hover:bg-green-600 rounded-xl font-black text-white shadow-[0_0_15px_rgba(34,197,94,0.4)] active:scale-95 mb-2 transition-all tracking-widest text-sm">▶ አሁን ግባ (JOIN NOW)</button>
-                <div class="text-center font-bold text-xs bg-slate-900 p-2 rounded-xl border border-green-500 w-full"><span class="text-green-400 text-lg">✅ ${myCards.length}/4 ተገዝቷል</span><br><span class="text-gray-400">ጨዋታ እስኪጀምር ይጠብቁ...</span></div>`;
+                <div class="text-center font-bold text-xs bg-slate-900 p-2 rounded-xl border border-green-500 w-full"><span class="text-green-400 text-lg">✅ ${myCards.length}/${maxAllowed} ተገዝቷል</span><br><span class="text-gray-400">ጨዋታ እስኪጀምር ይጠብቁ...</span></div>`;
             } 
         }
 
@@ -734,6 +767,13 @@
             if(isProcessingCard) {
                 if (tg) tg.showAlert("Please wait, processing previous click..."); 
                 else alert("Please wait, processing previous click...");
+                return;
+            }
+            
+            let maxAllowed = activeBet === 10 ? 50 : 4;
+            if (!myCards.includes(n) && myCards.length >= maxAllowed) {
+                if (tg) tg.showAlert(`በዚህ ክፍል ውስጥ ከ ${maxAllowed} ካርድ በላይ መግዛት አይቻልም!`);
+                else alert(`በዚህ ክፍል ውስጥ ከ ${maxAllowed} ካርድ በላይ መግዛት አይቻልም!`);
                 return;
             }
             
@@ -773,7 +813,19 @@
         }
         
         function previewCard(n){ document.getElementById('prev-num').innerText="#"+n; safeFetch('/api/card-data/'+n+'/').then(d=>{ const mini=document.getElementById('mini-grid'); mini.innerHTML=''; d.board.forEach(row=>row.forEach(v=>{ let c=document.createElement('div'); c.className='mini-cell'; c.innerText=v==='FREE'?'X':v; mini.appendChild(c); })); }).catch(e=>console.error); }
-        function pickRandom(){ if(myCards.length>=4) return tg?tg.showAlert("በአንድ ጊዜ ከ 4 ካርድ በላይ መግዛት አይቻልም!"):alert("በአንድ ጊዜ ከ 4 ካርድ በላይ መግዛት አይቻልም!"); let max=getMaxCards(); let r=Math.floor(Math.random()*max)+1; while(myCards.includes(r)) r=Math.floor(Math.random()*max)+1; selectCard(r); }
+        
+        function pickRandom(){ 
+            let maxAllowed = activeBet === 10 ? 50 : 4;
+            if(myCards.length >= maxAllowed) {
+                if(tg) tg.showAlert(`በዚህ ክፍል ውስጥ ከ ${maxAllowed} ካርድ በላይ መግዛት አይቻልም!`);
+                else alert(`በዚህ ክፍል ውስጥ ከ ${maxAllowed} ካርድ በላይ መግዛት አይቻልም!`);
+                return;
+            }
+            let max = getMaxCards(); 
+            let r = Math.floor(Math.random()*max)+1; 
+            while(myCards.includes(r)) r = Math.floor(Math.random()*max)+1; 
+            selectCard(r); 
+        }
 
         setInterval(appLoop, 3000);
         setInterval(() => { 
