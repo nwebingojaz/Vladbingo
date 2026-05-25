@@ -120,7 +120,6 @@ def join_room(request, tg_id, bet, card_num):
         user = User.objects.select_for_update().get(id=user.id)
         
         game = GameRound.objects.select_for_update().filter(status="LOBBY", bet_amount=bet).first()
-        
         if not game: 
             return JsonResponse({'status': 'error', 'error': 'Room is starting or unavailable. Wait for next round.'})
         
@@ -136,6 +135,10 @@ def join_room(request, tg_id, bet, card_num):
         user_cards = players.get(str(tg_id), [])
         if isinstance(user_cards, int): user_cards = [user_cards]
         
+        # 🚀 NEW: DYNAMIC ROOM LIMITS
+        # Room 10 allows 50 cards. All other rooms allow 4 cards.
+        max_allowed_cards = 50 if int(bet) == 10 else 4
+        
         action = ""
         if c_num in user_cards:
             # INSTANT REFUND
@@ -149,8 +152,8 @@ def join_room(request, tg_id, bet, card_num):
             action = 'removed'
         else:
             # INSTANT BUY
-            if len(user_cards) >= 4:
-                return JsonResponse({'status': 'error', 'error': 'Max 4 cards allowed!'})
+            if len(user_cards) >= max_allowed_cards:
+                return JsonResponse({'status': 'error', 'error': f'Max {max_allowed_cards} cards allowed in this room!'})
             if user.operational_credit < Decimal(str(bet)):
                 return JsonResponse({'status': 'error', 'error': 'Insufficient balance!'})
             
@@ -294,7 +297,6 @@ def check_win(request, game_id, tg_id):
             game.finished_at = timezone.now()
             game.save(update_fields=['status', 'winner_username', 'winner_prize', 'finished_at'])
             
-            # 🚀 WEBSOCKET BROADCAST INJECTION
             try:
                 channel_layer = get_channel_layer()
                 async_to_sync(channel_layer.group_send)(
@@ -378,10 +380,8 @@ def submit_deposit(request):
             except:
                 return JsonResponse({"status": "error", "message": "Invalid amount format."})
 
-            # BULLETPROOF FIX: If user doesn't exist, create them instantly!
             user, _ = User.objects.get_or_create(username=f"tg_{tg_id}")
             
-            # Capture the transaction object so we can get its ID!
             tx = Transaction.objects.create(
                 agent=user, 
                 amount=amount, 
@@ -412,7 +412,6 @@ def submit_withdrawal(request):
             except:
                 return JsonResponse({"status": "error", "message": "Invalid amount format."})
 
-            # BULLETPROOF FIX
             user, _ = User.objects.get_or_create(username=f"tg_{tg_id}")
             
             if user.operational_credit < amount: 
@@ -423,7 +422,6 @@ def submit_withdrawal(request):
             user.operational_credit -= amount
             user.save()
             
-            # Capture the transaction object!
             tx = Transaction.objects.create(
                 agent=user, 
                 amount=amount, 
@@ -455,7 +453,6 @@ def submit_transfer(request):
             except:
                 return JsonResponse({"status": "error", "message": "Invalid amount format."})
 
-            # BULLETPROOF FIX
             sender, _ = User.objects.get_or_create(username=f"tg_{tg_id}")
             
             if sender.operational_credit < amount: 
