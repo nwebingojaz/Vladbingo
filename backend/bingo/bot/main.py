@@ -88,6 +88,16 @@ def get_all_user_tg_ids():
         except: pass
     return ids
 
+@sync_to_async
+def change_user_name(target_tg_id, new_name):
+    try:
+        user = User.objects.get(username=f"tg_{target_tg_id}")
+        user.real_name = new_name
+        user.save(update_fields=['real_name'])
+        return True, f"Successfully changed user {target_tg_id}'s name to: {new_name}"
+    except User.DoesNotExist:
+        return False, "User not found."
+
 # ==========================================
 # 4. BACKGROUND JOBS (Broadcaster & Promo)
 # ==========================================
@@ -129,16 +139,15 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, use
     )
 
     if is_admin(user.username.replace('tg_', '')):
-        caption += "\n\n👑 <b>Admin Commands:</b>\n/pending - View pending TXs\n/approve [id] - Approve TX\n/reject [id] - Reject TX\n/forcewin [card_num] - Force a card\n/stats - View Casino Stats\n/broadcast - Reply to any msg to Mass DM"
+        caption += "\n\n👑 <b>Admin Commands:</b>\n/pending - View pending TXs\n/approve [id] - Approve TX\n/reject [id] - Reject TX\n/forcewin [card_num] - Force a card\n/setname [id] [name] - Change a user's name\n/stats - View Casino Stats\n/broadcast - Reply to any msg to Mass DM"
     
-    # FIX: Added ?v=2.1 Cache-Buster query parameter here!
     base_url = "https://vladbingo-dmzg.onrender.com/api/live/?v=2.1"
     
     keyboard = [
         [InlineKeyboardButton("🎮 ጌም ይጫወቱ (Play Games)", web_app=WebAppInfo(url=base_url))],
-        [InlineKeyboardButton("💰 ያስገቡ (Deposit)", web_app=WebAppInfo(url=base_url + "?tab=deposit")), InlineKeyboardButton("💸 ያውጡ (Withdraw)", web_app=WebAppInfo(url=base_url + "?tab=withdraw"))],
-        [InlineKeyboardButton("↔️ ያስተላልፉ (Transfer)", web_app=WebAppInfo(url=base_url + "?tab=transfer")), InlineKeyboardButton("👤 ፕሮፋይል (Profile)", callback_data="profile")],
-        [InlineKeyboardButton("📜 ታሪክ (History)", web_app=WebAppInfo(url=base_url + "?tab=history")), InlineKeyboardButton("⚖️ ሂሳብ (Balance)", callback_data="balance")],
+        [InlineKeyboardButton("💰 ያስገቡ (Deposit)", web_app=WebAppInfo(url=base_url + "&tab=deposit")), InlineKeyboardButton("💸 ያውጡ (Withdraw)", web_app=WebAppInfo(url=base_url + "&tab=withdraw"))],
+        [InlineKeyboardButton("↔️ ያስተላልፉ (Transfer)", web_app=WebAppInfo(url=base_url + "&tab=transfer")), InlineKeyboardButton("👤 ፕሮፋይል (Profile)", callback_data="profile")],
+        [InlineKeyboardButton("📜 ታሪክ (History)", web_app=WebAppInfo(url=base_url + "&tab=history")), InlineKeyboardButton("⚖️ ሂሳብ (Balance)", callback_data="balance")],
         [InlineKeyboardButton("📢 ቻናል (Channel)", url="https://t.me/biggestbingo"), InlineKeyboardButton("💬 ግሩፕ (Group)", url="https://t.me/biggestbingochat")],
         [InlineKeyboardButton("🎧 ያግኙን (Contact Admin)", url="https://t.me/yeab")]
     ]
@@ -228,6 +237,18 @@ async def cmd_forcewin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"🎯 {msg}")
     except (IndexError, ValueError): await update.message.reply_text("⚠️ Usage: /forcewin <card_number>\nUse 0 to clear.")
 
+async def cmd_setname(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.message.from_user.id): return
+    try:
+        target_tg_id = context.args[0]
+        new_name = " ".join(context.args[1:])
+        if not new_name:
+            raise ValueError
+        success, msg = await change_user_name(target_tg_id, new_name)
+        await update.message.reply_text(f"✅ {msg}" if success else f"⚠️ {msg}")
+    except (IndexError, ValueError):
+        await update.message.reply_text("⚠️ Usage: /setname <telegram_id> <New Name Here>")
+
 async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id): return
     msg = await get_casino_stats()
@@ -268,6 +289,7 @@ def run():
     app.add_handler(CommandHandler("approve", cmd_approve))
     app.add_handler(CommandHandler("reject", cmd_reject))
     app.add_handler(CommandHandler("forcewin", cmd_forcewin))
+    app.add_handler(CommandHandler("setname", cmd_setname))
     app.add_handler(CommandHandler("stats", cmd_stats))
     app.add_handler(CommandHandler("broadcast", cmd_broadcast))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
