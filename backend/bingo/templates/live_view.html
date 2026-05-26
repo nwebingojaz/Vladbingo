@@ -10,8 +10,10 @@
     <style>
         body { background-color: #0b0f19; color: white; font-family: sans-serif; overflow: hidden; }
         .header-bg { background: #0f172a; border-bottom: 2px solid #3b82f6; }
-        .room-card { background: #1e293b; border-radius: 12px; padding: 15px; margin-bottom: 10px; border-left: 4px solid #3b82f6; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        .room-card.live { border-left-color: #ef4444; opacity: 0.8; }
+        /* Updated Room Card Styling for a better pop */
+        .room-card { background: linear-gradient(to right, #1e293b, #0f172a); border-radius: 12px; padding: 16px; margin-bottom: 12px; border-left: 4px solid #3b82f6; border-top: 1px solid #1e293b; border-right: 1px solid #1e293b; border-bottom: 1px solid #1e293b; box-shadow: 0 4px 10px rgba(0,0,0,0.4); transition: transform 0.1s; }
+        .room-card:active { transform: scale(0.98); }
+        .room-card.live { border-left-color: #ef4444; background: linear-gradient(to right, #2a1414, #0f172a); }
         .active-banner { background: #0b0f19; border: 2px solid #ef4444; color: #ef4444; border-radius: 8px; padding: 6px; text-align: center; font-weight: 900; margin-bottom: 10px; animation: pulse 2s infinite; }
         .card-num { height: 32px; background: #1e293b; border: 1px solid #3b82f6; border-radius: 4px; font-size: 0.65rem; font-weight: bold; color: #93c5fd; transition: transform 0.1s; }
         .card-num:active { transform: scale(0.9); }
@@ -32,7 +34,6 @@
         #sidebar { position: fixed; top: 0; left: -100%; width: 75%; max-width: 300px; height: 100%; background: #0f172a; z-index: 100; transition: 0.3s; box-shadow: 5px 0 15px rgba(0,0,0,0.5); }
         #sidebar.open { left: 0; }
         
-        /* FIX: FORCE THE GRID CONTAINER TO FLOATING HIGH Z-INDEX TO PREVENT OVERLAYS FROM STEALING CLICKS */
         #grid-container { position: relative; z-index: 9999 !important; pointer-events: auto !important; }
         #sidebar-overlay, .modal, #toast-msg { pointer-events: none !important; }
         .modal[style*="display: flex"], .modal[style*="display: block"], #sidebar.open { pointer-events: auto !important; }
@@ -104,7 +105,8 @@
             🎲 <span class="text-white text-sm" id="nav-room">10</span>
         </div>
         
-        <div class="flex items-center gap-1.5 bg-yellow-500/20 px-3 py-0.5 rounded-xl border border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.2)]">
+        <!-- HIDDEN IN LOBBY, SHOWN IN ROOMS -->
+        <div id="top-nav-prize-box" class="hidden flex items-center gap-1.5 bg-yellow-500/20 px-3 py-0.5 rounded-xl border border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.2)]">
             <span class="text-yellow-500 text-lg animate-pulse">🎁</span> 
             <span class="text-yellow-400 font-black text-xl tracking-wider drop-shadow-md" id="nav-prize">0</span> 
             <span class="text-yellow-500 text-[9px] mt-1">ETB</span>
@@ -137,7 +139,6 @@
         <div class="flex gap-3 items-center bg-slate-800/50 p-3 rounded-2xl border border-white/5">
             <div class="preview-container w-[110px] p-2"><div id="mini-grid" class="grid grid-cols-5 gap-0.5"></div><div class="text-[8px] text-center mt-2 text-blue-400 font-bold uppercase">ካርድ <span id="prev-num">#---</span></div></div>
             <div class="flex-1 flex flex-col justify-center" id="action-button-container">
-                <!-- Instant Buy UX Area -->
             </div>
         </div>
     </div>
@@ -160,11 +161,13 @@
         </div>
 
         <div id="play-tracker" class="mb-2 p-1 bg-slate-900/80 rounded-xl border border-blue-900/50 hidden"></div>
+        
+        <!-- CARDS CONTAINER -->
         <div id="multi-card-container" class="grid grid-cols-2 gap-1 mb-3">
-            <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-1"><div id="play-card-1" class="w-full flex items-center justify-center h-full"><span class="text-slate-600 font-black text-[10px] animate-pulse">LOADING CARDS...</span></div></div>
-            <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-2"><div id="play-card-2" class="w-full flex items-center justify-center h-full"><span class="text-slate-600 font-black text-[10px] animate-pulse">LOADING CARDS...</span></div></div>
-            <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-3"><div id="play-card-3" class="w-full flex items-center justify-center h-full"><span class="text-slate-600 font-black text-[10px] animate-pulse">LOADING CARDS...</span></div></div>
-            <div class="bg-slate-900/50 p-1 rounded-xl border-2 border-slate-700 border-dashed flex items-center justify-center min-h-[100px]" id="slot-4"><div id="play-card-4" class="w-full flex items-center justify-center h-full"><span class="text-slate-600 font-black text-[10px] animate-pulse">LOADING CARDS...</span></div></div>
+            <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex flex-col items-center justify-center min-h-[100px]" id="slot-1"><div id="play-card-1" class="w-full flex items-center justify-center h-full"><span class="text-slate-600 font-black text-[10px] animate-pulse">LOADING CARDS...</span></div></div>
+            <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex flex-col items-center justify-center min-h-[100px]" id="slot-2"><div id="play-card-2" class="w-full flex items-center justify-center h-full"><span class="text-slate-600 font-black text-[10px] animate-pulse">LOADING CARDS...</span></div></div>
+            <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex flex-col items-center justify-center min-h-[100px]" id="slot-3"><div id="play-card-3" class="w-full flex items-center justify-center h-full"><span class="text-slate-600 font-black text-[10px] animate-pulse">LOADING CARDS...</span></div></div>
+            <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex flex-col items-center justify-center min-h-[100px]" id="slot-4"><div id="play-card-4" class="w-full flex items-center justify-center h-full"><span class="text-slate-600 font-black text-[10px] animate-pulse">LOADING CARDS...</span></div></div>
         </div>
         <button onclick="hitBingo()" id="bingo-btn" class="w-full py-3 bg-slate-700 text-slate-400 rounded-xl font-black text-lg border-2 border-slate-600 transition-all tracking-widest shadow-lg">BINGO!</button>
     </div>
@@ -488,6 +491,16 @@
             document.getElementById(id).classList.remove('hidden'); 
             
             document.getElementById('nav-room').innerText = activeBet;
+            
+            // --- HIDE GLOBAL PRIZE IN LOBBY ---
+            const prizeBox = document.getElementById('top-nav-prize-box');
+            if(id === 'v-lobby') {
+                if(prizeBox) prizeBox.classList.add('hidden');
+            } else {
+                if(prizeBox) prizeBox.classList.remove('hidden');
+            }
+            // ----------------------------------
+
             if(id==='v-selector') updateStatusIndicator(); 
             const timerBar = document.getElementById('timer-bar'); 
             if(id==='v-play') timerBar.classList.add('hidden'); 
@@ -620,12 +633,43 @@
                     }
                 }
 
-                const list=document.getElementById('room-list'); list.innerHTML='';
-                d.rooms.sort((a,b)=>a.bet-b.bet).forEach(room=>{
-                    const isLive=room.status==='ACTIVE';
+                const list = document.getElementById('room-list'); 
+                list.innerHTML = '';
+                
+                d.rooms.sort((a,b)=>a.bet-b.bet).forEach(room => {
+                    const isLive = room.status === 'ACTIVE';
                     const numCardsOwned = (myLobbyCardsMap[room.bet.toString()] || []).length;
                     
-                    list.innerHTML+=`<div onclick="selectRoom(${room.bet})" class="room-card ${isLive?'live':''} cursor-pointer"><div class="flex justify-between w-full"><div><div class="text-white font-black text-xl">BIGGEST BINGO ${room.bet}</div><div class="text-[11px] font-bold ${isLive?'text-red-400':'text-blue-400'} mt-1">${isLive?'እየተጠራ ነው: '+room.called_count+'/75':'ሊጀምር ነው: '+room.time_left+'s'}</div><div class="text-[10px] text-gray-400 mt-1">ሽልማት: <span class="text-white font-bold">${room.win.toFixed(0)} ETB</span></div></div><div class="flex flex-col items-end justify-center"><div class="${isLive?'text-red-500':'text-blue-500'} font-bold text-2xl">${isLive?'⏳':'▶'}</div><div class="text-[9px] ${numCardsOwned>0?'text-green-400 font-bold':'text-gray-500'} mt-2">${room.players} ተጫዋች (${numCardsOwned} ያንተ)</div></div></div></div>`;
+                    let displayPlayers = room.players;
+                    if (numCardsOwned > 1) {
+                        displayPlayers = room.players + numCardsOwned - 1; 
+                    }
+                    
+                    // --- MASSIVE PRIZE LOBBY CARD DESIGN ---
+                    list.innerHTML += `
+                    <div onclick="selectRoom(${room.bet})" class="room-card ${isLive?'live':''} cursor-pointer">
+                        <div class="flex justify-between items-center w-full">
+                            <div class="flex flex-col">
+                                <div class="text-white font-black text-xl drop-shadow-md">🎲 BINGO ${room.bet}</div>
+                                <div class="text-[10px] font-bold ${isLive?'text-red-400':'text-blue-400'} mt-1 mb-2 bg-black/30 px-2 py-0.5 rounded w-fit">
+                                    ${isLive ? '🔴 እየተጠራ ነው: ' + room.called_count + '/75' : '🟢 ሊጀምር ነው: ' + room.time_left + 's'}
+                                </div>
+                                <div class="text-[10px] ${displayPlayers>0?'text-green-400 font-bold':'text-gray-500'}">
+                                    👥 ${displayPlayers} ተጫዋች ገብቷል
+                                </div>
+                            </div>
+                            
+                            <div class="flex flex-col items-end text-right">
+                                <div class="text-[9px] text-yellow-500/80 font-black uppercase tracking-widest mb-0.5">🎁 ሽልማት (PRIZE)</div>
+                                <div class="text-3xl font-black text-yellow-400 tracking-tighter drop-shadow-[0_0_15px_rgba(250,204,21,0.5)]">
+                                    ${room.win.toFixed(0)} <span class="text-xs font-bold text-yellow-500">ETB</span>
+                                </div>
+                                <div class="${isLive?'bg-red-500/20 text-red-400 border-red-500/50':'bg-blue-600 text-white border-blue-500'} border px-4 py-1 rounded-full text-[10px] font-black mt-2 shadow-lg uppercase tracking-wider">
+                                    ${isLive ? 'ተመልከት ⏳' : 'ግባ (Play) ▶'}
+                                </div>
+                            </div>
+                        </div>
+                    </div>`;
                 });
             } catch(e){}
         }
@@ -658,20 +702,24 @@
                         let slotNum = i + 1; 
                         let pc = document.getElementById('play-card-' + slotNum);
                         let parentDiv = pc.parentElement;
+                        
                         parentDiv.style.display = 'flex';
+                        parentDiv.style.flexDirection = 'column'; 
                         
                         if(pc.children.length === 0 || pc.innerHTML.includes("LOADING CARDS...")) {
-                            // FIX: Added B-I-N-G-O letters back into the active card header!
-                            parentDiv.className = "bg-slate-800 p-1.5 pt-3 rounded-xl border-2 border-yellow-500 relative shadow-md w-fit mx-auto"; 
+                            parentDiv.className = "flex flex-col items-center bg-slate-800 p-2 pt-4 rounded-xl border-2 border-yellow-500 relative shadow-md w-fit mx-auto"; 
+                            
                             parentDiv.innerHTML = `
                                 <div class="absolute -top-2 left-2 bg-yellow-500 text-black text-[8px] font-black px-1.5 py-0.5 rounded">#${boardObj.card_number}</div>
-                                <div class="grid grid-cols-5 gap-[2px] mt-1 mb-0.5 text-center">
-                                    <div class="font-black text-[10px] text-blue-400">B</div>
-                                    <div class="font-black text-[10px] text-blue-400">I</div>
-                                    <div class="font-black text-[10px] text-blue-400">N</div>
-                                    <div class="font-black text-[10px] text-blue-400">G</div>
-                                    <div class="font-black text-[10px] text-blue-400">O</div>
+                                
+                                <div class="grid grid-cols-5 gap-[2px] w-full text-center mb-1">
+                                    <div class="font-black text-xs text-blue-400 w-[27px] sm:w-[32px]">B</div>
+                                    <div class="font-black text-xs text-blue-400 w-[27px] sm:w-[32px]">I</div>
+                                    <div class="font-black text-xs text-blue-400 w-[27px] sm:w-[32px]">N</div>
+                                    <div class="font-black text-xs text-blue-400 w-[27px] sm:w-[32px]">G</div>
+                                    <div class="font-black text-xs text-blue-400 w-[27px] sm:w-[32px]">O</div>
                                 </div>
+                                
                                 <div id="play-card-${slotNum}" class="grid grid-cols-5 gap-[2px]"></div>
                             `;
                             pc = document.getElementById('play-card-' + slotNum); 
@@ -742,7 +790,7 @@
                 indicator.innerHTML=`
                 <button onclick="pickRandom()" class="btn-random mb-2">🎲 በዕድል (RANDOM)</button>
                 <button onclick="showScreen('v-play')" class="w-full py-2.5 bg-green-500 hover:bg-green-600 rounded-xl font-black text-white shadow-[0_0_15px_rgba(34,197,94,0.4)] active:scale-95 mb-2 transition-all tracking-widest text-sm">▶ አሁን ግባ (JOIN NOW)</button>
-                <div class="text-center font-bold text-xs bg-slate-900 p-2 rounded-xl border border-green-500 w-full"><span class="text-green-400 text-lg">✅ ${myCards.length}/${maxAllowed} ተገዝቷል</span><br><span class="text-gray-400">ጨዋታ እስኪጀምር ይጠብቁ...</span></div>`;
+                <div class="text-center font-bold text-xs bg-slate-900 p-2 rounded-xl border border-green-500 w-full"><span class="text-green-400 text-lg">✅ ${myCards.length} ተገዝቷል (4 ይታያሉ)</span><br><span class="text-gray-400">ጨዋታ እስኪጀምር ይጠብቁ...</span></div>`;
             } 
         }
 
