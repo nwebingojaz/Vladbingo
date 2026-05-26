@@ -10,7 +10,6 @@
     <style>
         body { background-color: #0b0f19; color: white; font-family: sans-serif; overflow: hidden; }
         .header-bg { background: #0f172a; border-bottom: 2px solid #3b82f6; }
-        /* Updated Room Card Styling for a better pop */
         .room-card { background: linear-gradient(to right, #1e293b, #0f172a); border-radius: 12px; padding: 16px; margin-bottom: 12px; border-left: 4px solid #3b82f6; border-top: 1px solid #1e293b; border-right: 1px solid #1e293b; border-bottom: 1px solid #1e293b; box-shadow: 0 4px 10px rgba(0,0,0,0.4); transition: transform 0.1s; }
         .room-card:active { transform: scale(0.98); }
         .room-card.live { border-left-color: #ef4444; background: linear-gradient(to right, #2a1414, #0f172a); }
@@ -426,7 +425,11 @@
             if (data.action === 'new_ball' && data.ball) {
                 
                 let letter = "B"; if(data.ball>15) letter="I"; if(data.ball>30) letter="N"; if(data.ball>45) letter="G"; if(data.ball>60) letter="O";
-                playSound(letter + data.ball + '.mp3');
+                
+                // --- AUDIO FIX: Pad numbers 1-9 with a leading zero to match audio files! ---
+                let paddedBall = data.ball < 10 ? '0' + data.ball : data.ball;
+                playSound(letter + paddedBall + '.mp3');
+                // ---------------------------------------------------------------------------
 
                 document.getElementById('latest-ball').innerText = data.ball;
                 document.getElementById('called-count-badge').innerText = data.called_count;
@@ -492,14 +495,12 @@
             
             document.getElementById('nav-room').innerText = activeBet;
             
-            // --- HIDE GLOBAL PRIZE IN LOBBY ---
             const prizeBox = document.getElementById('top-nav-prize-box');
             if(id === 'v-lobby') {
                 if(prizeBox) prizeBox.classList.add('hidden');
             } else {
                 if(prizeBox) prizeBox.classList.remove('hidden');
             }
-            // ----------------------------------
 
             if(id==='v-selector') updateStatusIndicator(); 
             const timerBar = document.getElementById('timer-bar'); 
@@ -600,17 +601,23 @@
                 document.getElementById('bal-header').innerText = d.balance.toFixed(2);
                 myLobbyCardsMap = d.my_lobby_cards || {};
                 
+                let syncRoom = null;
                 if (d.rooms) {
-                    let activeR = d.rooms.find(r=>r.id===d.active_game_id);
-                    if(activeR){ 
-                        currentRoomTime=activeR.time_left; 
-                        currentRoomStatus=activeR.status; 
-                        document.getElementById('nav-prize').innerText=activeR.win.toFixed(0);
+                    if (d.active_game_id) {
+                        syncRoom = d.rooms.find(r => r.id === d.active_game_id);
+                    } else {
+                        syncRoom = d.rooms.find(r => r.bet === activeBet);
                     }
                 }
+
+                if (syncRoom) { 
+                    currentRoomTime = syncRoom.time_left; 
+                    currentRoomStatus = syncRoom.status; 
+                    document.getElementById('nav-prize').innerText = syncRoom.win.toFixed(0);
+                }
                 
-                if(d.active_game_id){ 
-                    myActiveGameId=d.active_game_id; 
+                if (d.active_game_id) { 
+                    myActiveGameId = d.active_game_id; 
                     if (currentRoomStatus === 'ACTIVE' && sessionStorage.getItem('currentScreen') !== 'v-play') {
                         showScreen('v-play');
                     }
@@ -636,41 +643,42 @@
                 const list = document.getElementById('room-list'); 
                 list.innerHTML = '';
                 
-                d.rooms.sort((a,b)=>a.bet-b.bet).forEach(room => {
-                    const isLive = room.status === 'ACTIVE';
-                    const numCardsOwned = (myLobbyCardsMap[room.bet.toString()] || []).length;
-                    
-                    let displayPlayers = room.players;
-                    if (numCardsOwned > 1) {
-                        displayPlayers = room.players + numCardsOwned - 1; 
-                    }
-                    
-                    // --- MASSIVE PRIZE LOBBY CARD DESIGN ---
-                    list.innerHTML += `
-                    <div onclick="selectRoom(${room.bet})" class="room-card ${isLive?'live':''} cursor-pointer">
-                        <div class="flex justify-between items-center w-full">
-                            <div class="flex flex-col">
-                                <div class="text-white font-black text-xl drop-shadow-md">🎲 BINGO ${room.bet}</div>
-                                <div class="text-[10px] font-bold ${isLive?'text-red-400':'text-blue-400'} mt-1 mb-2 bg-black/30 px-2 py-0.5 rounded w-fit">
-                                    ${isLive ? '🔴 እየተጠራ ነው: ' + room.called_count + '/75' : '🟢 ሊጀምር ነው: ' + room.time_left + 's'}
+                if(d.rooms) {
+                    d.rooms.sort((a,b)=>a.bet-b.bet).forEach(room => {
+                        const isLive = room.status === 'ACTIVE';
+                        const numCardsOwned = (myLobbyCardsMap[room.bet.toString()] || []).length;
+                        
+                        let displayPlayers = room.players;
+                        if (numCardsOwned > 1) {
+                            displayPlayers = room.players + numCardsOwned - 1; 
+                        }
+                        
+                        list.innerHTML += `
+                        <div onclick="selectRoom(${room.bet})" class="room-card ${isLive?'live':''} cursor-pointer">
+                            <div class="flex justify-between items-center w-full">
+                                <div class="flex flex-col">
+                                    <div class="text-white font-black text-xl drop-shadow-md">🎲 BINGO ${room.bet}</div>
+                                    <div class="text-[10px] font-bold ${isLive?'text-red-400':'text-blue-400'} mt-1 mb-2 bg-black/30 px-2 py-0.5 rounded w-fit">
+                                        ${isLive ? '🔴 እየተጠራ ነው: ' + room.called_count + '/75' : '🟢 ሊጀምር ነው: ' + room.time_left + 's'}
+                                    </div>
+                                    <div class="text-[10px] ${displayPlayers>0?'text-green-400 font-bold':'text-gray-500'}">
+                                        👥 ${displayPlayers} ተጫዋች ገብቷል
+                                    </div>
                                 </div>
-                                <div class="text-[10px] ${displayPlayers>0?'text-green-400 font-bold':'text-gray-500'}">
-                                    👥 ${displayPlayers} ተጫዋች ገብቷል
+                                
+                                <div class="flex flex-col items-end text-right">
+                                    <div class="text-[9px] text-yellow-500/80 font-black uppercase tracking-widest mb-0.5">🎁 ደራሽ (PRIZE)</div>
+                                    <div class="text-3xl font-black text-yellow-400 tracking-tighter drop-shadow-[0_0_15px_rgba(250,204,21,0.5)]">
+                                        ${room.win.toFixed(0)} <span class="text-xs font-bold text-yellow-500">ETB</span>
+                                    </div>
+                                    <div class="${isLive?'bg-red-500/20 text-red-400 border-red-500/50':'bg-blue-600 text-white border-blue-500'} border px-4 py-1 rounded-full text-[10px] font-black mt-2 shadow-lg uppercase tracking-wider">
+                                        ${isLive ? 'ተመልከት ⏳' : 'ግባ (Play) ▶'}
+                                    </div>
                                 </div>
                             </div>
-                            
-                            <div class="flex flex-col items-end text-right">
-                                <div class="text-[9px] text-yellow-500/80 font-black uppercase tracking-widest mb-0.5">🎁 ደራሽ (PRIZE)</div>
-                                <div class="text-3xl font-black text-yellow-400 tracking-tighter drop-shadow-[0_0_15px_rgba(250,204,21,0.5)]">
-                                    ${room.win.toFixed(0)} <span class="text-xs font-bold text-yellow-500">ETB</span>
-                                </div>
-                                <div class="${isLive?'bg-red-500/20 text-red-400 border-red-500/50':'bg-blue-600 text-white border-blue-500'} border px-4 py-1 rounded-full text-[10px] font-black mt-2 shadow-lg uppercase tracking-wider">
-                                    ${isLive ? 'ተመልከት ⏳' : 'ግባ (Play) ▶'}
-                                </div>
-                            </div>
-                        </div>
-                    </div>`;
-                });
+                        </div>`;
+                    });
+                }
             } catch(e){}
         }
 
