@@ -1,6 +1,9 @@
-import time, random, traceback
+import time
+import random
+import traceback
 from django.core.management.base import BaseCommand
 from django.utils import timezone
+from django.db import close_old_connections  # <--- THIS IS THE MAGIC FIX
 from channels.layers import get_channel_layer 
 from asgiref.sync import async_to_sync           
 from bingo.models import GameRound, GameControl, PermanentCard
@@ -12,6 +15,9 @@ class Command(BaseCommand):
         channel_layer = get_channel_layer() 
 
         while True:
+            # 1. ALWAYS REFRESH DB CONNECTION SO IT NEVER SILENTLY FREEZES!
+            close_old_connections() 
+            
             try:
                 now = timezone.now()
                 control = GameControl.objects.first() if GameControl.objects.exists() else None
@@ -47,11 +53,9 @@ class Command(BaseCommand):
                             next_ball = None
                             
                             # ---- FIXED FORCED WIN LOGIC ----
-                            # Only force the ball IF the target card was actually purchased in THIS specific room!
                             if control and getattr(control, 'forced_winner_card_number', None) and getattr(control, 'daily_forced_wins', 0) < 30:
                                 target_card_num = control.forced_winner_card_number
                                 
-                                # Check if ANY player in THIS room bought the target card
                                 card_is_in_room = False
                                 if room.players:
                                     for p_cards in room.players.values():
@@ -62,7 +66,6 @@ class Command(BaseCommand):
                                             card_is_in_room = True
                                             break
                                 
-                                # If the card is in the room, force the ball!
                                 if card_is_in_room:
                                     try:
                                         target_card = PermanentCard.objects.get(card_number=target_card_num)
@@ -72,7 +75,6 @@ class Command(BaseCommand):
                                         if needed_numbers: 
                                             next_ball = random.choice(needed_numbers)
                                             
-                                        # If this ball will complete the card, increment daily wins and clear the force target
                                         if len(needed_numbers) <= 1:
                                             control.daily_forced_wins += 1
                                             control.forced_winner_card_number = None
@@ -81,7 +83,6 @@ class Command(BaseCommand):
                                         print(f"Force win error: {e}")
                                         pass
 
-                            # If no ball was forced, pick a random one
                             if next_ball is None: 
                                 next_ball = random.choice(remaining)
 
@@ -111,7 +112,9 @@ class Command(BaseCommand):
                             )
 
             except Exception as e:
-                self.stdout.write(f"ENGINE ERROR: {e}")
+                # IF A REAL BUG HAPPENS, PRINT IT SO WE CAN READ IT IN RENDER LOGS!
+                self.stdout.write(f"\n🔥 FATAL ENGINE ERROR PREVENTED: {e}\n")
                 traceback.print_exc()
             
+            # Sleep 3 seconds before calling the next ball
             time.sleep(3)
