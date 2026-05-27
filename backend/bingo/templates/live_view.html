@@ -332,11 +332,27 @@
         let refreshRunning = false; 
         let globalBoardsData = [];
 
-        // 🔊 AUDIO ENGINE
+        // 🔊 AUDIO ENGINE & UNLOCKER (FIX FOR SILENT INITIAL BALLS)
+        let audioUnlocked = false;
+        function initAudio() {
+            if (audioUnlocked) return;
+            // Play a tiny silent dummy sound to force the browser to unlock the Audio Context
+            let a = new Audio();
+            a.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA"; 
+            a.play().then(() => { audioUnlocked = true; }).catch(e => {});
+            document.removeEventListener('touchstart', initAudio);
+            document.removeEventListener('click', initAudio);
+        }
+        document.addEventListener('touchstart', initAudio);
+        document.addEventListener('click', initAudio);
+
         function playSound(filename) {
             try {
                 let audio = new Audio('/static/audio/' + filename);
-                audio.play().catch(e => console.log("Audio play blocked by browser:", e));
+                let playPromise = audio.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(e => console.log("Audio autoplay blocked. User needs to tap screen."));
+                }
             } catch(e) { console.error("Audio error:", e); }
         }
 
@@ -625,20 +641,32 @@
                     myActiveGameId = null;
                 }
                 
-                if(isFirstLoad){
-                    isFirstLoad=false;
-                    const saved=sessionStorage.getItem('currentScreen');
-                    if(saved==='v-selector' || saved==='v-play'){
-                        activeBet = parseInt(sessionStorage.getItem('activeBet')) || 10;
+                // --- FIX FOR BLACK SCREEN ON REFRESH ---
+                if(isFirstLoad) {
+                    isFirstLoad = false;
+                    let saved = sessionStorage.getItem('currentScreen');
+                    
+                    if (myActiveGameId && currentRoomStatus === 'ACTIVE') {
+                        // Game is live, force into play screen correctly
+                        activeBet = syncRoom ? syncRoom.bet : activeBet;
                         myCards = myLobbyCardsMap[activeBet.toString()] || [];
-                        document.getElementById('nav-room').innerText=activeBet;
-                        showScreen(saved);
+                        document.getElementById('nav-room').innerText = activeBet;
+                        showScreen('v-play');
+                    } else if (saved === 'v-selector' && activeBet) {
+                        // In lobby, looking at selector correctly
+                        myCards = myLobbyCardsMap[activeBet.toString()] || [];
+                        document.getElementById('nav-room').innerText = activeBet;
+                        showScreen('v-selector');
                         initGrid();
                         myCards.forEach(c=>{ let btn=document.getElementById('c-'+c); if(btn) btn.classList.add('active');});
                         if(myCards.length) previewCard(myCards[myCards.length-1]);
-                        if(saved==='v-selector') updateStatusIndicator();
+                        updateStatusIndicator();
+                    } else {
+                        // Safe fallback to main lobby
+                        showScreen('v-lobby');
                     }
                 }
+                // ----------------------------------------
 
                 const list = document.getElementById('room-list'); 
                 list.innerHTML = '';
@@ -884,6 +912,8 @@
         }
 
         setInterval(appLoop, 3000);
+        
+        // --- TIMER FIX: NO DELAY AT 0:00 ---
         setInterval(() => { 
             const tEl = document.getElementById('timer'); 
             const lbl = document.getElementById('timer-label'); 
@@ -893,14 +923,19 @@
                 lbl.innerText = "ጨዋታው ሊጀምር ነው: "; tEl.classList.remove('text-red-400'); 
                 if(currentRoomTime > 0) {
                     currentRoomTime--; 
-                    if (currentRoomTime === 0 && sessionStorage.getItem('currentScreen') === 'v-selector') {
-                        playSound('game_start.mp3');
+                    if (currentRoomTime === 0) {
+                        if (sessionStorage.getItem('currentScreen') === 'v-selector') {
+                            playSound('game_start.mp3');
+                        }
+                        // FORCE IMMEDIATE REFRESH WHEN TIMER HITS ZERO!
+                        appLoop();
                     }
                 }
                 let m = Math.floor(currentRoomTime / 60), s = currentRoomTime % 60; 
                 tEl.innerText = m + ":" + (s < 10 ? "0" + s : s); 
             } 
         }, 1000);
+        // ------------------------------------
         
         appLoop();
     </script>
