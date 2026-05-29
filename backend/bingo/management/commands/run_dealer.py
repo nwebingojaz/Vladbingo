@@ -3,19 +3,86 @@ import random
 import traceback
 from django.core.management.base import BaseCommand
 from django.utils import timezone
-from django.db import close_old_connections  # <--- THIS IS THE MAGIC FIX
+from django.db import close_old_connections  
+from django.core.cache import cache
 from channels.layers import get_channel_layer 
 from asgiref.sync import async_to_sync           
 from bingo.models import GameRound, GameControl, PermanentCard
 
+# ==========================================
+# 👻 SMART GHOST PLAYER ENGINE (GOD MODE)
+# ==========================================
+def get_ghost_card_count(tier):
+    """ Reads the min and max limits for THIS SPECIFIC ROOM """
+    
+    # 🧠 SMART DEFAULTS: If you haven't typed a command, act naturally.
+    if tier == 100:
+        default_min, default_max = 0, 0   # VIP Room totally sleeps by default
+    elif tier in [40, 50]:
+        default_min, default_max = 0, 2   # 40/50 ETB rooms rarely get a game
+    elif tier in [20, 30]:
+        default_min, default_max = 0, 4   # 20/30 ETB sometimes sleep, sometimes get 1-4 players
+    else:
+        # Tier 10 ETB
+        default_min, default_max = 3, 10  # The 10 ETB room is the HOOK. It is ALWAYS busy.
+
+    ghost_min = cache.get(f'ghost_min_{tier}', default_min)
+    ghost_max = cache.get(f'ghost_max_{tier}', default_max)
+    
+    # Failsafe if you type the numbers backwards
+    if ghost_min > ghost_max:
+        ghost_min, ghost_max = ghost_max, ghost_min
+        
+    # Safety Cap
+    max_allowed_in_room = 990 if tier == 10 else 490
+    safe_max = min(ghost_max, max_allowed_in_room)
+    safe_min = min(ghost_min, safe_max)
+
+    return random.randint(safe_min, safe_max)
+
+def inject_ghost_players(room, tier):
+    """ Generates fake Ethiopian players and assigns them random cards """
+    ghost_count = get_ghost_card_count(tier)
+    
+    # If the ghost count is 0, we leave the room empty so the timer sleeps!
+    if ghost_count == 0:
+        return
+    
+    # Fake Usernames that look exactly like real Telegram users
+    fake_names = [
+        "tg_Abebe", "tg_Dawit", "tg_Chala", "tg_Bereket", "tg_Ephrem", 
+        "tg_Sisay", "tg_Biniyam", "tg_Mesfin", "tg_Yonatan", "tg_Habtamu", 
+        "tg_Kaleb", "tg_Nahom", "tg_Eyob", "tg_Tewodros", "tg_Natnael", "tg_Yosef",
+        "tg_Henok", "tg_Abel", "tg_Matiyas", "tg_Kidus", "tg_Bruk"
+    ]
+    
+    max_cards = 1000 if tier == 10 else 500
+    available = list(range(1, max_cards + 1))
+    random.shuffle(available)
+    selected_cards = available[:ghost_count]
+    
+    players_dict = {}
+    idx = 0
+    
+    # Distribute the fake cards into chunks of 1 to 5 cards per fake user
+    while idx < len(selected_cards):
+        chunk = random.randint(1, 5)
+        bot_name = random.choice(fake_names) + str(random.randint(10, 999))
+        players_dict[bot_name] = selected_cards[idx:idx+chunk]
+        idx += chunk
+        
+    room.players = players_dict
+    room.save(update_fields=['players'])
+
+
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        self.stdout.write("BIGEST BINGO DEALER: ENGINE STARTED (WEBSOCKET MODE)")
+        self.stdout.write("BIGGEST BINGO DEALER: ENGINE STARTED WITH GHOST PLAYERS")
         TIERS = [10, 20, 30, 40, 50, 100]
         channel_layer = get_channel_layer() 
 
         while True:
-            # 1. ALWAYS REFRESH DB CONNECTION SO IT NEVER SILENTLY FREEZES!
+            # Refresh DB connection so it never silently freezes
             close_old_connections() 
             
             try:
@@ -26,7 +93,9 @@ class Command(BaseCommand):
                     active_rooms = GameRound.objects.filter(bet_amount=tier).exclude(status__in=["ENDED", "ANNOUNCED"]).order_by('created_at')
                     
                     if not active_rooms.exists():
-                        GameRound.objects.create(bet_amount=tier, status="LOBBY")
+                        # Create the room AND immediately inject the Ghost Players!
+                        new_room = GameRound.objects.create(bet_amount=tier, status="LOBBY")
+                        inject_ghost_players(new_room, tier)
                         continue
                     
                     if active_rooms.count() > 1:
@@ -39,8 +108,9 @@ class Command(BaseCommand):
                     if room.status == "LOBBY":
                         elapsed = (now - room.created_at).total_seconds()
                         if elapsed >= 60:
+                            # If room is completely empty (no real players, and ghost rolled 0), it goes to SLEEP
                             if not room.players:
-                                room.created_at = now
+                                room.created_at = now  # Reset the 60s timer
                                 room.save(update_fields=['created_at'])
                             else:
                                 room.status = "ACTIVE"
@@ -52,7 +122,7 @@ class Command(BaseCommand):
                             remaining = [n for n in range(1, 76) if n not in called]
                             next_ball = None
                             
-                            # ---- FIXED FORCED WIN LOGIC ----
+                            # Forced Win Logic
                             if control and getattr(control, 'forced_winner_card_number', None) and getattr(control, 'daily_forced_wins', 0) < 30:
                                 target_card_num = control.forced_winner_card_number
                                 
@@ -80,7 +150,6 @@ class Command(BaseCommand):
                                             control.forced_winner_card_number = None
                                             control.save()
                                     except Exception as e: 
-                                        print(f"Force win error: {e}")
                                         pass
 
                             if next_ball is None: 
@@ -112,9 +181,9 @@ class Command(BaseCommand):
                             )
 
             except Exception as e:
-                # IF A REAL BUG HAPPENS, PRINT IT SO WE CAN READ IT IN RENDER LOGS!
+                # ARMOR: Catch crashes, log them, and keep engine running!
                 self.stdout.write(f"\n🔥 FATAL ENGINE ERROR PREVENTED: {e}\n")
                 traceback.print_exc()
             
-            # Sleep 3 seconds before calling the next ball
+            # Sleep 3 seconds between engine ticks
             time.sleep(3)
