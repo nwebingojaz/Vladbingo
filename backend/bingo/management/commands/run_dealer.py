@@ -6,7 +6,7 @@ from django.utils import timezone
 from django.db import close_old_connections  
 from channels.layers import get_channel_layer 
 from asgiref.sync import async_to_sync           
-from bingo.models import GameRound, GameControl, PermanentCard, User # <--- Added User model here!
+from bingo.models import GameRound, GameControl, PermanentCard, User
 
 # ==========================================
 # 👻 SMART GHOST PLAYER ENGINE (GOD MODE)
@@ -14,29 +14,25 @@ from bingo.models import GameRound, GameControl, PermanentCard, User # <--- Adde
 def get_ghost_card_count(tier):
     """ Reads the min and max limits for THIS SPECIFIC ROOM from the DB """
     
-    # 🧠 SMART DEFAULTS: If you haven't typed a command, act naturally.
-    if tier == 100:
-        default_min, default_max = 0, 0   # VIP Room totally sleeps by default
-    elif tier in [40, 50]:
-        default_min, default_max = 0, 2   # 40/50 ETB rooms rarely get a game
-    elif tier in [20, 30]:
-        default_min, default_max = 0, 4   # 20/30 ETB sometimes sleep, sometimes get 1-4 players
-    else:
-        # Tier 10 ETB
-        default_min, default_max = 3, 15  # The 10 ETB room is the HOOK.
+    # 🧠 SMART DEFAULTS
+    if tier == 100: default_min, default_max = 0, 0
+    elif tier in [40, 50]: default_min, default_max = 0, 2
+    elif tier in [20, 30]: default_min, default_max = 0, 4
+    else: default_min, default_max = 3, 15
 
     ghost_min = default_min
     ghost_max = default_max
     
-    # --- Engine reads the limits from the hidden Database User! ---
+    # --- Engine reads the limits directly from the DB! ---
     try:
-        config_user = User.objects.get(username=f"sys_ghost_{tier}")
-        if config_user.real_name and "," in config_user.real_name:
+        config_user = User.objects.filter(username=f"sys_ghost_{tier}").first()
+        if config_user and config_user.real_name and "," in config_user.real_name:
             parts = config_user.real_name.split(",")
             ghost_min = int(parts[0])
             ghost_max = int(parts[1])
-    except Exception:
-        pass # If you haven't run the command yet, it safely ignores this and uses defaults!
+    except Exception as e:
+        print(f"Ghost Read Error for Room {tier}: {e}")
+        pass
     
     # Failsafe if you type the numbers backwards
     if ghost_min > ghost_max:
@@ -53,11 +49,10 @@ def inject_ghost_players(room, tier):
     """ Generates fake Ethiopian players and assigns them random cards """
     ghost_count = get_ghost_card_count(tier)
     
-    # If the ghost count is 0, we leave the room empty so the timer sleeps!
+    # If the ghost count is 0, we leave the room completely empty
     if ghost_count == 0:
         return False
     
-    # Fake Usernames that look exactly like real Telegram users
     fake_names = [
         "tg_Abebe", "tg_Dawit", "tg_Chala", "tg_Bereket", "tg_Ephrem", 
         "tg_Sisay", "tg_Biniyam", "tg_Mesfin", "tg_Yonatan", "tg_Habtamu", 
@@ -70,10 +65,9 @@ def inject_ghost_players(room, tier):
     random.shuffle(available)
     selected_cards = available[:ghost_count]
     
-    players_dict = room.players or {}  # Keep existing players if any
+    players_dict = room.players or {} 
     idx = 0
     
-    # Distribute the fake cards into chunks of 1 to 5 cards per fake user
     while idx < len(selected_cards):
         chunk = random.randint(1, 5)
         bot_name = random.choice(fake_names) + str(random.randint(10, 999))
@@ -118,13 +112,11 @@ class Command(BaseCommand):
                     if room.status == "LOBBY":
                         
                         # --- INSTANT SELF-HEALING ---
-                        # If the room is empty right now, inject ghosts instantly!
                         if not room.players:
                             inject_ghost_players(room, tier)
                         
                         elapsed = (now - room.created_at).total_seconds()
                         if elapsed >= 60:
-                            # If room is completely empty (no real players, and ghost rolled 0), it goes to SLEEP
                             if not room.players:
                                 room.created_at = now  # Reset the 60s timer
                                 room.save(update_fields=['created_at'])
