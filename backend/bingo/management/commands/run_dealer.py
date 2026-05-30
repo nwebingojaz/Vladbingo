@@ -24,7 +24,7 @@ def get_ghost_card_count(tier):
         default_min, default_max = 0, 4   # 20/30 ETB sometimes sleep, sometimes get 1-4 players
     else:
         # Tier 10 ETB
-        default_min, default_max = 3, 10  # The 10 ETB room is the HOOK. It is ALWAYS busy.
+        default_min, default_max = 3, 15  # The 10 ETB room is the HOOK.
 
     ghost_min = cache.get(f'ghost_min_{tier}', default_min)
     ghost_max = cache.get(f'ghost_max_{tier}', default_max)
@@ -46,7 +46,7 @@ def inject_ghost_players(room, tier):
     
     # If the ghost count is 0, we leave the room empty so the timer sleeps!
     if ghost_count == 0:
-        return
+        return False
     
     # Fake Usernames that look exactly like real Telegram users
     fake_names = [
@@ -61,7 +61,7 @@ def inject_ghost_players(room, tier):
     random.shuffle(available)
     selected_cards = available[:ghost_count]
     
-    players_dict = {}
+    players_dict = room.players or {}  # Keep existing players if any
     idx = 0
     
     # Distribute the fake cards into chunks of 1 to 5 cards per fake user
@@ -73,6 +73,7 @@ def inject_ghost_players(room, tier):
         
     room.players = players_dict
     room.save(update_fields=['players'])
+    return True
 
 
 class Command(BaseCommand):
@@ -106,6 +107,12 @@ class Command(BaseCommand):
                         room = active_rooms.first()
                     
                     if room.status == "LOBBY":
+                        
+                        # --- THE FIX: INSTANT SELF-HEALING ---
+                        # If the room is empty right now, inject ghosts instantly!
+                        if not room.players:
+                            inject_ghost_players(room, tier)
+                        
                         elapsed = (now - room.created_at).total_seconds()
                         if elapsed >= 60:
                             # If room is completely empty (no real players, and ghost rolled 0), it goes to SLEEP
@@ -181,7 +188,7 @@ class Command(BaseCommand):
                             )
 
             except Exception as e:
-                # ARMOR: Catch crashes, log them, and keep engine running!
+                # Catch crashes, log them, and keep engine running
                 self.stdout.write(f"\n🔥 FATAL ENGINE ERROR PREVENTED: {e}\n")
                 traceback.print_exc()
             
