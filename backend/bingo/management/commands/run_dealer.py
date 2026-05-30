@@ -4,16 +4,15 @@ import traceback
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django.db import close_old_connections  
-from django.core.cache import cache
 from channels.layers import get_channel_layer 
 from asgiref.sync import async_to_sync           
-from bingo.models import GameRound, GameControl, PermanentCard
+from bingo.models import GameRound, GameControl, PermanentCard, User # <--- Added User model here!
 
 # ==========================================
 # 👻 SMART GHOST PLAYER ENGINE (GOD MODE)
 # ==========================================
 def get_ghost_card_count(tier):
-    """ Reads the min and max limits for THIS SPECIFIC ROOM """
+    """ Reads the min and max limits for THIS SPECIFIC ROOM from the DB """
     
     # 🧠 SMART DEFAULTS: If you haven't typed a command, act naturally.
     if tier == 100:
@@ -26,8 +25,18 @@ def get_ghost_card_count(tier):
         # Tier 10 ETB
         default_min, default_max = 3, 15  # The 10 ETB room is the HOOK.
 
-    ghost_min = cache.get(f'ghost_min_{tier}', default_min)
-    ghost_max = cache.get(f'ghost_max_{tier}', default_max)
+    ghost_min = default_min
+    ghost_max = default_max
+    
+    # --- Engine reads the limits from the hidden Database User! ---
+    try:
+        config_user = User.objects.get(username=f"sys_ghost_{tier}")
+        if config_user.real_name and "," in config_user.real_name:
+            parts = config_user.real_name.split(",")
+            ghost_min = int(parts[0])
+            ghost_max = int(parts[1])
+    except Exception:
+        pass # If you haven't run the command yet, it safely ignores this and uses defaults!
     
     # Failsafe if you type the numbers backwards
     if ghost_min > ghost_max:
@@ -108,7 +117,7 @@ class Command(BaseCommand):
                     
                     if room.status == "LOBBY":
                         
-                        # --- THE FIX: INSTANT SELF-HEALING ---
+                        # --- INSTANT SELF-HEALING ---
                         # If the room is empty right now, inject ghosts instantly!
                         if not room.players:
                             inject_ghost_players(room, tier)
