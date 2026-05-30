@@ -3,7 +3,6 @@ from pathlib import Path
 from asgiref.sync import sync_to_async
 from django.db.models import Sum
 from django.utils import timezone
-from django.core.cache import cache  # <--- Added Cache for Ghost Bot
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, WebAppInfo
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 
@@ -140,7 +139,6 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, use
     )
 
     if is_admin(user.username.replace('tg_', '')):
-        # Added /setghost to your Admin Command List!
         caption += "\n\n👑 <b>Admin Commands:</b>\n/pending - View pending TXs\n/approve [id] - Approve TX\n/reject [id] - Reject TX\n/forcewin [card_num] - Force a card\n/setname [id] [name] - Change a user's name\n/setghost [room] [min] [max] - Control Ghost Players\n/stats - View Casino Stats\n/broadcast - Reply to any msg to Mass DM"
     
     base_url = "https://vladbingo-dmzg.onrender.com/api/live/?v=2.1"
@@ -251,22 +249,23 @@ async def cmd_setname(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except (IndexError, ValueError):
         await update.message.reply_text("⚠️ Usage: /setname <telegram_id> <New Name Here>")
 
-# --- BRAND NEW GHOST BOT COMMAND ---
+# --- BRAND NEW GHOST BOT COMMAND (DATABASE SYNCED) ---
 async def cmd_setghost(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id): return
     try:
-        tier = int(context.args[0])       # Which room? (10, 20, 30...)
-        min_cards = int(context.args[1])  # Minimum cards
-        max_cards = int(context.args[2])  # Maximum cards
+        tier = int(context.args[0])       
+        min_cards = int(context.args[1])  
+        max_cards = int(context.args[2])  
         
         valid_tiers = [10, 20, 30, 40, 50, 100]
         if tier not in valid_tiers:
             await update.message.reply_text("⚠️ Invalid room! Please use 10, 20, 30, 40, 50, or 100.")
             return
         
-        # Save the settings specifically for THIS room tier!
-        cache.set(f'ghost_min_{tier}', min_cards, timeout=None)
-        cache.set(f'ghost_max_{tier}', max_cards, timeout=None)
+        # Save the limits as a hidden Fake User in the DB!
+        config_user, _ = await sync_to_async(User.objects.get_or_create)(username=f"sys_ghost_{tier}")
+        config_user.real_name = f"{min_cards},{max_cards}"
+        await sync_to_async(config_user.save)(update_fields=['real_name'])
         
         await update.message.reply_text(
             f"✅ GHOST BOT UPDATED FOR ROOM {tier} ETB!\n"
@@ -321,7 +320,7 @@ def run():
     app.add_handler(CommandHandler("reject", cmd_reject))
     app.add_handler(CommandHandler("forcewin", cmd_forcewin))
     app.add_handler(CommandHandler("setname", cmd_setname))
-    app.add_handler(CommandHandler("setghost", cmd_setghost)) # <--- Registered the Ghost Command here!
+    app.add_handler(CommandHandler("setghost", cmd_setghost))
     app.add_handler(CommandHandler("stats", cmd_stats))
     app.add_handler(CommandHandler("broadcast", cmd_broadcast))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
