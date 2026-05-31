@@ -4,7 +4,6 @@ import traceback
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django.db import close_old_connections  
-from django.core.cache import cache
 from channels.layers import get_channel_layer 
 from asgiref.sync import async_to_sync           
 from bingo.models import GameRound, GameControl, PermanentCard, User
@@ -13,6 +12,7 @@ from bingo.models import GameRound, GameControl, PermanentCard, User
 # 👻 SMART GHOST PLAYER ENGINE (GOD MODE)
 # ==========================================
 def get_ghost_card_count(tier):
+    """ Reads the min and max limits for THIS SPECIFIC ROOM from the DB """
     if tier == 100: default_min, default_max = 0, 0
     elif tier in [40, 50]: default_min, default_max = 0, 2
     elif tier in [20, 30]: default_min, default_max = 0, 4
@@ -27,7 +27,7 @@ def get_ghost_card_count(tier):
             parts = config_user.real_name.split(",")
             ghost_min = int(parts[0])
             ghost_max = int(parts[1])
-    except Exception: pass
+    except Exception as e: pass
     
     if ghost_min > ghost_max:
         ghost_min, ghost_max = ghost_max, ghost_min
@@ -39,6 +39,7 @@ def get_ghost_card_count(tier):
     return random.randint(safe_min, safe_max)
 
 def inject_ghost_players(room, tier):
+    """ Generates fake Ethiopian players and assigns them random cards """
     ghost_count = get_ghost_card_count(tier)
     if ghost_count == 0: return False
     
@@ -66,6 +67,7 @@ def inject_ghost_players(room, tier):
     room.save(update_fields=['players'])
     return True
 
+
 class Command(BaseCommand):
     def handle(self, *args, **options):
         self.stdout.write("BIGGEST BINGO DEALER: ENGINE STARTED WITH GHOST PLAYERS")
@@ -74,6 +76,7 @@ class Command(BaseCommand):
 
         while True:
             close_old_connections() 
+            
             try:
                 now = timezone.now()
                 control = GameControl.objects.first() if GameControl.objects.exists() else None
@@ -94,12 +97,13 @@ class Command(BaseCommand):
                         room = active_rooms.first()
                     
                     if room.status == "LOBBY":
-                        if not room.players: inject_ghost_players(room, tier)
+                        if not room.players:
+                            inject_ghost_players(room, tier)
                         
                         elapsed = (now - room.created_at).total_seconds()
                         if elapsed >= 60:
                             if not room.players:
-                                room.created_at = now
+                                room.created_at = now  
                                 room.save(update_fields=['created_at'])
                             else:
                                 room.status = "ACTIVE"
@@ -133,27 +137,47 @@ class Command(BaseCommand):
                                             control.save()
                                     except Exception: pass
 
-                            if next_ball is None: next_ball = random.choice(remaining)
+                            if next_ball is None: 
+                                next_ball = random.choice(remaining)
+
                             called.append(next_ball)
                             room.called_numbers = called
                             room.save(update_fields=['called_numbers'])
 
                             async_to_sync(channel_layer.group_send)(
                                 f'game_{room.id}',
-                                {'type': 'bingo_message', 'message': {'action': 'new_ball', 'ball': next_ball, 'called_count': len(called)}}
+                                {
+                                    'type': 'bingo_message',
+                                    'message': {'action': 'new_ball', 'ball': next_ball, 'called_count': len(called)}
+                                }
                             )
                         else:
-                            # --- THE FIX: CROWN A GHOST WINNER IF HUMAN DID NOT WIN ---
-                            if getattr(room, 'winner_username', None) is None and room.players:
-                                ghosts = [p for p in room.players.keys() if str(p).startswith("tg_") and not str(p).replace("tg_", "").isdigit()]
-                                if ghosts:
-                                    winner_name = random.choice(ghosts)
-                                    room.winner_username = winner_name
-                                    total_cards = sum(len(c) if isinstance(c, list) else 1 for c in room.players.values())
-                                    room.winner_prize = int((total_cards * room.bet_amount) * 0.75) # 75% House Payout
-                                    w_cards = room.players[winner_name]
-                                    room.winning_card = w_cards[0] if isinstance(w_cards, list) else w_cards
+                            # ===============================================
+                            # --- SAFETY NET: CROWN GHOST WINNER SAFELY ---
+                            # ===============================================
+                            try:
+                                if getattr(room, 'winner_username', None) is None and room.players:
+                                    ghosts = [p for p in room.players.keys() if str(p).startswith("tg_") and not str(p).replace("tg_", "").isdigit()]
+                                    if ghosts:
+                                        winner_name = random.choice(ghosts)
+                                        room.winner_username = winner_name
+                                        
+                                        # Safely calculate total cards
+                                        total_cards = sum(len(c) if isinstance(c, list) else 1 for c in room.players.values())
+                                        
+                                        # Safely cast everything to float to prevent Decimal TypeErrors!
+                                        calc_prize = (float(total_cards) * float(room.bet_amount)) * 0.75
+                                        room.winner_prize = int(calc_prize) 
+                                        
+                                        # Safely extract the winning card number
+                                        w_cards = room.players[winner_name]
+                                        winning_num = w_cards[0] if isinstance(w_cards, list) else w_cards
+                                        room.winning_card = int(winning_num)
+                            except Exception as e:
+                                print(f"⚠️ Warning: Ghost crowning skipped due to error: {e}")
+                                # Even if this fails, we IGNORE the error so the room can END properly!
 
+                            # THESE 3 LINES MUST RUN NO MATTER WHAT!
                             room.status = "ENDED"
                             room.finished_at = now
                             room.save()
