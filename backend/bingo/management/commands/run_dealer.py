@@ -4,6 +4,7 @@ import traceback
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django.db import close_old_connections  
+from django.core.cache import cache
 from channels.layers import get_channel_layer 
 from asgiref.sync import async_to_sync           
 from bingo.models import GameRound, GameControl, PermanentCard, User
@@ -12,9 +13,6 @@ from bingo.models import GameRound, GameControl, PermanentCard, User
 # 👻 SMART GHOST PLAYER ENGINE (GOD MODE)
 # ==========================================
 def get_ghost_card_count(tier):
-    """ Reads the min and max limits for THIS SPECIFIC ROOM from the DB """
-    
-    # 🧠 SMART DEFAULTS
     if tier == 100: default_min, default_max = 0, 0
     elif tier in [40, 50]: default_min, default_max = 0, 2
     elif tier in [20, 30]: default_min, default_max = 0, 4
@@ -23,22 +21,17 @@ def get_ghost_card_count(tier):
     ghost_min = default_min
     ghost_max = default_max
     
-    # --- Engine reads the limits directly from the DB! ---
     try:
         config_user = User.objects.filter(username=f"sys_ghost_{tier}").first()
         if config_user and config_user.real_name and "," in config_user.real_name:
             parts = config_user.real_name.split(",")
             ghost_min = int(parts[0])
             ghost_max = int(parts[1])
-    except Exception as e:
-        print(f"Ghost Read Error for Room {tier}: {e}")
-        pass
+    except Exception: pass
     
-    # Failsafe if you type the numbers backwards
     if ghost_min > ghost_max:
         ghost_min, ghost_max = ghost_max, ghost_min
         
-    # Safety Cap
     max_allowed_in_room = 990 if tier == 10 else 490
     safe_max = min(ghost_max, max_allowed_in_room)
     safe_min = min(ghost_min, safe_max)
@@ -46,12 +39,8 @@ def get_ghost_card_count(tier):
     return random.randint(safe_min, safe_max)
 
 def inject_ghost_players(room, tier):
-    """ Generates fake Ethiopian players and assigns them random cards """
     ghost_count = get_ghost_card_count(tier)
-    
-    # If the ghost count is 0, we leave the room completely empty
-    if ghost_count == 0:
-        return False
+    if ghost_count == 0: return False
     
     fake_names = [
         "tg_Abebe", "tg_Dawit", "tg_Chala", "tg_Bereket", "tg_Ephrem", 
@@ -67,7 +56,6 @@ def inject_ghost_players(room, tier):
     
     players_dict = room.players or {} 
     idx = 0
-    
     while idx < len(selected_cards):
         chunk = random.randint(1, 5)
         bot_name = random.choice(fake_names) + str(random.randint(10, 999))
@@ -78,7 +66,6 @@ def inject_ghost_players(room, tier):
     room.save(update_fields=['players'])
     return True
 
-
 class Command(BaseCommand):
     def handle(self, *args, **options):
         self.stdout.write("BIGGEST BINGO DEALER: ENGINE STARTED WITH GHOST PLAYERS")
@@ -86,9 +73,7 @@ class Command(BaseCommand):
         channel_layer = get_channel_layer() 
 
         while True:
-            # Refresh DB connection so it never silently freezes
             close_old_connections() 
-            
             try:
                 now = timezone.now()
                 control = GameControl.objects.first() if GameControl.objects.exists() else None
@@ -97,7 +82,6 @@ class Command(BaseCommand):
                     active_rooms = GameRound.objects.filter(bet_amount=tier).exclude(status__in=["ENDED", "ANNOUNCED"]).order_by('created_at')
                     
                     if not active_rooms.exists():
-                        # Create the room AND immediately inject the Ghost Players!
                         new_room = GameRound.objects.create(bet_amount=tier, status="LOBBY")
                         inject_ghost_players(new_room, tier)
                         continue
@@ -110,15 +94,12 @@ class Command(BaseCommand):
                         room = active_rooms.first()
                     
                     if room.status == "LOBBY":
-                        
-                        # --- INSTANT SELF-HEALING ---
-                        if not room.players:
-                            inject_ghost_players(room, tier)
+                        if not room.players: inject_ghost_players(room, tier)
                         
                         elapsed = (now - room.created_at).total_seconds()
                         if elapsed >= 60:
                             if not room.players:
-                                room.created_at = now  # Reset the 60s timer
+                                room.created_at = now
                                 room.save(update_fields=['created_at'])
                             else:
                                 room.status = "ACTIVE"
@@ -133,16 +114,11 @@ class Command(BaseCommand):
                             # Forced Win Logic
                             if control and getattr(control, 'forced_winner_card_number', None) and getattr(control, 'daily_forced_wins', 0) < 30:
                                 target_card_num = control.forced_winner_card_number
-                                
                                 card_is_in_room = False
                                 if room.players:
                                     for p_cards in room.players.values():
-                                        if isinstance(p_cards, list) and target_card_num in p_cards:
-                                            card_is_in_room = True
-                                            break
-                                        elif p_cards == target_card_num:
-                                            card_is_in_room = True
-                                            break
+                                        if isinstance(p_cards, list) and target_card_num in p_cards: card_is_in_room = True; break
+                                        elif p_cards == target_card_num: card_is_in_room = True; break
                                 
                                 if card_is_in_room:
                                     try:
@@ -150,38 +126,37 @@ class Command(BaseCommand):
                                         board_nums = [num for row in target_card.board for num in row if isinstance(num, int)]
                                         needed_numbers = [n for n in board_nums if n not in called]
                                         
-                                        if needed_numbers: 
-                                            next_ball = random.choice(needed_numbers)
-                                            
+                                        if needed_numbers: next_ball = random.choice(needed_numbers)
                                         if len(needed_numbers) <= 1:
                                             control.daily_forced_wins += 1
                                             control.forced_winner_card_number = None
                                             control.save()
-                                    except Exception as e: 
-                                        pass
+                                    except Exception: pass
 
-                            if next_ball is None: 
-                                next_ball = random.choice(remaining)
-
+                            if next_ball is None: next_ball = random.choice(remaining)
                             called.append(next_ball)
                             room.called_numbers = called
                             room.save(update_fields=['called_numbers'])
 
                             async_to_sync(channel_layer.group_send)(
                                 f'game_{room.id}',
-                                {
-                                    'type': 'bingo_message',
-                                    'message': {
-                                        'action': 'new_ball',
-                                        'ball': next_ball,
-                                        'called_count': len(called)
-                                    }
-                                }
+                                {'type': 'bingo_message', 'message': {'action': 'new_ball', 'ball': next_ball, 'called_count': len(called)}}
                             )
                         else:
+                            # --- THE FIX: CROWN A GHOST WINNER IF HUMAN DID NOT WIN ---
+                            if getattr(room, 'winner_username', None) is None and room.players:
+                                ghosts = [p for p in room.players.keys() if str(p).startswith("tg_") and not str(p).replace("tg_", "").isdigit()]
+                                if ghosts:
+                                    winner_name = random.choice(ghosts)
+                                    room.winner_username = winner_name
+                                    total_cards = sum(len(c) if isinstance(c, list) else 1 for c in room.players.values())
+                                    room.winner_prize = int((total_cards * room.bet_amount) * 0.75) # 75% House Payout
+                                    w_cards = room.players[winner_name]
+                                    room.winning_card = w_cards[0] if isinstance(w_cards, list) else w_cards
+
                             room.status = "ENDED"
                             room.finished_at = now
-                            room.save(update_fields=['status', 'finished_at'])
+                            room.save()
                             
                             async_to_sync(channel_layer.group_send)(
                                 f'game_{room.id}',
@@ -189,9 +164,7 @@ class Command(BaseCommand):
                             )
 
             except Exception as e:
-                # Catch crashes, log them, and keep engine running
                 self.stdout.write(f"\n🔥 FATAL ENGINE ERROR PREVENTED: {e}\n")
                 traceback.print_exc()
             
-            # Sleep 3 seconds between engine ticks
             time.sleep(3)
