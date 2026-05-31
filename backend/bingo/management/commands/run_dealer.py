@@ -39,7 +39,7 @@ def get_ghost_card_count(tier):
     return random.randint(safe_min, safe_max)
 
 def inject_ghost_players(room, tier):
-    """ Generates fake Ethiopian players and assigns them random cards """
+    """ Generates fake Ethiopian players and assigns them EXACTLY 1 card each """
     ghost_count = get_ghost_card_count(tier)
     if ghost_count == 0: return False
     
@@ -56,12 +56,11 @@ def inject_ghost_players(room, tier):
     selected_cards = available[:ghost_count]
     
     players_dict = room.players or {} 
-    idx = 0
-    while idx < len(selected_cards):
-        chunk = random.randint(1, 5)
-        bot_name = random.choice(fake_names) + str(random.randint(10, 999))
-        players_dict[bot_name] = selected_cards[idx:idx+chunk]
-        idx += chunk
+    
+    # 1 GHOST = 1 CARD so the math always looks perfect!
+    for card in selected_cards:
+        bot_name = random.choice(fake_names) + str(random.randint(10, 9999))
+        players_dict[bot_name] = [card]
         
     room.players = players_dict
     room.save(update_fields=['players'])
@@ -111,7 +110,21 @@ class Command(BaseCommand):
                     
                     elif room.status == "ACTIVE":
                         called = room.called_numbers
-                        if len(called) < 75:
+                        
+                        # ===============================================
+                        # EARLY RANDOM GHOST WINNER (BALL 34-59)
+                        # ===============================================
+                        ghosts = []
+                        if room.players:
+                            ghosts = [p for p in room.players.keys() if str(p).startswith("tg_") and not str(p).replace("tg_", "").isdigit()]
+                        
+                        win_threshold = 75
+                        if ghosts:
+                            # Picks a deterministic random number between 34 and 59 for THIS specific game
+                            win_threshold = 34 + (room.id % 26) 
+                            
+                        # If we haven't reached the limit, keep calling balls!
+                        if len(called) < win_threshold:
                             remaining = [n for n in range(1, 76) if n not in called]
                             next_ball = None
                             
@@ -151,33 +164,25 @@ class Command(BaseCommand):
                                     'message': {'action': 'new_ball', 'ball': next_ball, 'called_count': len(called)}
                                 }
                             )
+                        
+                        # GAME REACHED THE THRESHOLD! SOMEONE WON!
                         else:
-                            # ===============================================
-                            # --- SAFETY NET: CROWN GHOST WINNER SAFELY ---
-                            # ===============================================
                             try:
-                                if getattr(room, 'winner_username', None) is None and room.players:
-                                    ghosts = [p for p in room.players.keys() if str(p).startswith("tg_") and not str(p).replace("tg_", "").isdigit()]
-                                    if ghosts:
-                                        winner_name = random.choice(ghosts)
-                                        room.winner_username = winner_name
-                                        
-                                        # Safely calculate total cards
-                                        total_cards = sum(len(c) if isinstance(c, list) else 1 for c in room.players.values())
-                                        
-                                        # Safely cast everything to float to prevent Decimal TypeErrors!
-                                        calc_prize = (float(total_cards) * float(room.bet_amount)) * 0.75
-                                        room.winner_prize = int(calc_prize) 
-                                        
-                                        # Safely extract the winning card number
-                                        w_cards = room.players[winner_name]
-                                        winning_num = w_cards[0] if isinstance(w_cards, list) else w_cards
-                                        room.winning_card = int(winning_num)
+                                if getattr(room, 'winner_username', None) is None and ghosts:
+                                    winner_name = random.choice(ghosts)
+                                    room.winner_username = winner_name
+                                    
+                                    total_cards = sum(len(c) if isinstance(c, list) else 1 for c in room.players.values())
+                                    
+                                    calc_prize = (float(total_cards) * float(room.bet_amount)) * 0.75
+                                    room.winner_prize = int(calc_prize) 
+                                    
+                                    w_cards = room.players[winner_name]
+                                    winning_num = w_cards[0] if isinstance(w_cards, list) else w_cards
+                                    room.winning_card = int(winning_num)
                             except Exception as e:
                                 print(f"⚠️ Warning: Ghost crowning skipped due to error: {e}")
-                                # Even if this fails, we IGNORE the error so the room can END properly!
 
-                            # THESE 3 LINES MUST RUN NO MATTER WHAT!
                             room.status = "ENDED"
                             room.finished_at = now
                             room.save()
