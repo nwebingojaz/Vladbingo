@@ -18,6 +18,7 @@
         .card-num { height: 32px; background: #1e293b; border: 1px solid #3b82f6; border-radius: 4px; font-size: 0.65rem; font-weight: bold; color: #93c5fd; transition: transform 0.1s, background-color 0.3s; }
         .card-num:active { transform: scale(0.9); }
         .card-num.active { background: #10b981 !important; color: white !important; border-color: white !important; transform: scale(1.1); box-shadow: 0 0 10px #10b981; }
+        
         /* THE TAKEN CARD CSS */
         .card-num.taken { background: #0f172a !important; color: #334155 !important; border-color: #1e293b !important; pointer-events: none; opacity: 0.7; }
         
@@ -108,7 +109,6 @@
             🎲 <span class="text-white text-sm" id="nav-room">10</span>
         </div>
         
-        <!-- HIDDEN IN LOBBY, SHOWN IN ROOMS -->
         <div id="top-nav-prize-box" class="hidden flex items-center gap-1.5 bg-yellow-500/20 px-3 py-0.5 rounded-xl border border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.2)]">
             <span class="text-yellow-500 text-lg animate-pulse">🎁</span> 
             <span class="text-yellow-400 font-black text-xl tracking-wider drop-shadow-md" id="nav-prize">0</span> 
@@ -165,7 +165,6 @@
 
         <div id="play-tracker" class="mb-2 p-1 bg-slate-900/80 rounded-xl border border-blue-900/50 hidden"></div>
         
-        <!-- CARDS CONTAINER -->
         <div id="multi-card-container" class="grid grid-cols-2 gap-1 mb-3">
             <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex flex-col items-center justify-center min-h-[100px]" id="slot-1"><div id="play-card-1" class="w-full flex items-center justify-center h-full"><span class="text-slate-600 font-black text-[10px] animate-pulse">LOADING CARDS...</span></div></div>
             <div class="bg-slate-900/50 p-1 rounded-xl border border-slate-700 border-dashed flex flex-col items-center justify-center min-h-[100px]" id="slot-2"><div id="play-card-2" class="w-full flex items-center justify-center h-full"><span class="text-slate-600 font-black text-[10px] animate-pulse">LOADING CARDS...</span></div></div>
@@ -336,7 +335,7 @@
         let refreshRunning = false; 
         let globalBoardsData = [];
         
-        // --- 👻 FAKE LIVE BUYING SIMULATOR ---
+        // --- 👻 PERFECTED LIVE BUYING SIMULATOR ---
         let ghostBuyTimer = null;
         function triggerGhostBuy() {
             if (sessionStorage.getItem('currentScreen') !== 'v-selector' || currentRoomStatus !== 'LOBBY') return;
@@ -344,16 +343,23 @@
             let available = Array.from(document.querySelectorAll('.card-num:not(.active):not(.taken)'));
             if (available.length > 0 && Math.random() > 0.4) { 
                 let btn = available[Math.floor(Math.random() * available.length)];
+                let cardId = parseInt(btn.id.replace('c-', ''));
                 let oldText = btn.innerText;
                 
-                // Mark it taken and flash it yellow with a player icon!
                 btn.classList.add('taken');
                 btn.innerText = '👤';
                 btn.style.backgroundColor = '#f59e0b'; 
                 btn.style.color = '#fff';
                 btn.style.borderColor = '#f59e0b';
                 
-                // Fade out to dark grey after 500ms
+                // SAVE IT SO IT NEVER SHIFTS ON REFRESH!
+                let cacheKey = 'takenCards_' + activeBet + '_' + (myActiveGameId || 'lobby');
+                let savedTaken = JSON.parse(sessionStorage.getItem(cacheKey) || "[]");
+                if(!savedTaken.includes(cardId)) {
+                    savedTaken.push(cardId);
+                    sessionStorage.setItem(cacheKey, JSON.stringify(savedTaken));
+                }
+
                 setTimeout(() => {
                     btn.style.backgroundColor = '';
                     btn.style.color = '';
@@ -361,7 +367,6 @@
                     btn.innerText = oldText; 
                 }, 500);
             }
-            // Loop the simulation every 1 to 3 seconds randomly
             ghostBuyTimer = setTimeout(triggerGhostBuy, Math.random() * 2000 + 1000);
         }
 
@@ -413,6 +418,7 @@
                     document.getElementById('win-card-num-display').innerText = d.winning_card || "---";
                     document.getElementById('win-ticket-sub').innerText = d.winning_card || "---";
                     const grid = document.getElementById('win-card-grid'); grid.innerHTML = '';
+                    
                     if(d.winning_board && d.called) {
                         let calledSet = new Set(d.called); calledSet.add('FREE');
                         let winCoords = []; let b = d.winning_board;
@@ -543,7 +549,7 @@
 
             if(id === 'v-selector') {
                 updateStatusIndicator(); 
-                if(!ghostBuyTimer) triggerGhostBuy(); // Start the FOMO simulator!
+                if(!ghostBuyTimer) triggerGhostBuy();
             } else {
                 if(ghostBuyTimer) clearTimeout(ghostBuyTimer);
             }
@@ -895,18 +901,25 @@
             updateStatusIndicator();
         }
 
-        // --- THE FIX: PRE-TAKE RANDOM CARDS ON LOAD ---
+        // --- THE FIX: MEMORIZE TAKEN CARDS USING SESSION STORAGE! ---
         function initGrid(){ 
             const g = document.getElementById('grid-container'); 
             g.innerHTML = ''; 
             let max = getMaxCards(); 
             
-            // Randomly pick a few cards to show as "already taken by others"
-            let preTakenCount = activeBet === 10 ? Math.floor(Math.random() * 50) + 15 : Math.floor(Math.random() * 10) + 2;
+            let cacheKey = 'takenCards_' + activeBet + '_' + (myActiveGameId || 'lobby');
+            let savedTaken = sessionStorage.getItem(cacheKey);
             let preTakenSet = new Set();
-            while(preTakenSet.size < preTakenCount) {
-                let r = Math.floor(Math.random() * max) + 1;
-                if (!myCards.includes(r)) preTakenSet.add(r);
+            
+            if (savedTaken) {
+                preTakenSet = new Set(JSON.parse(savedTaken));
+            } else {
+                let preTakenCount = activeBet === 10 ? Math.floor(Math.random() * 30) + 15 : Math.floor(Math.random() * 8) + 2;
+                while(preTakenSet.size < preTakenCount) {
+                    let r = Math.floor(Math.random() * max) + 1;
+                    if (!myCards.includes(r)) preTakenSet.add(r);
+                }
+                sessionStorage.setItem(cacheKey, JSON.stringify(Array.from(preTakenSet)));
             }
 
             for(let i=1;i<=max;i++){ 
