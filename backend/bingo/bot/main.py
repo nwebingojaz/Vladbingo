@@ -98,12 +98,13 @@ def change_user_name(target_tg_id, new_name):
     except User.DoesNotExist:
         return False, "User not found."
 
-# --- BULLETPROOF DB SAVER FOR GHOST BOT ---
+# --- BULLETPROOF DB WRAPPER FOR GHOST BOT ---
 @sync_to_async
-def save_ghost_config(tier, min_c, max_c):
+def save_ghost_config(tier, min_cards, max_cards):
     config_user, _ = User.objects.get_or_create(username=f"sys_ghost_{tier}")
-    config_user.real_name = f"{min_c},{max_c}"
+    config_user.real_name = f"{min_cards},{max_cards}"
     config_user.save()
+    return True
 
 # ==========================================
 # 4. BACKGROUND JOBS (Broadcaster & Promo)
@@ -130,6 +131,7 @@ async def daily_promo_task(context: ContextTypes.DEFAULT_TYPE):
     
     try: await context.bot.send_photo(chat_id=channel_id, photo=photo_url, caption=caption, parse_mode="HTML", reply_markup=reply_markup)
     except Exception as e: print(f"Daily promo failed: {e}")
+
 
 # ==========================================
 # 5. USER FLOW COMMANDS
@@ -255,9 +257,15 @@ async def cmd_setname(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except (IndexError, ValueError):
         await update.message.reply_text("⚠️ Usage: /setname <telegram_id> <New Name Here>")
 
+# --- BRAND NEW GHOST BOT COMMAND (DATABASE SYNCED) ---
 async def cmd_setghost(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id): return
+    
     try:
+        # Step 1: Ensure they typed 3 numbers!
+        if len(context.args) < 3:
+            raise ValueError
+            
         tier = int(context.args[0])       
         min_cards = int(context.args[1])  
         max_cards = int(context.args[2])  
@@ -267,20 +275,24 @@ async def cmd_setghost(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⚠️ Invalid room! Please use 10, 20, 30, 40, 50, or 100.")
             return
         
-        # Uses the new bulletproof database wrapper
+        # Step 2: Use the bulletproof wrapper to save to DB!
         await save_ghost_config(tier, min_cards, max_cards)
         
         await update.message.reply_text(
             f"✅ GHOST BOT UPDATED FOR ROOM {tier} ETB!\n"
-            f"The engine will now gracefully buy between {min_cards} and {max_cards} cards in Room {tier}."
+            f"The engine will now magically buy between {min_cards} and {max_cards} cards in Room {tier}."
         )
-    except (IndexError, ValueError):
+        
+    except ValueError:
         await update.message.reply_text(
             "⚠️ Usage: /setghost <room> <min> <max>\n\n"
             "Example 1: /setghost 10 50 150 (Make room 10 viral)\n"
             "Example 2: /setghost 100 0 2 (Make VIP room sleep/rarely play)\n"
             "Example 3: /setghost 50 0 0 (Put Room 50 fully to sleep)"
         )
+    except Exception as e:
+        # Step 3: If it fails for ANY reason, tell us instead of going silent!
+        await update.message.reply_text(f"❌ Server Error: {e}")
 
 async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id): return
