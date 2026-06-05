@@ -3,6 +3,8 @@ from pathlib import Path
 from asgiref.sync import sync_to_async
 from django.db.models import Sum
 from django.utils import timezone
+from django.core.cache import cache
+from django.db import close_old_connections  # <--- THE MAGIC FIX ADDED HERE
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, WebAppInfo
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 
@@ -28,6 +30,7 @@ def is_admin(tg_id):
 # 3. DATABASE WRAPPERS (Sync to Async)
 # ==========================================
 def db_op(uid, action, val=None):
+    close_old_connections() # <--- Wake up database!
     user, _ = User.objects.get_or_create(username=f"tg_{uid}")
     if action == "name": 
         user.real_name = val
@@ -42,10 +45,12 @@ def db_op(uid, action, val=None):
 
 @sync_to_async
 def get_pending_transactions():
+    close_old_connections()
     return list(Transaction.objects.filter(status="pending").order_by('timestamp'))
 
 @sync_to_async
 def process_transaction(tx_id, new_status):
+    close_old_connections()
     try:
         tx = Transaction.objects.get(id=tx_id)
         if tx.status != 'pending': return False, f"Transaction #{tx_id} is already {tx.status}."
@@ -55,6 +60,7 @@ def process_transaction(tx_id, new_status):
 
 @sync_to_async
 def set_force_win(card_number):
+    close_old_connections()
     control, _ = GameControl.objects.get_or_create(id=1)
     if card_number == 0:
         control.forced_winner_card_number = None; control.save()
@@ -65,6 +71,7 @@ def set_force_win(card_number):
 
 @sync_to_async
 def get_casino_stats():
+    close_old_connections()
     total_users = User.objects.count()
     total_liability = User.objects.aggregate(Sum('operational_credit'))['operational_credit__sum'] or 0
     today = timezone.now().date()
@@ -74,6 +81,7 @@ def get_casino_stats():
 
 @sync_to_async
 def get_and_mark_finished_rooms():
+    close_old_connections()
     finished_rooms = list(GameRound.objects.filter(status="ENDED", winner_username__isnull=False))
     for room in finished_rooms:
         room.status = "ANNOUNCED"
@@ -82,6 +90,7 @@ def get_and_mark_finished_rooms():
 
 @sync_to_async
 def get_all_user_tg_ids():
+    close_old_connections()
     ids = []
     for u in User.objects.filter(username__startswith='tg_'):
         try: ids.append(int(u.username.replace('tg_', '')))
@@ -90,6 +99,7 @@ def get_all_user_tg_ids():
 
 @sync_to_async
 def change_user_name(target_tg_id, new_name):
+    close_old_connections()
     try:
         user = User.objects.get(username=f"tg_{target_tg_id}")
         user.real_name = new_name
@@ -98,9 +108,9 @@ def change_user_name(target_tg_id, new_name):
     except User.DoesNotExist:
         return False, "User not found."
 
-# --- BULLETPROOF DB WRAPPER FOR GHOST BOT ---
 @sync_to_async
 def save_ghost_config(tier, min_cards, max_cards):
+    close_old_connections()
     config_user, _ = User.objects.get_or_create(username=f"sys_ghost_{tier}")
     config_user.real_name = f"{min_cards},{max_cards}"
     config_user.save()
@@ -131,7 +141,6 @@ async def daily_promo_task(context: ContextTypes.DEFAULT_TYPE):
     
     try: await context.bot.send_photo(chat_id=channel_id, photo=photo_url, caption=caption, parse_mode="HTML", reply_markup=reply_markup)
     except Exception as e: print(f"Daily promo failed: {e}")
-
 
 # ==========================================
 # 5. USER FLOW COMMANDS
@@ -257,15 +266,10 @@ async def cmd_setname(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except (IndexError, ValueError):
         await update.message.reply_text("⚠️ Usage: /setname <telegram_id> <New Name Here>")
 
-# --- BRAND NEW GHOST BOT COMMAND (DATABASE SYNCED) ---
 async def cmd_setghost(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id): return
-    
     try:
-        # Step 1: Ensure they typed 3 numbers!
-        if len(context.args) < 3:
-            raise ValueError
-            
+        if len(context.args) < 3: raise ValueError
         tier = int(context.args[0])       
         min_cards = int(context.args[1])  
         max_cards = int(context.args[2])  
@@ -274,15 +278,13 @@ async def cmd_setghost(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if tier not in valid_tiers:
             await update.message.reply_text("⚠️ Invalid room! Please use 10, 20, 30, 40, 50, or 100.")
             return
-        
-        # Step 2: Use the bulletproof wrapper to save to DB!
+            
         await save_ghost_config(tier, min_cards, max_cards)
         
         await update.message.reply_text(
             f"✅ GHOST BOT UPDATED FOR ROOM {tier} ETB!\n"
             f"The engine will now magically buy between {min_cards} and {max_cards} cards in Room {tier}."
         )
-        
     except ValueError:
         await update.message.reply_text(
             "⚠️ Usage: /setghost <room> <min> <max>\n\n"
@@ -291,7 +293,6 @@ async def cmd_setghost(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Example 3: /setghost 50 0 0 (Put Room 50 fully to sleep)"
         )
     except Exception as e:
-        # Step 3: If it fails for ANY reason, tell us instead of going silent!
         await update.message.reply_text(f"❌ Server Error: {e}")
 
 async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
