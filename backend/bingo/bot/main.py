@@ -4,7 +4,7 @@ from asgiref.sync import sync_to_async
 from django.db.models import Sum
 from django.utils import timezone
 from django.core.cache import cache
-from django.db import close_old_connections  # <--- THE MAGIC FIX ADDED HERE
+from django.db import close_old_connections  
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, WebAppInfo
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 
@@ -19,18 +19,26 @@ django.setup()
 from bingo.models import User, Transaction, GameControl, GameRound
 
 # ==========================================
-# 2. ADMIN CONFIGURATION
+# 2. ADMIN CONFIGURATION (UPGRADED)
 # ==========================================
-ADMIN_TG_ID = os.environ.get("ADMIN_TG_ID", "YOUR_TG_ID") 
+BOSS_TG_ID = str(os.environ.get("ADMIN_TG_ID", "YOUR_TG_ID"))
 
+def is_boss(tg_id):
+    return str(tg_id) == BOSS_TG_ID
+
+# Check if someone is the Boss OR a Sub-Admin (Cashier)
 def is_admin(tg_id):
-    return str(tg_id) == str(ADMIN_TG_ID)
+    if is_boss(tg_id):
+        return True
+    # Read the sub-admins list from cache
+    sub_admins = cache.get('sub_admins_list', [])
+    return str(tg_id) in sub_admins
 
 # ==========================================
 # 3. DATABASE WRAPPERS (Sync to Async)
 # ==========================================
 def db_op(uid, action, val=None):
-    close_old_connections() # <--- Wake up database!
+    close_old_connections()
     user, _ = User.objects.get_or_create(username=f"tg_{uid}")
     if action == "name": 
         user.real_name = val
@@ -155,8 +163,15 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, use
         f"ከታች ካሉት አማራጮች ውስጥ ይምረጡ:\n<i>(Choose an option below)</i>"
     )
 
-    if is_admin(user.username.replace('tg_', '')):
-        caption += "\n\n👑 <b>Admin Commands:</b>\n/pending - View pending TXs\n/approve [id] - Approve TX\n/reject [id] - Reject TX\n/forcewin [card_num] - Force a card\n/setname [id] [name] - Change a user's name\n/setghost [room] [min] [max] - Control Ghost Players\n/stats - View Casino Stats\n/broadcast - Reply to any msg to Mass DM"
+    tg_id = user.username.replace('tg_', '')
+    
+    # Sub-Admins see this (Cashiers)
+    if is_admin(tg_id) and not is_boss(tg_id):
+        caption += "\n\n👔 <b>Cashier Commands:</b>\n/pending - View pending TXs\n/approve [id] - Approve TX\n/reject [id] - Reject TX\n/stats - View Casino Stats"
+    
+    # ONLY YOU see this (Boss)
+    elif is_boss(tg_id):
+        caption += "\n\n👑 <b>Boss Commands:</b>\n/pending - View TXs\n/approve [id]\n/reject [id]\n/addadmin [id] - Hire Cashier\n/removeadmin [id] - Fire Cashier\n/forcewin [card_num]\n/setname [id] [name]\n/setghost [room] [min] [max]\n/stats\n/broadcast (Reply to msg)"
     
     base_url = "https://vladbingo-dmzg.onrender.com/api/live/?v=2.1"
     
@@ -174,7 +189,6 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, use
     try:
         await context.bot.send_photo(chat_id=chat_id, photo=photo_url, caption=caption, reply_markup=reply_markup, parse_mode='HTML')
     except Exception as e:
-        print(f"Photo send failed: {e}. Falling back to text.")
         await context.bot.send_message(chat_id=chat_id, text=caption, reply_markup=reply_markup, parse_mode='HTML')
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -225,6 +239,78 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ==========================================
 # 6. ADMIN COMMAND HANDLERS
 # ==========================================
+
+# --- BOSS ONLY COMMANDS ---
+async def cmd_addadmin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_boss(update.message.from_user.id): return
+    try:
+        new_admin_id = str(context.args[0])
+        admins = cache.get('sub_admins_list', [])
+        if new_admin_id not in admins:
+            admins.append(new_admin_id)
+            cache.set('sub_admins_list', admins, timeout=None)
+        await update.message.reply_text(f"✅ User {new_admin_id} has been Hired as a Cashier!")
+    except IndexError:
+        await update.message.reply_text("⚠️ Usage: /addadmin <telegram_id>")
+
+async def cmd_removeadmin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_boss(update.message.from_user.id): return
+    try:
+        old_admin_id = str(context.args[0])
+        admins = cache.get('sub_admins_list', [])
+        if old_admin_id in admins:
+            admins.remove(old_admin_id)
+            cache.set('sub_admins_list', admins, timeout=None)
+        await update.message.reply_text(f"🚫 User {old_admin_id} has been Fired.")
+    except IndexError:
+        await update.message.reply_text("⚠️ Usage: /removeadmin <telegram_id>")
+
+async def cmd_forcewin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_boss(update.message.from_user.id): return
+    try:
+        msg = await set_force_win(int(context.args[0]))
+        await update.message.reply_text(f"🎯 {msg}")
+    except (IndexError, ValueError): await update.message.reply_text("⚠️ Usage: /forcewin <card_number>\nUse 0 to clear.")
+
+async def cmd_setname(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_boss(update.message.from_user.id): return
+    try:
+        target_tg_id = context.args[0]
+        new_name = " ".join(context.args[1:])
+        if not new_name: raise ValueError
+        success, msg = await change_user_name(target_tg_id, new_name)
+        await update.message.reply_text(f"✅ {msg}" if success else f"⚠️ {msg}")
+    except (IndexError, ValueError): await update.message.reply_text("⚠️ Usage: /setname <telegram_id> <New Name Here>")
+
+async def cmd_setghost(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_boss(update.message.from_user.id): return
+    try:
+        if len(context.args) < 3: raise ValueError
+        tier = int(context.args[0])       
+        min_cards = int(context.args[1])  
+        max_cards = int(context.args[2])  
+        valid_tiers = [10, 20, 30, 40, 50, 100]
+        if tier not in valid_tiers: return await update.message.reply_text("⚠️ Invalid room!")
+        await save_ghost_config(tier, min_cards, max_cards)
+        await update.message.reply_text(f"✅ GHOST BOT UPDATED FOR ROOM {tier} ETB!\nNow buying {min_cards}-{max_cards} cards.")
+    except ValueError: await update.message.reply_text("⚠️ Usage: /setghost <room> <min> <max>")
+    except Exception as e: await update.message.reply_text(f"❌ Server Error: {e}")
+
+async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_boss(update.message.from_user.id): return
+    if not update.message.reply_to_message: return await update.message.reply_text("⚠️ You must REPLY to a message.")
+    target_message = update.message.reply_to_message
+    tg_ids = await get_all_user_tg_ids()
+    await update.message.reply_text(f"⏳ Sending to {len(tg_ids)} users...")
+    success_count = 0
+    for tid in tg_ids:
+        try:
+            await context.bot.copy_message(chat_id=tid, from_chat_id=target_message.chat_id, message_id=target_message.message_id)
+            success_count += 1
+        except Exception: pass
+    await update.message.reply_text(f"✅ Broadcast delivered to {success_count} users!")
+
+# --- GENERAL ADMIN COMMANDS (Boss & Cashiers) ---
 async def cmd_pending(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id): return
     txs = await get_pending_transactions()
@@ -247,77 +333,10 @@ async def cmd_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"🚫 {msg}" if success else f"⚠️ {msg}")
     except (IndexError, ValueError): await update.message.reply_text("⚠️ Usage: /reject <transaction_id>")
 
-async def cmd_forcewin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_admin(update.message.from_user.id): return
-    try:
-        msg = await set_force_win(int(context.args[0]))
-        await update.message.reply_text(f"🎯 {msg}")
-    except (IndexError, ValueError): await update.message.reply_text("⚠️ Usage: /forcewin <card_number>\nUse 0 to clear.")
-
-async def cmd_setname(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_admin(update.message.from_user.id): return
-    try:
-        target_tg_id = context.args[0]
-        new_name = " ".join(context.args[1:])
-        if not new_name:
-            raise ValueError
-        success, msg = await change_user_name(target_tg_id, new_name)
-        await update.message.reply_text(f"✅ {msg}" if success else f"⚠️ {msg}")
-    except (IndexError, ValueError):
-        await update.message.reply_text("⚠️ Usage: /setname <telegram_id> <New Name Here>")
-
-async def cmd_setghost(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_admin(update.message.from_user.id): return
-    try:
-        if len(context.args) < 3: raise ValueError
-        tier = int(context.args[0])       
-        min_cards = int(context.args[1])  
-        max_cards = int(context.args[2])  
-        
-        valid_tiers = [10, 20, 30, 40, 50, 100]
-        if tier not in valid_tiers:
-            await update.message.reply_text("⚠️ Invalid room! Please use 10, 20, 30, 40, 50, or 100.")
-            return
-            
-        await save_ghost_config(tier, min_cards, max_cards)
-        
-        await update.message.reply_text(
-            f"✅ GHOST BOT UPDATED FOR ROOM {tier} ETB!\n"
-            f"The engine will now magically buy between {min_cards} and {max_cards} cards in Room {tier}."
-        )
-    except ValueError:
-        await update.message.reply_text(
-            "⚠️ Usage: /setghost <room> <min> <max>\n\n"
-            "Example 1: /setghost 10 50 150 (Make room 10 viral)\n"
-            "Example 2: /setghost 100 0 2 (Make VIP room sleep/rarely play)\n"
-            "Example 3: /setghost 50 0 0 (Put Room 50 fully to sleep)"
-        )
-    except Exception as e:
-        await update.message.reply_text(f"❌ Server Error: {e}")
-
 async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id): return
     msg = await get_casino_stats()
     await update.message.reply_text(msg, parse_mode="HTML")
-
-async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_admin(update.message.from_user.id): return
-    if not update.message.reply_to_message:
-        await update.message.reply_text("⚠️ You must REPLY to a message, photo, or video with /broadcast to send it to everyone.")
-        return
-        
-    target_message = update.message.reply_to_message
-    tg_ids = await get_all_user_tg_ids()
-    await update.message.reply_text(f"⏳ Copying your message and sending to {len(tg_ids)} users...")
-    
-    success_count = 0
-    for tid in tg_ids:
-        try:
-            await context.bot.copy_message(chat_id=tid, from_chat_id=target_message.chat_id, message_id=target_message.message_id)
-            success_count += 1
-        except Exception as e: pass
-        
-    await update.message.reply_text(f"✅ Broadcast successfully delivered to {success_count} users!")
 
 # ==========================================
 # 7. RUN BOT
@@ -331,14 +350,21 @@ def run():
     app = Application.builder().token(token).post_init(lambda a: a.bot.delete_webhook(drop_pending_updates=True)).build()
     
     app.add_handler(CommandHandler("start", start))
+    
+    # Admin & Boss Commands
     app.add_handler(CommandHandler("pending", cmd_pending))
     app.add_handler(CommandHandler("approve", cmd_approve))
     app.add_handler(CommandHandler("reject", cmd_reject))
+    app.add_handler(CommandHandler("stats", cmd_stats))
+    
+    # Boss Only Commands
+    app.add_handler(CommandHandler("addadmin", cmd_addadmin))
+    app.add_handler(CommandHandler("removeadmin", cmd_removeadmin))
     app.add_handler(CommandHandler("forcewin", cmd_forcewin))
     app.add_handler(CommandHandler("setname", cmd_setname))
     app.add_handler(CommandHandler("setghost", cmd_setghost))
-    app.add_handler(CommandHandler("stats", cmd_stats))
     app.add_handler(CommandHandler("broadcast", cmd_broadcast))
+    
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
     app.add_handler(CallbackQueryHandler(handle_buttons))
