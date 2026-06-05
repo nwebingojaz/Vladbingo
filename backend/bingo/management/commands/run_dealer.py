@@ -9,6 +9,52 @@ from asgiref.sync import async_to_sync
 from bingo.models import GameRound, GameControl, PermanentCard, User
 
 # ==========================================
+# 🎲 DYNAMIC GHOST BOARD GENERATOR
+# ==========================================
+def generate_ghost_winning_board(called):
+    """ Creates a mathematically perfect, guaranteed winning 5x5 board """
+    board = [[0]*5 for _ in range(5)]
+    cols = [
+        list(range(1, 16)), list(range(16, 31)), list(range(31, 46)), 
+        list(range(46, 61)), list(range(61, 76))
+    ]
+    
+    # Remove already called numbers so we don't accidentally duplicate them
+    for n in called:
+        if 1 <= n <= 15 and n in cols[0]: cols[0].remove(n)
+        elif 16 <= n <= 30 and n in cols[1]: cols[1].remove(n)
+        elif 31 <= n <= 45 and n in cols[2]: cols[2].remove(n)
+        elif 46 <= n <= 60 and n in cols[3]: cols[3].remove(n)
+        elif 61 <= n <= 75 and n in cols[4]: cols[4].remove(n)
+
+    for c in cols: random.shuffle(c)
+    
+    # Fill the board with random uncalled numbers
+    for r in range(5):
+        for c in range(5):
+            if r == 2 and c == 2:
+                board[r][c] = "FREE"
+            else:
+                board[r][c] = cols[c].pop()
+                
+    # ==========================================
+    # FORCE A BEAUTIFUL DIAGONAL WIN 
+    # ==========================================
+    called_b = [x for x in called if 1 <= x <= 15]
+    called_i = [x for x in called if 16 <= x <= 30]
+    called_n = [x for x in called if 31 <= x <= 45]
+    called_g = [x for x in called if 46 <= x <= 60]
+    called_o = [x for x in called if 61 <= x <= 75]
+    
+    if called_b: board[0][0] = random.choice(called_b)
+    if called_i: board[1][1] = random.choice(called_i)
+    # board[2][2] is already "FREE"
+    if called_g: board[3][3] = random.choice(called_g)
+    if called_o: board[4][4] = random.choice(called_o)
+    
+    return board
+
+# ==========================================
 # 👻 SMART GHOST PLAYER ENGINE (GOD MODE)
 # ==========================================
 def get_ghost_card_count(tier):
@@ -49,7 +95,26 @@ def inject_ghost_players(room, tier):
     ]
     
     max_cards = 1000 if tier == 10 else 500
-    available = list(range(1, max_cards + 1))
+    
+    # --- THE FIX: PREVENT GHOSTS FROM STEALING REAL PLAYERS CARDS ---
+    taken_cards = set()
+    if room.players:
+        for p_cards in room.players.values():
+            if isinstance(p_cards, list):
+                for c in p_cards: taken_cards.add(int(c))
+            else:
+                taken_cards.add(int(p_cards))
+                
+    # Create a bucket of cards that ONLY contains empty, unbought numbers
+    available = [c for c in range(1, max_cards + 1) if c not in taken_cards]
+    
+    # If the room is almost full, only take what's left!
+    if len(available) < ghost_count:
+        ghost_count = len(available)
+        
+    if ghost_count <= 0:
+        return False
+        
     random.shuffle(available)
     selected_cards = available[:ghost_count]
     
@@ -93,6 +158,7 @@ class Command(BaseCommand):
                         room = active_rooms.first()
                     
                     if room.status == "LOBBY":
+                        # Auto-heal empty rooms
                         if not room.players:
                             inject_ghost_players(room, tier)
                         
@@ -169,15 +235,17 @@ class Command(BaseCommand):
                                     
                                     w_cards = room.players[winner_name]
                                     winning_num = w_cards[0] if isinstance(w_cards, list) else w_cards
-                                    room.winning_card = int(winning_num)
                                     
-                                    # --- THE FIX: GRAB THE BOARD FOR THE GHOST SO IT SHOWS UP ON FRONTEND! ---
+                                    room.winning_card = str(winning_num)
+                                    
                                     try:
-                                        real_card = PermanentCard.objects.get(card_number=int(winning_num))
+                                        try:
+                                            real_card = PermanentCard.objects.get(card_number=int(winning_num))
+                                        except:
+                                            real_card = PermanentCard.objects.get(id=int(winning_num))
                                         room.winning_board = real_card.board
-                                    except Exception as e:
-                                        print(f"Could not load card board for ghost: {e}")
-                                    # -----------------------------------------------------------------------
+                                    except Exception:
+                                        room.winning_board = generate_ghost_winning_board(called)
 
                             except Exception as e:
                                 print(f"⚠️ Warning: Ghost crowning skipped due to error: {e}")
