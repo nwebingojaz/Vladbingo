@@ -172,13 +172,13 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, use
 
     tg_id = user.username.replace('tg_', '')
     
-    # CASHIERS MENU (Restricted)
+    # CASHIERS MENU (Restricted, but added /housewin and /broadcast)
     if is_admin(tg_id) and not is_boss(tg_id):
-        caption += "\n\n👔 <b>Cashier Commands:</b>\n/pending | /approve [id] | /reject [id]\n/requestpromo [room] [amount] (Max: 15)\n/stats | /broadcast (Reply to msg)"
+        caption += "\n\n👔 <b>Cashier Commands:</b>\n/pending | /approve [id] | /reject [id]\n/requestpromo [rm] [amt] (Max: 15)\n/housewin [room] 💀 (Stop a winning streak)\n/stats | /broadcast (Reply to msg)"
     
     # BOSS MENU (Full Power)
     elif is_boss(tg_id):
-        caption += "\n\n👑 <b>Boss Commands:</b>\n/addadmin [id] | /removeadmin [id]\n/pending | /approve | /reject\n/addbal [id] | /subbal [id] | /forcewin\n/setname | /setghost [rm] [min] [max]\n/housewin [room]\n/stats | /broadcast"
+        caption += "\n\n👑 <b>Boss Commands:</b>\n/addadmin [id] | /removeadmin [id]\n/pending | /approve | /reject\n/addbal [id] | /subbal [id] | /forcewin\n/setname | /setghost [rm] [min] [max]\n/housewin [room] 💀\n/stats | /broadcast"
     
     base_url = "https://vladbingo-dmzg.onrender.com/api/live/?v=2.1"
     
@@ -270,18 +270,8 @@ async def cmd_setghost(update: Update, context: ContextTypes.DEFAULT_TYPE):
         tier, min_c, max_c = int(context.args[0]), int(context.args[1]), int(context.args[2])
         if tier not in [10, 20, 30, 40, 50, 100]: return await update.message.reply_text("⚠️ Invalid room!")
         await save_ghost_config(tier, min_c, max_c)
-        await update.message.reply_text(f"✅ GHOST BOT UPDATED FOR ROOM {tier} ETB!\nNow buying {min_c}-{max_cards} cards.")
+        await update.message.reply_text(f"✅ GHOST BOT UPDATED FOR ROOM {tier} ETB!\nNow buying {min_c}-{max_c} cards.")
     except: await update.message.reply_text("⚠️ Usage: /setghost <room> <min> <max>")
-
-async def cmd_housewin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_boss(update.message.from_user.id): return
-    try:
-        tier = int(context.args[0])
-        if tier not in [10, 20, 30, 40, 50, 100]: return await update.message.reply_text("⚠️ Invalid room!")
-        cache.set(f'housewin_{tier}', True, timeout=120)
-        await update.message.reply_text(f"💀 <b>BLOW REQUEST ACTIVATED!</b>\nRoom {tier} ETB will be terminated to protect house funds.", parse_mode="HTML")
-    except:
-        await update.message.reply_text("⚠️ Usage: /housewin <room>")
 
 async def cmd_addbal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_boss(update.message.from_user.id): return
@@ -297,34 +287,24 @@ async def cmd_subbal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✅ {msg}" if success else f"⚠️ {msg}")
     except: await update.message.reply_text("⚠️ Usage: /subbal <id> <amount>")
 
-
 # --- GENERAL ADMIN COMMANDS (Boss & Cashiers) ---
 
-# NEW PROMO REQUEST FOR CASHIERS
 async def cmd_requestpromo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id): return
     try:
         tier = int(context.args[0])
         amount = int(context.args[1])
-        if tier not in [10, 20, 30, 40, 50, 100]: 
-            return await update.message.reply_text("⚠️ Invalid room!")
-        
+        if tier not in [10, 20, 30, 40, 50, 100]: return await update.message.reply_text("⚠️ Invalid room!")
         if not is_boss(update.message.from_user.id) and amount > 15:
             return await update.message.reply_text("⚠️ You can only request up to 15 promo players.")
             
-        cashier_id = update.message.from_user.id
         msg_to_boss = (
-            f"🔔 <b>PROMO REQUEST FROM CASHIER</b>\n"
-            f"Cashier ID: <code>{cashier_id}</code>\n"
-            f"Room: {tier} ETB\n"
-            f"Requested Players: {amount}\n\n"
-            f"<i>To approve this, tap the command below:</i>\n"
-            f"<code>/setghost {tier} {amount} {amount}</code>"
+            f"🔔 <b>PROMO REQUEST</b>\nCashier ID: <code>{update.message.from_user.id}</code>\nRoom: {tier} ETB\nRequested Players: {amount}\n\n"
+            f"<i>Approve by tapping:</i>\n<code>/setghost {tier} {amount} {amount}</code>"
         )
         await context.bot.send_message(chat_id=BOSS_TG_ID, text=msg_to_boss, parse_mode="HTML")
         await update.message.reply_text("✅ Promo request sent to the Boss successfully!")
-    except:
-        await update.message.reply_text("⚠️ Usage: /requestpromo <room> <amount>\nExample: /requestpromo 10 5")
+    except: await update.message.reply_text("⚠️ Usage: /requestpromo <room> <amount>")
 
 async def cmd_pending(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id): return
@@ -352,6 +332,7 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id): return
     await update.message.reply_text(await get_casino_stats(), parse_mode="HTML")
 
+# CHANGED: Now Cashiers CAN use this!
 async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id): return
     if not update.message.reply_to_message: return await update.message.reply_text("⚠️ You must REPLY to a message to broadcast.")
@@ -364,6 +345,18 @@ async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except: pass
     await update.message.reply_text(f"✅ Delivered to {sc} users!")
 
+# CHANGED: Now Cashiers CAN use this!
+async def cmd_housewin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.message.from_user.id): return
+    try:
+        tier = int(context.args[0])
+        if tier not in [10, 20, 30, 40, 50, 100]: return await update.message.reply_text("⚠️ Invalid room!")
+        cache.set(f'housewin_{tier}', True, timeout=120)
+        await update.message.reply_text(f"💀 <b>BLOW REQUEST ACTIVATED!</b>\nRoom {tier} ETB will be terminated on the next ball.", parse_mode="HTML")
+    except:
+        await update.message.reply_text("⚠️ Usage: /housewin <room>")
+
+
 # ==========================================
 # 7. RUN BOT
 # ==========================================
@@ -374,23 +367,23 @@ def run():
     
     app.add_handler(CommandHandler("start", start))
     
-    # Boss-Only Controls
+    # Boss Only Commands
     app.add_handler(CommandHandler("setghost", cmd_setghost))
     app.add_handler(CommandHandler("addbal", cmd_addbal))
     app.add_handler(CommandHandler("subbal", cmd_subbal))
-    app.add_handler(CommandHandler("housewin", cmd_housewin)) 
     app.add_handler(CommandHandler("addadmin", cmd_addadmin))
     app.add_handler(CommandHandler("removeadmin", cmd_removeadmin))
     app.add_handler(CommandHandler("forcewin", cmd_forcewin))
     app.add_handler(CommandHandler("setname", cmd_setname))
 
-    # Cashier & Boss Controls
-    app.add_handler(CommandHandler("requestpromo", cmd_requestpromo)) # <--- NEW
+    # Cashier & Boss Commands
+    app.add_handler(CommandHandler("requestpromo", cmd_requestpromo))
     app.add_handler(CommandHandler("pending", cmd_pending))
     app.add_handler(CommandHandler("approve", cmd_approve))
     app.add_handler(CommandHandler("reject", cmd_reject))
     app.add_handler(CommandHandler("stats", cmd_stats))
     app.add_handler(CommandHandler("broadcast", cmd_broadcast))
+    app.add_handler(CommandHandler("housewin", cmd_housewin)) 
     
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
