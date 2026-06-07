@@ -19,23 +19,21 @@ django.setup()
 from bingo.models import User, Transaction, GameControl, GameRound
 
 # ==========================================
-# 2. ADMIN CONFIGURATION (UPGRADED)
+# 2. ADMIN CONFIGURATION
 # ==========================================
 BOSS_TG_ID = str(os.environ.get("ADMIN_TG_ID", "YOUR_TG_ID"))
 
 def is_boss(tg_id):
     return str(tg_id) == BOSS_TG_ID
 
-# Check if someone is the Boss OR a Sub-Admin (Cashier)
 def is_admin(tg_id):
     if is_boss(tg_id):
         return True
-    # Read the sub-admins list from cache
     sub_admins = cache.get('sub_admins_list', [])
     return str(tg_id) in sub_admins
 
 # ==========================================
-# 3. DATABASE WRAPPERS (Sync to Async)
+# 3. DATABASE WRAPPERS
 # ==========================================
 def db_op(uid, action, val=None):
     close_old_connections()
@@ -124,19 +122,34 @@ def save_ghost_config(tier, min_cards, max_cards):
     config_user.save()
     return True
 
+@sync_to_async
+def adjust_user_balance(tg_id, amount, action="add"):
+    close_old_connections()
+    try:
+        user = User.objects.get(username=f"tg_{tg_id}")
+        amount = float(amount)
+        if action == "add":
+            user.operational_credit += amount
+        elif action == "deduct":
+            if user.operational_credit < amount:
+                return False, f"User only has {user.operational_credit} ETB! Cannot deduct {amount} ETB."
+            user.operational_credit -= amount
+        
+        user.save(update_fields=['operational_credit'])
+        return True, f"Success! User {tg_id} balance is now: {user.operational_credit} ETB."
+    except User.DoesNotExist:
+        return False, "User not found in database."
+    except ValueError:
+        return False, "Invalid amount provided."
+
 # ==========================================
-# 4. BACKGROUND JOBS (Broadcaster & Promo)
+# 4. BACKGROUND JOBS 
 # ==========================================
 async def broadcast_winners_task(context: ContextTypes.DEFAULT_TYPE):
     channel_id = os.environ.get("CHANNEL_ID", "@bigestbingo")
     finished_rooms = await get_and_mark_finished_rooms()
-    
     for room in finished_rooms:
-        msg = (f"🏆 <b>Game #{room.id} Finished!</b>\n\n"
-               f"💰 Bet: {float(room.bet_amount):.2f} ETB\n"
-               f"👤 Winner: {room.winner_username.replace('tg_','')}\n"
-               f"🎁 Prize: {float(room.winner_prize):.2f} ETB\n\n"
-               f"Play now: https://t.me/Bigestbingobot")
+        msg = (f"🏆 <b>Game #{room.id} Finished!</b>\n\n💰 Bet: {float(room.bet_amount):.2f} ETB\n👤 Winner: {room.winner_username.replace('tg_','')}\n🎁 Prize: {float(room.winner_prize):.2f} ETB\n\nPlay now: https://t.me/Bigestbingobot")
         try: await context.bot.send_message(chat_id=channel_id, text=msg, parse_mode="HTML")
         except: pass
 
@@ -146,7 +159,6 @@ async def daily_promo_task(context: ContextTypes.DEFAULT_TYPE):
     caption = "🎰 <b>BIGGEST BINGO BOT</b> 🎰\n\nበየቀኑ በሺዎች የሚቆጠሩ ብሮችን ያሸንፉ!\nአሁኑኑ ይጫወቱ እና እድልዎን ይሞክሩ!"
     keyboard = [[InlineKeyboardButton("🎮 አሁኑኑ ይጫወቱ (PLAY NOW)", url="https://t.me/Bigestbingobot")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
     try: await context.bot.send_photo(chat_id=channel_id, photo=photo_url, caption=caption, parse_mode="HTML", reply_markup=reply_markup)
     except Exception as e: print(f"Daily promo failed: {e}")
 
@@ -155,54 +167,34 @@ async def daily_promo_task(context: ContextTypes.DEFAULT_TYPE):
 # ==========================================
 async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, user):
     photo_url = "https://i.ibb.co/3m20B6k/bingo-money.jpg"
-    
-    caption = (
-        f"🎰 <b>BIGGEST BINGO BOT</b> 🎰\n\n"
-        f"እንኳን በደህና መጡ፣ <b>{user.real_name}</b>! (Welcome)\n"
-        f"💰 <b>ቀሪ ሂሳብ (Balance):</b> {user.operational_credit} ETB\n\n"
-        f"ከታች ካሉት አማራጮች ውስጥ ይምረጡ:\n<i>(Choose an option below)</i>"
-    )
+    caption = (f"🎰 <b>BIGGEST BINGO BOT</b> 🎰\n\nእንኳን በደህና መጡ፣ <b>{user.real_name}</b>!\n💰 <b>ቀሪ ሂሳብ:</b> {user.operational_credit} ETB\n\nከታች ካሉት አማራጮች ውስጥ ይምረጡ:")
 
     tg_id = user.username.replace('tg_', '')
-    
-    # Sub-Admins see this (Cashiers)
     if is_admin(tg_id) and not is_boss(tg_id):
-        caption += "\n\n👔 <b>Cashier Commands:</b>\n/pending - View pending TXs\n/approve [id] - Approve TX\n/reject [id] - Reject TX\n/stats - View Casino Stats"
-    
-    # ONLY YOU see this (Boss)
+        caption += "\n\n👔 <b>Cashier Commands:</b>\n/pending | /approve [id] | /reject [id]\n/addbal [id] [amt] | /subbal [id] [amt]\n/stats | /setghost [rm] [min] [max]\n/housewin [room] - Recover Money!\n/broadcast"
     elif is_boss(tg_id):
-        caption += "\n\n👑 <b>Boss Commands:</b>\n/pending - View TXs\n/approve [id]\n/reject [id]\n/addadmin [id] - Hire Cashier\n/removeadmin [id] - Fire Cashier\n/forcewin [card_num]\n/setname [id] [name]\n/setghost [room] [min] [max]\n/stats\n/broadcast (Reply to msg)"
+        caption += "\n\n👑 <b>Boss Commands:</b>\n/addadmin [id] | /removeadmin [id]\n/pending | /approve | /reject\n/addbal | /subbal | /forcewin\n/setname | /setghost | /housewin [room]\n/stats | /broadcast"
     
     base_url = "https://vladbingo-dmzg.onrender.com/api/live/?v=2.1"
-    
     keyboard = [
-        [InlineKeyboardButton("🎮 ጌም ይጫወቱ (Play Games)", web_app=WebAppInfo(url=base_url))],
-        [InlineKeyboardButton("💰 ያስገቡ (Deposit)", web_app=WebAppInfo(url=base_url + "&tab=deposit")), InlineKeyboardButton("💸 ያውጡ (Withdraw)", web_app=WebAppInfo(url=base_url + "&tab=withdraw"))],
-        [InlineKeyboardButton("↔️ ያስተላልፉ (Transfer)", web_app=WebAppInfo(url=base_url + "&tab=transfer")), InlineKeyboardButton("👤 ፕሮፋይል (Profile)", callback_data="profile")],
-        [InlineKeyboardButton("📜 ታሪክ (History)", web_app=WebAppInfo(url=base_url + "&tab=history")), InlineKeyboardButton("⚖️ ሂሳብ (Balance)", callback_data="balance")],
-        [InlineKeyboardButton("📢 ቻናል (Channel)", url="https://t.me/biggestbingo"), InlineKeyboardButton("💬 ግሩፕ (Group)", url="https://t.me/biggestbingochat")],
-        [InlineKeyboardButton("🎧 ያግኙን (Contact Admin)", url="https://t.me/yeab")]
+        [InlineKeyboardButton("🎮 ጌም ይጫወቱ (Play)", web_app=WebAppInfo(url=base_url))],
+        [InlineKeyboardButton("💰 ያስገቡ", web_app=WebAppInfo(url=base_url + "&tab=deposit")), InlineKeyboardButton("💸 ያውጡ", web_app=WebAppInfo(url=base_url + "&tab=withdraw"))],
+        [InlineKeyboardButton("↔️ ያስተላልፉ", web_app=WebAppInfo(url=base_url + "&tab=transfer")), InlineKeyboardButton("👤 ፕሮፋይል", callback_data="profile")],
+        [InlineKeyboardButton("📜 ታሪክ", web_app=WebAppInfo(url=base_url + "&tab=history")), InlineKeyboardButton("⚖️ ሂሳብ", callback_data="balance")],
+        [InlineKeyboardButton("📢 ቻናል", url="https://t.me/biggestbingo"), InlineKeyboardButton("💬 ግሩፕ", url="https://t.me/biggestbingochat")]
     ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    chat_id = update.effective_chat.id
-    try:
-        await context.bot.send_photo(chat_id=chat_id, photo=photo_url, caption=caption, reply_markup=reply_markup, parse_mode='HTML')
-    except Exception as e:
-        await context.bot.send_message(chat_id=chat_id, text=caption, reply_markup=reply_markup, parse_mode='HTML')
+    try: await context.bot.send_photo(chat_id=update.effective_chat.id, photo=photo_url, caption=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
+    except: await context.bot.send_message(chat_id=update.effective_chat.id, text=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     tg_id = update.effective_user.id
     user = await sync_to_async(db_op)(tg_id, "get")
-    
     if not user.real_name:
         await sync_to_async(db_op)(tg_id, "state", "REG_NAME")
-        return await context.bot.send_message(chat_id=update.effective_chat.id, text="👋 ወደ <b>BIGGEST BINGO BOT</b> እንኳን በደህና መጡ!\n\nእባክዎ ትክክለኛ ሙሉ ስምዎን ያስገቡ (Please enter your Full Name):", parse_mode='HTML')
-        
+        return await context.bot.send_message(chat_id=update.effective_chat.id, text="👋 እባክዎ ትክክለኛ ሙሉ ስምዎን ያስገቡ:", parse_mode='HTML')
     if not user.phone_number:
-        btn = [[KeyboardButton("📲 ስልክ ቁጥር ያጋሩ (Share Phone)", request_contact=True)]]
-        return await context.bot.send_message(chat_id=update.effective_chat.id, text="አካውንትዎን ለማረጋገጥ ከታች ያለውን ቁልፍ ይጫኑ:\n(Tap the button below to verify your phone number)", reply_markup=ReplyKeyboardMarkup(btn, one_time_keyboard=True, resize_keyboard=True))
-    
+        btn = [[KeyboardButton("📲 ስልክ ቁጥር ያጋሩ", request_contact=True)]]
+        return await context.bot.send_message(chat_id=update.effective_chat.id, text="አካውንትዎን ለማረጋገጥ ከታች ያለውን ቁልፍ ይጫኑ:", reply_markup=ReplyKeyboardMarkup(btn, one_time_keyboard=True, resize_keyboard=True))
     await send_main_menu(update, context, user)
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -217,106 +209,59 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     phone = update.message.contact.phone_number
     if phone.startswith('+251'): phone = '0' + phone[4:]
     elif phone.startswith('251'): phone = '0' + phone[3:]
-        
     await sync_to_async(db_op)(tg_id, "phone", phone)
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="✅ ስልክዎ በትክክል ተረጋግጧል! (Phone Verified Successfully!)", reply_markup=ReplyKeyboardRemove())
+    await context.bot.send_message(chat_id=update.effective_chat.id, text="✅ ተረጋግጧል!", reply_markup=ReplyKeyboardRemove())
     await start(update, context)
 
 async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user = await sync_to_async(db_op)(query.from_user.id, "get")
-    
-    if query.data == "balance":
-        await query.answer(f"💰 ቀሪ ሂሳብዎ (Balance): {user.operational_credit} ETB", show_alert=True)
+    if query.data == "balance": await query.answer(f"💰 ቀሪ ሂሳብዎ: {user.operational_credit} ETB", show_alert=True)
     elif query.data == "profile":
-        phone = user.phone_number if user and user.phone_number else "ያልተመዘገበ (Not linked)"
-        msg = f"👤 <b>የእርስዎ ፕሮፋይል (Profile)</b>\n\n🆔 መለያ (ID): <code>{user.username.replace('tg_','')}</code>\n📱 ስልክ (Phone): {phone}\n💰 ሂሳብ (Balance): {user.operational_credit} ETB"
-        await context.bot.send_message(query.message.chat.id, msg, parse_mode="HTML")
-        await query.answer()
-    else:
+        await context.bot.send_message(query.message.chat.id, f"👤 <b>ፕሮፋይል</b>\n🆔 ID: <code>{user.username.replace('tg_','')}</code>\n💰 Balance: {user.operational_credit} ETB", parse_mode="HTML")
         await query.answer()
 
 # ==========================================
 # 6. ADMIN COMMAND HANDLERS
 # ==========================================
-
-# --- BOSS ONLY COMMANDS ---
 async def cmd_addadmin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_boss(update.message.from_user.id): return
     try:
         new_admin_id = str(context.args[0])
         admins = cache.get('sub_admins_list', [])
-        if new_admin_id not in admins:
-            admins.append(new_admin_id)
-            cache.set('sub_admins_list', admins, timeout=None)
+        if new_admin_id not in admins: admins.append(new_admin_id); cache.set('sub_admins_list', admins, timeout=None)
         await update.message.reply_text(f"✅ User {new_admin_id} has been Hired as a Cashier!")
-    except IndexError:
-        await update.message.reply_text("⚠️ Usage: /addadmin <telegram_id>")
+    except IndexError: await update.message.reply_text("⚠️ Usage: /addadmin <telegram_id>")
 
 async def cmd_removeadmin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_boss(update.message.from_user.id): return
     try:
         old_admin_id = str(context.args[0])
         admins = cache.get('sub_admins_list', [])
-        if old_admin_id in admins:
-            admins.remove(old_admin_id)
-            cache.set('sub_admins_list', admins, timeout=None)
+        if old_admin_id in admins: admins.remove(old_admin_id); cache.set('sub_admins_list', admins, timeout=None)
         await update.message.reply_text(f"🚫 User {old_admin_id} has been Fired.")
-    except IndexError:
-        await update.message.reply_text("⚠️ Usage: /removeadmin <telegram_id>")
+    except IndexError: await update.message.reply_text("⚠️ Usage: /removeadmin <telegram_id>")
 
 async def cmd_forcewin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_boss(update.message.from_user.id): return
     try:
         msg = await set_force_win(int(context.args[0]))
         await update.message.reply_text(f"🎯 {msg}")
-    except (IndexError, ValueError): await update.message.reply_text("⚠️ Usage: /forcewin <card_number>\nUse 0 to clear.")
+    except: await update.message.reply_text("⚠️ Usage: /forcewin <card_number>\nUse 0 to clear.")
 
 async def cmd_setname(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_boss(update.message.from_user.id): return
     try:
-        target_tg_id = context.args[0]
-        new_name = " ".join(context.args[1:])
-        if not new_name: raise ValueError
-        success, msg = await change_user_name(target_tg_id, new_name)
+        success, msg = await change_user_name(context.args[0], " ".join(context.args[1:]))
         await update.message.reply_text(f"✅ {msg}" if success else f"⚠️ {msg}")
-    except (IndexError, ValueError): await update.message.reply_text("⚠️ Usage: /setname <telegram_id> <New Name Here>")
+    except: await update.message.reply_text("⚠️ Usage: /setname <id> <name>")
 
-async def cmd_setghost(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_boss(update.message.from_user.id): return
-    try:
-        if len(context.args) < 3: raise ValueError
-        tier = int(context.args[0])       
-        min_cards = int(context.args[1])  
-        max_cards = int(context.args[2])  
-        valid_tiers = [10, 20, 30, 40, 50, 100]
-        if tier not in valid_tiers: return await update.message.reply_text("⚠️ Invalid room!")
-        await save_ghost_config(tier, min_cards, max_cards)
-        await update.message.reply_text(f"✅ GHOST BOT UPDATED FOR ROOM {tier} ETB!\nNow buying {min_cards}-{max_cards} cards.")
-    except ValueError: await update.message.reply_text("⚠️ Usage: /setghost <room> <min> <max>")
-    except Exception as e: await update.message.reply_text(f"❌ Server Error: {e}")
-
-async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_boss(update.message.from_user.id): return
-    if not update.message.reply_to_message: return await update.message.reply_text("⚠️ You must REPLY to a message.")
-    target_message = update.message.reply_to_message
-    tg_ids = await get_all_user_tg_ids()
-    await update.message.reply_text(f"⏳ Sending to {len(tg_ids)} users...")
-    success_count = 0
-    for tid in tg_ids:
-        try:
-            await context.bot.copy_message(chat_id=tid, from_chat_id=target_message.chat_id, message_id=target_message.message_id)
-            success_count += 1
-        except Exception: pass
-    await update.message.reply_text(f"✅ Broadcast delivered to {success_count} users!")
-
-# --- GENERAL ADMIN COMMANDS (Boss & Cashiers) ---
 async def cmd_pending(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id): return
     txs = await get_pending_transactions()
     if not txs: return await update.message.reply_text("✅ No pending transactions!")
-    msg = "📝 <b>PENDING TRANSACTIONS:</b>\n\n"
-    for tx in txs: msg += f"<b>ID:</b> <code>{tx.id}</code>\n<b>Type:</b> {tx.type}\n<b>Amount:</b> {tx.amount} ETB\n<b>Note:</b> {tx.note}\n--------------------\n"
+    msg = "📝 <b>PENDING:</b>\n"
+    for tx in txs: msg += f"<b>ID:</b> <code>{tx.id}</code>\n<b>Type:</b> {tx.type}\n<b>Amount:</b> {tx.amount} ETB\n----------------\n"
     await update.message.reply_text(msg, parse_mode="HTML")
 
 async def cmd_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -324,46 +269,98 @@ async def cmd_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         success, msg = await process_transaction(int(context.args[0]), "approved")
         await update.message.reply_text(f"✅ {msg}" if success else f"⚠️ {msg}")
-    except (IndexError, ValueError): await update.message.reply_text("⚠️ Usage: /approve <transaction_id>")
+    except: await update.message.reply_text("⚠️ Usage: /approve <tx_id>")
 
 async def cmd_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id): return
     try:
         success, msg = await process_transaction(int(context.args[0]), "rejected")
         await update.message.reply_text(f"🚫 {msg}" if success else f"⚠️ {msg}")
-    except (IndexError, ValueError): await update.message.reply_text("⚠️ Usage: /reject <transaction_id>")
+    except: await update.message.reply_text("⚠️ Usage: /reject <tx_id>")
 
 async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id): return
-    msg = await get_casino_stats()
-    await update.message.reply_text(msg, parse_mode="HTML")
+    await update.message.reply_text(await get_casino_stats(), parse_mode="HTML")
+
+async def cmd_setghost(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    tg_id = update.message.from_user.id
+    if not is_admin(tg_id): return
+    try:
+        tier, min_c, max_c = int(context.args[0]), int(context.args[1]), int(context.args[2])
+        if tier not in [10, 20, 30, 40, 50, 100]: return await update.message.reply_text("⚠️ Invalid room!")
+        if not is_boss(tg_id) and max_c > 15: return await update.message.reply_text("⚠️ Cashier Limit: Max 15 ghost players allowed.")
+        await save_ghost_config(tier, min_c, max_c)
+        await update.message.reply_text(f"✅ ROOM {tier} UPDATED! Buying {min_c}-{max_c} cards.")
+    except: await update.message.reply_text("⚠️ Usage: /setghost <room> <min> <max>")
+
+async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.message.from_user.id): return
+    if not update.message.reply_to_message: return await update.message.reply_text("⚠️ You must REPLY to a message to broadcast.")
+    target = update.message.reply_to_message
+    tg_ids = await get_all_user_tg_ids()
+    await update.message.reply_text(f"⏳ Sending to {len(tg_ids)} users...")
+    sc = 0
+    for tid in tg_ids:
+        try: await context.bot.copy_message(chat_id=tid, from_chat_id=target.chat_id, message_id=target.message_id); sc += 1
+        except: pass
+    await update.message.reply_text(f"✅ Delivered to {sc} users!")
+
+async def cmd_addbal(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.message.from_user.id): return
+    try:
+        success, msg = await adjust_user_balance(context.args[0], context.args[1], "add")
+        await update.message.reply_text(f"✅ {msg}" if success else f"⚠️ {msg}")
+    except: await update.message.reply_text("⚠️ Usage: /addbal <id> <amount>")
+
+async def cmd_subbal(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.message.from_user.id): return
+    try:
+        success, msg = await adjust_user_balance(context.args[0], context.args[1], "deduct")
+        await update.message.reply_text(f"✅ {msg}" if success else f"⚠️ {msg}")
+    except: await update.message.reply_text("⚠️ Usage: /subbal <id> <amount>")
+
+# --- 💀 THE BLOW REQUEST COMMAND (HOUSE WIN) ---
+async def cmd_housewin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update.message.from_user.id): return
+    try:
+        tier = int(context.args[0])
+        if tier not in [10, 20, 30, 40, 50, 100]: return await update.message.reply_text("⚠️ Invalid room!")
+        
+        # We save the flag in memory for the engine to read!
+        cache.set(f'housewin_{tier}', True, timeout=120)
+        
+        await update.message.reply_text(
+            f"💀 <b>BLOW REQUEST ACTIVATED!</b>\n"
+            f"Room {tier} ETB will be terminated to protect house funds.\n"
+            f"A Ghost Player will naturally yell BINGO! on the very next ball drop.", 
+            parse_mode="HTML"
+        )
+    except:
+        await update.message.reply_text("⚠️ Usage: /housewin <room>\nExample: /housewin 10")
 
 # ==========================================
 # 7. RUN BOT
 # ==========================================
 def run():
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
-    if not token:
-        print("CRITICAL ERROR: TELEGRAM_BOT_TOKEN is missing!")
-        return
-        
+    if not token: return print("CRITICAL ERROR: TELEGRAM_BOT_TOKEN is missing!")
     app = Application.builder().token(token).post_init(lambda a: a.bot.delete_webhook(drop_pending_updates=True)).build()
     
     app.add_handler(CommandHandler("start", start))
-    
-    # Admin & Boss Commands
     app.add_handler(CommandHandler("pending", cmd_pending))
     app.add_handler(CommandHandler("approve", cmd_approve))
     app.add_handler(CommandHandler("reject", cmd_reject))
     app.add_handler(CommandHandler("stats", cmd_stats))
+    app.add_handler(CommandHandler("setghost", cmd_setghost))
+    app.add_handler(CommandHandler("broadcast", cmd_broadcast))
+    app.add_handler(CommandHandler("addbal", cmd_addbal))
+    app.add_handler(CommandHandler("subbal", cmd_subbal))
+    app.add_handler(CommandHandler("housewin", cmd_housewin)) # <--- ADDED
     
-    # Boss Only Commands
     app.add_handler(CommandHandler("addadmin", cmd_addadmin))
     app.add_handler(CommandHandler("removeadmin", cmd_removeadmin))
     app.add_handler(CommandHandler("forcewin", cmd_forcewin))
     app.add_handler(CommandHandler("setname", cmd_setname))
-    app.add_handler(CommandHandler("setghost", cmd_setghost))
-    app.add_handler(CommandHandler("broadcast", cmd_broadcast))
     
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
