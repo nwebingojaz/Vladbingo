@@ -318,9 +318,6 @@ def check_win(request, game_id, tg_id):
 # ==========================================
 def send_telegram_message(chat_id, text):
     try: 
-        # ==========================================
-        # ⚠️ PASTE YOUR EXACT BOT TOKEN HERE:
-        # ==========================================
         bot_token = "8212617770:AAEGMXyirnTEjOJVG_t7xINkmF7DAhOP8WM"
         
         url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
@@ -390,7 +387,8 @@ def submit_deposit(request):
                 status="pending"
             )
             
-            admin_group_id = "-5139316806"
+            # --- THE FIX: NEW PRIVATE TRANSACTION GROUP ---
+            admin_group_id = "-1003754961441"
             send_telegram_message(admin_group_id, f"🟢 <b>NEW DEPOSIT</b>\n<b>ID: {tx.id}</b>\nUser: <code>{tg_id}</code>\nAmount: {amount} ETB\nMethod: {method}\nTXID: {tx_id}\n\n<i>To approve, tap:</i>\n<code>/approve {tx.id}</code>")
             
             return JsonResponse({"status": "success", "message": "Deposit submitted! Waiting for Admin approval."})
@@ -430,7 +428,8 @@ def submit_withdrawal(request):
                 status="pending"
             )
             
-            admin_group_id = "-5139316806"
+            # --- THE FIX: NEW PRIVATE TRANSACTION GROUP ---
+            admin_group_id = "-1003754961441"
             send_telegram_message(admin_group_id, f"🔴 <b>NEW WITHDRAWAL</b>\n<b>ID: {tx.id}</b>\nUser: <code>{tg_id}</code>\nAmount: {amount} ETB\nAccount: <code>{data.get('account')}</code>\nPhone: {user.phone_number}\n\n<i>To approve, tap:</i>\n<code>/approve {tx.id}</code>")
             
             return JsonResponse({"status": "success", "message": "Withdrawal requested successfully!"})
@@ -475,7 +474,8 @@ def submit_transfer(request):
             tx_out = Transaction.objects.create(agent=sender, amount=amount, note=f"Transfer to {target_account}", type="TRANSFER_OUT", status="approved")
             Transaction.objects.create(agent=receiver, amount=amount, note=f"Transfer from {tg_id}", type="TRANSFER_IN", status="approved")
             
-            admin_group_id = "-5139316806"
+            # --- THE FIX: NEW PRIVATE TRANSACTION GROUP ---
+            admin_group_id = "-1003754961441"
             send_telegram_message(admin_group_id, f"💸 <b>TRANSFER PROCESSED</b>\n<b>ID: {tx_out.id}</b>\nFrom: <code>{tg_id}</code>\nTo: <code>{target_account}</code>\nAmount: {amount} ETB")
             
             if receiver.telegram_id: 
