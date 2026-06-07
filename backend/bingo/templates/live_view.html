@@ -19,7 +19,6 @@
         .card-num:active { transform: scale(0.9); }
         .card-num.active { background: #10b981 !important; color: white !important; border-color: white !important; transform: scale(1.1); box-shadow: 0 0 10px #10b981; }
         
-        /* THE TAKEN CARD CSS */
         .card-num.taken { background: #0f172a !important; color: #334155 !important; border-color: #1e293b !important; pointer-events: none; opacity: 0.7; }
         
         .preview-container { border: 2px solid #3b82f6; border-radius: 12px; padding: 10px; background: rgba(0,0,0,0.4); width: 135px; }
@@ -253,6 +252,8 @@
                 <p class="text-xs text-green-400 font-bold uppercase mb-1">የእርስዎ ፕሮሞ ኮድ (Your Code)</p>
                 <p id="my-promo-code" class="text-3xl font-black text-white tracking-widest"></p>
             </div>
+            
+            <!-- UPDATE: LINK CHANGED TO biggestbingobot -->
             <button onclick="copyPromoMessage()" class="w-full bg-green-600 hover:bg-green-700 text-white font-black py-4 rounded-xl shadow-[0_0_15px_rgba(22,163,74,0.4)] active:scale-95 transition-all flex items-center justify-center gap-2 mb-6">
                 <span>📋</span> መልዕክቱን ኮፒ አድርግ (COPY)
             </button>
@@ -335,7 +336,6 @@
         let refreshRunning = false; 
         let globalBoardsData = [];
         
-        // --- 👻 PERFECTED LIVE BUYING SIMULATOR ---
         let ghostBuyTimer = null;
         function triggerGhostBuy() {
             if (sessionStorage.getItem('currentScreen') !== 'v-selector' || currentRoomStatus !== 'LOBBY') return;
@@ -352,7 +352,6 @@
                 btn.style.color = '#fff';
                 btn.style.borderColor = '#f59e0b';
                 
-                // SAVE IT SO IT NEVER SHIFTS ON REFRESH!
                 let cacheKey = 'takenCards_' + activeBet + '_' + (myActiveGameId || 'lobby');
                 let savedTaken = JSON.parse(sessionStorage.getItem(cacheKey) || "[]");
                 if(!savedTaken.includes(cardId)) {
@@ -564,7 +563,13 @@
         function openWalletTab(tab){ ['deposit','withdraw','transfer'].forEach(t=>{document.getElementById('w-tab-'+t).classList.remove('active'); document.getElementById('w-sec-'+t).classList.add('hidden');}); document.getElementById('w-tab-'+tab).classList.add('active'); document.getElementById('w-sec-'+tab).classList.remove('hidden'); }
         function openSettings(){ document.getElementById('m-settings').style.display='flex'; }
         function openReferral(){ document.getElementById('m-referral').style.display='flex'; document.getElementById('my-promo-code').innerText=uid; }
-        function copyPromoMessage(){ const shareText=`🎰 Play BIGGEST BINGO BOT and win real money!\n\nUse my Promo Code [ ${uid} ] in the Wallet to get 10 ETB Free Bonus!\n\n1. Open: https://t.me/Bigestbingobot\n2. Go to Refer & Earn 🎟️\n3. Paste my code in the Promo box!\n\nGood luck! 🍀`; if(navigator.clipboard&&window.isSecureContext) navigator.clipboard.writeText(shareText).then(()=>{if(tg) tg.showAlert("✅ Promo message copied!");}).catch(()=>fallbackCopy(shareText)); else fallbackCopy(shareText); }
+        
+        // --- UPDATED REFERRAL LINK ---
+        function copyPromoMessage(){ 
+            const shareText=`🎰 Play BIGGEST BINGO BOT and win real money!\n\nUse my Promo Code [ ${uid} ] in the Wallet to get 10 ETB Free Bonus!\n\n1. Open: https://t.me/biggestbingobot\n2. Go to Refer & Earn 🎟️\n3. Paste my code in the Promo box!\n\nGood luck! 🍀`; 
+            if(navigator.clipboard&&window.isSecureContext) navigator.clipboard.writeText(shareText).then(()=>{if(tg) tg.showAlert("✅ Promo message copied!");}).catch(()=>fallbackCopy(shareText)); 
+            else fallbackCopy(shareText); 
+        }
         function fallbackCopy(text){ let ta=document.createElement("textarea"); ta.value=text; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy'); if(tg) tg.showAlert("✅ Copied!");}catch(e){} document.body.removeChild(ta); }
         
         function redeemPromo(){ 
@@ -901,7 +906,6 @@
             updateStatusIndicator();
         }
 
-        // --- THE FIX: MEMORIZE TAKEN CARDS USING SESSION STORAGE! ---
         function initGrid(){ 
             const g = document.getElementById('grid-container'); 
             g.innerHTML = ''; 
