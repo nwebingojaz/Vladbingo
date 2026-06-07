@@ -146,18 +146,20 @@ def adjust_user_balance(tg_id, amount, action="add"):
 # 4. BACKGROUND JOBS 
 # ==========================================
 async def broadcast_winners_task(context: ContextTypes.DEFAULT_TYPE):
-    channel_id = os.environ.get("CHANNEL_ID", "@bigestbingo")
+    # --- UPDATED CHANNEL LINK ---
+    channel_id = os.environ.get("CHANNEL_ID", "@biggestbingo")
     finished_rooms = await get_and_mark_finished_rooms()
     for room in finished_rooms:
-        msg = (f"🏆 <b>Game #{room.id} Finished!</b>\n\n💰 Bet: {float(room.bet_amount):.2f} ETB\n👤 Winner: {room.winner_username.replace('tg_','')}\n🎁 Prize: {float(room.winner_prize):.2f} ETB\n\nPlay now: https://t.me/Bigestbingobot")
+        msg = (f"🏆 <b>Game #{room.id} Finished!</b>\n\n💰 Bet: {float(room.bet_amount):.2f} ETB\n👤 Winner: {room.winner_username.replace('tg_','')}\n🎁 Prize: {float(room.winner_prize):.2f} ETB\n\nPlay now: https://t.me/biggestbingobot")
         try: await context.bot.send_message(chat_id=channel_id, text=msg, parse_mode="HTML")
         except: pass
 
 async def daily_promo_task(context: ContextTypes.DEFAULT_TYPE):
-    channel_id = os.environ.get("CHANNEL_ID", "@bigestbingo")
+    # --- UPDATED CHANNEL LINK ---
+    channel_id = os.environ.get("CHANNEL_ID", "@biggestbingo")
     photo_url = "https://i.ibb.co/3m20B6k/bingo-money.jpg" 
     caption = "🎰 <b>BIGGEST BINGO BOT</b> 🎰\n\nበየቀኑ በሺዎች የሚቆጠሩ ብሮችን ያሸንፉ!\nአሁኑኑ ይጫወቱ እና እድልዎን ይሞክሩ!"
-    keyboard = [[InlineKeyboardButton("🎮 አሁኑኑ ይጫወቱ (PLAY NOW)", url="https://t.me/Bigestbingobot")]]
+    keyboard = [[InlineKeyboardButton("🎮 አሁኑኑ ይጫወቱ (PLAY NOW)", url="https://t.me/biggestbingobot")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     try: await context.bot.send_photo(chat_id=channel_id, photo=photo_url, caption=caption, parse_mode="HTML", reply_markup=reply_markup)
     except Exception as e: print(f"Daily promo failed: {e}")
@@ -176,6 +178,8 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, use
         caption += "\n\n👑 <b>Boss Commands:</b>\n/addadmin [id] | /removeadmin [id]\n/pending | /approve | /reject\n/addbal | /subbal | /forcewin\n/setname | /setghost | /housewin [room]\n/stats | /broadcast"
     
     base_url = "https://vladbingo-dmzg.onrender.com/api/live/?v=2.1"
+    
+    # --- UPDATED UI LINKS ---
     keyboard = [
         [InlineKeyboardButton("🎮 ጌም ይጫወቱ (Play)", web_app=WebAppInfo(url=base_url))],
         [InlineKeyboardButton("💰 ያስገቡ", web_app=WebAppInfo(url=base_url + "&tab=deposit")), InlineKeyboardButton("💸 ያውጡ", web_app=WebAppInfo(url=base_url + "&tab=withdraw"))],
@@ -319,24 +323,15 @@ async def cmd_subbal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✅ {msg}" if success else f"⚠️ {msg}")
     except: await update.message.reply_text("⚠️ Usage: /subbal <id> <amount>")
 
-# --- 💀 THE BLOW REQUEST COMMAND (HOUSE WIN) ---
 async def cmd_housewin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id): return
     try:
         tier = int(context.args[0])
         if tier not in [10, 20, 30, 40, 50, 100]: return await update.message.reply_text("⚠️ Invalid room!")
-        
-        # We save the flag in memory for the engine to read!
         cache.set(f'housewin_{tier}', True, timeout=120)
-        
-        await update.message.reply_text(
-            f"💀 <b>BLOW REQUEST ACTIVATED!</b>\n"
-            f"Room {tier} ETB will be terminated to protect house funds.\n"
-            f"A Ghost Player will naturally yell BINGO! on the very next ball drop.", 
-            parse_mode="HTML"
-        )
+        await update.message.reply_text(f"💀 <b>BLOW REQUEST ACTIVATED!</b>\nRoom {tier} ETB will be terminated to protect house funds.", parse_mode="HTML")
     except:
-        await update.message.reply_text("⚠️ Usage: /housewin <room>\nExample: /housewin 10")
+        await update.message.reply_text("⚠️ Usage: /housewin <room>")
 
 # ==========================================
 # 7. RUN BOT
@@ -355,7 +350,7 @@ def run():
     app.add_handler(CommandHandler("broadcast", cmd_broadcast))
     app.add_handler(CommandHandler("addbal", cmd_addbal))
     app.add_handler(CommandHandler("subbal", cmd_subbal))
-    app.add_handler(CommandHandler("housewin", cmd_housewin)) # <--- ADDED
+    app.add_handler(CommandHandler("housewin", cmd_housewin)) 
     
     app.add_handler(CommandHandler("addadmin", cmd_addadmin))
     app.add_handler(CommandHandler("removeadmin", cmd_removeadmin))
