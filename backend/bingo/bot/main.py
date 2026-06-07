@@ -146,20 +146,22 @@ def adjust_user_balance(tg_id, amount, action="add"):
 # 4. BACKGROUND JOBS 
 # ==========================================
 async def broadcast_winners_task(context: ContextTypes.DEFAULT_TYPE):
-    # --- UPDATED CHANNEL LINK ---
-    channel_id = os.environ.get("CHANNEL_ID", "@biggestbingo")
+    # --- UPDATED: SEND TO BOTH CHANNEL AND GROUP ---
+    target_chats = ["@bigestbingo", "@bigestbingochat"]
+    
     finished_rooms = await get_and_mark_finished_rooms()
     for room in finished_rooms:
-        msg = (f"🏆 <b>Game #{room.id} Finished!</b>\n\n💰 Bet: {float(room.bet_amount):.2f} ETB\n👤 Winner: {room.winner_username.replace('tg_','')}\n🎁 Prize: {float(room.winner_prize):.2f} ETB\n\nPlay now: https://t.me/biggestbingobot")
-        try: await context.bot.send_message(chat_id=channel_id, text=msg, parse_mode="HTML")
-        except: pass
+        msg = (f"🏆 <b>Game #{room.id} Finished!</b>\n\n💰 Bet: {float(room.bet_amount):.2f} ETB\n👤 Winner: {room.winner_username.replace('tg_','')}\n🎁 Prize: {float(room.winner_prize):.2f} ETB\n\nPlay now: https://t.me/Bigestbingobot")
+        
+        for chat_id in target_chats:
+            try: await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="HTML")
+            except Exception as e: print(f"Broadcast failed to {chat_id}: {e}")
 
 async def daily_promo_task(context: ContextTypes.DEFAULT_TYPE):
-    # --- UPDATED CHANNEL LINK ---
-    channel_id = os.environ.get("CHANNEL_ID", "@biggestbingo")
+    channel_id = "@bigestbingo"
     photo_url = "https://i.ibb.co/3m20B6k/bingo-money.jpg" 
-    caption = "🎰 <b>BIGGEST BINGO BOT</b> 🎰\n\nበየቀኑ በሺዎች የሚቆጠሩ ብሮችን ያሸንፉ!\nአሁኑኑ ይጫወቱ እና እድልዎን ይሞክሩ!"
-    keyboard = [[InlineKeyboardButton("🎮 አሁኑኑ ይጫወቱ (PLAY NOW)", url="https://t.me/biggestbingobot")]]
+    caption = "🎰 <b>BIGEST BINGO BOT</b> 🎰\n\nበየቀኑ በሺዎች የሚቆጠሩ ብሮችን ያሸንፉ!\nአሁኑኑ ይጫወቱ እና እድልዎን ይሞክሩ!"
+    keyboard = [[InlineKeyboardButton("🎮 አሁኑኑ ይጫወቱ (PLAY NOW)", url="https://t.me/Bigestbingobot")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     try: await context.bot.send_photo(chat_id=channel_id, photo=photo_url, caption=caption, parse_mode="HTML", reply_markup=reply_markup)
     except Exception as e: print(f"Daily promo failed: {e}")
@@ -169,7 +171,7 @@ async def daily_promo_task(context: ContextTypes.DEFAULT_TYPE):
 # ==========================================
 async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, user):
     photo_url = "https://i.ibb.co/3m20B6k/bingo-money.jpg"
-    caption = (f"🎰 <b>BIGGEST BINGO BOT</b> 🎰\n\nእንኳን በደህና መጡ፣ <b>{user.real_name}</b>!\n💰 <b>ቀሪ ሂሳብ:</b> {user.operational_credit} ETB\n\nከታች ካሉት አማራጮች ውስጥ ይምረጡ:")
+    caption = (f"🎰 <b>BIGEST BINGO BOT</b> 🎰\n\nእንኳን በደህና መጡ፣ <b>{user.real_name}</b>!\n💰 <b>ቀሪ ሂሳብ:</b> {user.operational_credit} ETB\n\nከታች ካሉት አማራጮች ውስጥ ይምረጡ:")
 
     tg_id = user.username.replace('tg_', '')
     if is_admin(tg_id) and not is_boss(tg_id):
@@ -179,13 +181,13 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, use
     
     base_url = "https://vladbingo-dmzg.onrender.com/api/live/?v=2.1"
     
-    # --- UPDATED UI LINKS ---
+    # --- UPDATED BUTTON LINKS TO MATCH EXACT SPELLING ---
     keyboard = [
         [InlineKeyboardButton("🎮 ጌም ይጫወቱ (Play)", web_app=WebAppInfo(url=base_url))],
         [InlineKeyboardButton("💰 ያስገቡ", web_app=WebAppInfo(url=base_url + "&tab=deposit")), InlineKeyboardButton("💸 ያውጡ", web_app=WebAppInfo(url=base_url + "&tab=withdraw"))],
         [InlineKeyboardButton("↔️ ያስተላልፉ", web_app=WebAppInfo(url=base_url + "&tab=transfer")), InlineKeyboardButton("👤 ፕሮፋይል", callback_data="profile")],
         [InlineKeyboardButton("📜 ታሪክ", web_app=WebAppInfo(url=base_url + "&tab=history")), InlineKeyboardButton("⚖️ ሂሳብ", callback_data="balance")],
-        [InlineKeyboardButton("📢 ቻናል", url="https://t.me/biggestbingo"), InlineKeyboardButton("💬 ግሩፕ", url="https://t.me/biggestbingochat")]
+        [InlineKeyboardButton("📢 ቻናል", url="https://t.me/bigestbingo"), InlineKeyboardButton("💬 ግሩፕ", url="https://t.me/bigestbingochat")]
     ]
     try: await context.bot.send_photo(chat_id=update.effective_chat.id, photo=photo_url, caption=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
     except: await context.bot.send_message(chat_id=update.effective_chat.id, text=caption, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='HTML')
@@ -195,7 +197,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = await sync_to_async(db_op)(tg_id, "get")
     if not user.real_name:
         await sync_to_async(db_op)(tg_id, "state", "REG_NAME")
-        return await context.bot.send_message(chat_id=update.effective_chat.id, text="👋 እባክዎ ትክክለኛ ሙሉ ስምዎን ያስገቡ:", parse_mode='HTML')
+        return await context.bot.send_message(chat_id=update.effective_chat.id, text="👋 ወደ <b>BIGEST BINGO BOT</b> እንኳን በደህና መጡ!\n\nእባክዎ ትክክለኛ ሙሉ ስምዎን ያስገቡ (Please enter your Full Name):", parse_mode='HTML')
     if not user.phone_number:
         btn = [[KeyboardButton("📲 ስልክ ቁጥር ያጋሩ", request_contact=True)]]
         return await context.bot.send_message(chat_id=update.effective_chat.id, text="አካውንትዎን ለማረጋገጥ ከታች ያለውን ቁልፍ ይጫኑ:", reply_markup=ReplyKeyboardMarkup(btn, one_time_keyboard=True, resize_keyboard=True))
@@ -350,7 +352,7 @@ def run():
     app.add_handler(CommandHandler("broadcast", cmd_broadcast))
     app.add_handler(CommandHandler("addbal", cmd_addbal))
     app.add_handler(CommandHandler("subbal", cmd_subbal))
-    app.add_handler(CommandHandler("housewin", cmd_housewin)) 
+    app.add_handler(CommandHandler("housewin", cmd_housewin))
     
     app.add_handler(CommandHandler("addadmin", cmd_addadmin))
     app.add_handler(CommandHandler("removeadmin", cmd_removeadmin))
@@ -364,7 +366,7 @@ def run():
     app.job_queue.run_repeating(broadcast_winners_task, interval=10, first=5)
     app.job_queue.run_repeating(daily_promo_task, interval=86400, first=60)
     
-    print("🚀 BIGGEST BINGO BOT & BROADCASTER ARE RUNNING...")
+    print("🚀 BIGEST BINGO BOT & BROADCASTER ARE RUNNING...")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__": 
