@@ -134,13 +134,19 @@ def adjust_user_balance(tg_id, amount, action="add"):
             if user.operational_credit < amount:
                 return False, f"User only has {user.operational_credit} ETB! Cannot deduct {amount} ETB."
             user.operational_credit -= amount
-        
         user.save(update_fields=['operational_credit'])
         return True, f"Success! User {tg_id} balance is now: {user.operational_credit} ETB."
-    except User.DoesNotExist:
-        return False, "User not found in database."
-    except ValueError:
-        return False, "Invalid amount provided."
+    except User.DoesNotExist: return False, "User not found in database."
+    except ValueError: return False, "Invalid amount provided."
+
+# --- DB HACK FOR HOUSE WIN OVERRIDE ---
+@sync_to_async
+def trigger_house_win_db(tier):
+    close_old_connections()
+    config_user, _ = User.objects.get_or_create(username=f"sys_housewin_{tier}")
+    config_user.bot_state = "ACTIVE"
+    config_user.save(update_fields=['bot_state'])
+    return True
 
 # ==========================================
 # 4. BACKGROUND JOBS 
@@ -171,12 +177,8 @@ async def send_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, use
     caption = (f"🎰 <b>BIGEST BINGO BOT</b> 🎰\n\nእንኳን በደህና መጡ፣ <b>{user.real_name}</b>!\n💰 <b>ቀሪ ሂሳብ:</b> {user.operational_credit} ETB\n\nከታች ካሉት አማራጮች ውስጥ ይምረጡ:")
 
     tg_id = user.username.replace('tg_', '')
-    
-    # CASHIERS MENU (Restricted, but added /housewin and /broadcast)
     if is_admin(tg_id) and not is_boss(tg_id):
         caption += "\n\n👔 <b>Cashier Commands:</b>\n/pending | /approve [id] | /reject [id]\n/requestpromo [rm] [amt] (Max: 15)\n/housewin [room] 💀 (Stop a winning streak)\n/stats | /broadcast (Reply to msg)"
-    
-    # BOSS MENU (Full Power)
     elif is_boss(tg_id):
         caption += "\n\n👑 <b>Boss Commands:</b>\n/addadmin [id] | /removeadmin [id]\n/pending | /approve | /reject\n/addbal [id] | /subbal [id] | /forcewin\n/setname | /setghost [rm] [min] [max]\n/housewin [room] 💀\n/stats | /broadcast"
     
@@ -230,8 +232,6 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ==========================================
 # 6. ADMIN COMMAND HANDLERS
 # ==========================================
-
-# --- BOSS ONLY COMMANDS ---
 async def cmd_addadmin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_boss(update.message.from_user.id): return
     try:
@@ -287,21 +287,16 @@ async def cmd_subbal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✅ {msg}" if success else f"⚠️ {msg}")
     except: await update.message.reply_text("⚠️ Usage: /subbal <id> <amount>")
 
-# --- GENERAL ADMIN COMMANDS (Boss & Cashiers) ---
 
+# --- GENERAL ADMIN COMMANDS (Boss & Cashiers) ---
 async def cmd_requestpromo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id): return
     try:
         tier = int(context.args[0])
         amount = int(context.args[1])
         if tier not in [10, 20, 30, 40, 50, 100]: return await update.message.reply_text("⚠️ Invalid room!")
-        if not is_boss(update.message.from_user.id) and amount > 15:
-            return await update.message.reply_text("⚠️ You can only request up to 15 promo players.")
-            
-        msg_to_boss = (
-            f"🔔 <b>PROMO REQUEST</b>\nCashier ID: <code>{update.message.from_user.id}</code>\nRoom: {tier} ETB\nRequested Players: {amount}\n\n"
-            f"<i>Approve by tapping:</i>\n<code>/setghost {tier} {amount} {amount}</code>"
-        )
+        if not is_boss(update.message.from_user.id) and amount > 15: return await update.message.reply_text("⚠️ You can only request up to 15 promo players.")
+        msg_to_boss = (f"🔔 <b>PROMO REQUEST</b>\nCashier ID: <code>{update.message.from_user.id}</code>\nRoom: {tier} ETB\nRequested Players: {amount}\n\n<i>Approve by tapping:</i>\n<code>/setghost {tier} {amount} {amount}</code>")
         await context.bot.send_message(chat_id=BOSS_TG_ID, text=msg_to_boss, parse_mode="HTML")
         await update.message.reply_text("✅ Promo request sent to the Boss successfully!")
     except: await update.message.reply_text("⚠️ Usage: /requestpromo <room> <amount>")
@@ -332,7 +327,6 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id): return
     await update.message.reply_text(await get_casino_stats(), parse_mode="HTML")
 
-# CHANGED: Now Cashiers CAN use this!
 async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id): return
     if not update.message.reply_to_message: return await update.message.reply_text("⚠️ You must REPLY to a message to broadcast.")
@@ -345,17 +339,18 @@ async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except: pass
     await update.message.reply_text(f"✅ Delivered to {sc} users!")
 
-# CHANGED: Now Cashiers CAN use this!
 async def cmd_housewin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.message.from_user.id): return
     try:
         tier = int(context.args[0])
         if tier not in [10, 20, 30, 40, 50, 100]: return await update.message.reply_text("⚠️ Invalid room!")
-        cache.set(f'housewin_{tier}', True, timeout=120)
+        
+        # --- THE FIX: Uses the DB Wrapper so the Engine can see it! ---
+        await trigger_house_win_db(tier)
+        
         await update.message.reply_text(f"💀 <b>BLOW REQUEST ACTIVATED!</b>\nRoom {tier} ETB will be terminated on the next ball.", parse_mode="HTML")
     except:
         await update.message.reply_text("⚠️ Usage: /housewin <room>")
-
 
 # ==========================================
 # 7. RUN BOT
@@ -366,8 +361,6 @@ def run():
     app = Application.builder().token(token).post_init(lambda a: a.bot.delete_webhook(drop_pending_updates=True)).build()
     
     app.add_handler(CommandHandler("start", start))
-    
-    # Boss Only Commands
     app.add_handler(CommandHandler("setghost", cmd_setghost))
     app.add_handler(CommandHandler("addbal", cmd_addbal))
     app.add_handler(CommandHandler("subbal", cmd_subbal))
@@ -375,8 +368,7 @@ def run():
     app.add_handler(CommandHandler("removeadmin", cmd_removeadmin))
     app.add_handler(CommandHandler("forcewin", cmd_forcewin))
     app.add_handler(CommandHandler("setname", cmd_setname))
-
-    # Cashier & Boss Commands
+    
     app.add_handler(CommandHandler("requestpromo", cmd_requestpromo))
     app.add_handler(CommandHandler("pending", cmd_pending))
     app.add_handler(CommandHandler("approve", cmd_approve))
